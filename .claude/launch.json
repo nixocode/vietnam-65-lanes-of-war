@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vietnam65",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "tools/devserver.py",
+        "8931"
+      ],
+      "port": 8931
+    }
+  ]
+}
