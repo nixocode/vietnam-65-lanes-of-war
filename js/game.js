@@ -26,6 +26,19 @@ const FLAG_DRAIN = 0.22;
 const MORALE_LOSS = { us: 0.24, vc: 0.15 }; // per CP of unit lost — US is casualty-sensitive
 const MAX_TRAPS = 10;
 
+/* Concealment is a posture, not a map coordinate. Brush hides a man who has
+ * settled into it; it does not hide one crossing at a dead run. Gating on
+ * position alone made VC blink out mid-stride whenever they entered a conceal
+ * span — and those spans run to nearly half a lane on some maps, so a squad
+ * advancing down one popped in and out repeatedly. That reads as a rendering
+ * fault, not as stealth, which is the worst of both: it looks broken AND it
+ * gives away nothing about where the ambush actually is.
+ *
+ * stillT builds while a man holds position and zeroes the instant he moves, so
+ * breaking cover reveals immediately while a settled ambusher stays hidden. */
+const CONCEAL_SETTLE = 0.45;   // seconds of stillness before brush closes over him
+const CONCEAL_FADE = 0.40;     // seconds to dissolve out of sight once concealed
+
 /* structure archetypes: [w, hp] */
 const STRUCT_DEFS = {
   hooch:     { w: 42, hp: 60 },
@@ -162,7 +175,13 @@ class Game {
   isConcealed(u) {
     if (u.side !== 'vc' || !UNITS[u.key].conceal) return false;
     if (u.revealT > 0 || u.spotT > 0) return false;
-    // a prepared jungle hide conceals on its own, brush zone or not
+    // Movement disqualifies concealment outright — including inside a prepared
+    // hide. A squad is flagged inCover from the moment it is bound to the
+    // position, not from when it settles, so exempting hides here left men
+    // running at full speed while invisible. Both checks read u.moving as well
+    // as stillT because stillT is accumulated from the previous frame's flag;
+    // without it a man stays hidden for the first frame of his sprint.
+    if (u.moving || (u.stillT || 0) < CONCEAL_SETTLE) return false;
     const inHide = u.squad && u.squad.inCover && u.squad.cover && u.squad.cover.conceals;
     return inHide || this.inConceal(u.lane, u.x);
   }
@@ -1249,6 +1268,20 @@ class Game {
       u.hitT = Math.max(0, (u.hitT || 0) - dt);
       u.combatT = Math.max(0, (u.combatT || 0) - dt);
       u.transT = Math.max(0, (u.transT || 0) - dt);
+
+      // Stillness feeds concealment (see CONCEAL_SETTLE). Read from last frame's
+      // moving flag, which is set further down this same loop — a frame of lag
+      // is well under the settle time and invisible at any playback rate.
+      u.stillT = u.moving ? 0 : Math.min(2, (u.stillT || 0) + dt);
+
+      // Visibility is eased here rather than in the renderer so it advances once
+      // per sim step instead of once per draw. Appearing is instant — a man who
+      // breaks cover or opens fire is seen NOW — while slipping out of sight
+      // dissolves, so the brush reads as swallowing him rather than deleting him.
+      const seen = this.visibleToPlayer(u) || u.combatT > 0 || u.muzzleT > 0;
+      if (u.visA == null) u.visA = seen ? 1 : 0;
+      u.visA = seen ? 1 : Math.max(0, u.visA - dt / CONCEAL_FADE);
+
       if (u.emergeT > 0) { u.emergeT -= dt; u.moving = false; continue; }
 
       const d = UNITS[u.key];

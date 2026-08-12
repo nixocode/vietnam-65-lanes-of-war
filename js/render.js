@@ -2206,8 +2206,9 @@ const Renderer = {
       for (const u of game.units) {
         if (u.lane !== lane || !Camera.sees(u.x)) continue;
         if (u.deadT != null && u.deadT > 1.4) continue;
-        if (!(game.visibleToPlayer(u) || (u.combatT || 0) > 0 || (u.muzzleT || 0) > 0 ||
-              u.deadT != null)) continue;
+        // match the body's fade, or the shadow snaps off while the man is still
+        // dissolving and briefly leaves him floating
+        if (u.deadT == null && (u.visA != null ? u.visA : 1) <= 0.01) continue;
         const sc = LANE_DEPTH[lane] * (u.sj || 1);
         const cv2 = u.squad && u.squad.inCover ? u.squad.cover : null;
         const tl = cv2
@@ -2218,19 +2219,16 @@ const Renderer = {
     }
     for (const u of game.units) {
       if (u.lane !== lane || !Camera.sees(u.x)) continue;
-      // visibility FADES instead of popping: a VC slipping back into the brush
-      // dissolves over ~0.5s rather than blinking out between bursts
-      const visible = game.visibleToPlayer(u) ||
-        (u.combatT || 0) > 0 || (u.muzzleT || 0) > 0; // firing men never vanish
-      // Concealed enemies never dissolve to nothing — they settle to a dim
-      // shape in the brush. A soldier blinking in and out reads as a bug; a
-      // half-seen man in the treeline reads as the threat it is.
-      const targetVis = u.deadT != null ? 1 : (visible ? 1 : 0);
-      u.visA = targetVis;
-      if (!u.visA && u.deadT == null) continue;
+      // Visibility fades rather than pops, and the fade is driven by the sim
+      // (u.visA, see CONCEAL_FADE) — this used to assign the target straight to
+      // u.visA, which meant the dissolve the comment promised never actually
+      // ran and concealed men blinked out in a single frame.
+      // The dead are always drawn: a body does not hide.
+      const vis = u.deadT != null ? 1 : (u.visA != null ? u.visA : 1);
+      if (vis <= 0.01 && u.deadT == null) continue;
       const scale = LANE_DEPTH[lane] * (u.sj || 1);
       const concealed = u.side === 'vc' && game.isConcealed(u);
-      const alpha = (concealed && u.side === game.player ? 0.55 : 1) * Math.min(1, u.visA);
+      const alpha = (concealed && u.side === game.player ? 0.55 : 1) * Math.min(1, vis);
       // stance is decided by the squad-level state machine, nowhere else
       const pose = u.pose;
       // snipers on a tower platform stand above the ground line

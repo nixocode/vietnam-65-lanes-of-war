@@ -27,8 +27,16 @@ const S3_FOOT = 39 / 84;
  * is deliberately compressed — a shorter, quicker stride. That trades a little
  * foot-skate for urgency, which at 84px is the better deal. Walk survives only
  * for genuinely slow movement (suppressed, or easing into a slot). */
+/* The run cycle is 1.5x quicker than it was (0.58 -> 0.387). Because the gait is
+ * driven by DISTANCE, not time, a shorter cycle is exactly a faster cadence at
+ * an unchanged movement speed: the same crossing now costs 1.5x the strides.
+ * The cost is foot-skate — a 0.387 cycle is about a 32px stride at 84px tall,
+ * shorter than a man that size really covers — but a visibly urgent run beats a
+ * geometrically honest one at this scale, which is the trade the block above
+ * already describes. Walk is untouched; it only ever runs at genuinely slow
+ * speeds where the honest stride still reads correctly. */
 const S3_WALK_CYCLE = 0.72;
-const S3_RUN_CYCLE = 0.58;
+const S3_RUN_CYCLE = 0.387;
 const S3_WALK_SPD = 22;        // world px/s below which a soldier is picking his way
 
 /* Seconds to cross-fade between two clips. Without this a man snaps from running
