@@ -367,19 +367,51 @@ Two findings that correct assumptions worth writing down:
   because every pass runs at `globalAlpha` 0.08–0.14 in shades of *the same base
   colour* — the detail is present and nearly invisible. That makes this a cheap
   amplitude-and-hue fix, not a "build terrain texture" project.
-- **US troops wash out to near-white.** Visible in the captured frame on the
-  watchtower. Depth haze and the full-screen grade are applied uniformly, so
-  units take the same lift as the background they are supposed to stand against.
+- ~~**US troops wash out to near-white.**~~ **Withdrawn — I was wrong.** I read
+  this off pale shapes near the watchtower in the captured frame. Checking it:
+  all twelve unit atlases sample dark olive at the torso (luminance 21–32, none
+  above 32), and the haze maths does not support the claim either — lane 0 haze
+  is `globalAlpha 0.5` over a `0.12`-alpha fill, i.e. **0.06 effective**, which
+  moves a rifleman torso from (77,79,63) to about (84,88,71). The pale shapes
+  were tower structure, not men. **P7 #28 and P8 #30 are therefore unfounded as
+  written** and should not be actioned without new evidence. Reading colour off a
+  lossy screenshot crop is how this happened; sample the source next time.
 
 ### P7 — Make the frame read *(no new assets; highest impact per hour)*
-26. **Widen the palettes** on cuchi, khesanh, iadrang to ≥70° spread. Vietnam has
-    red laterite soil, ochre dust and muddy brown water; cuchi currently has zero
-    earth tones. Cool the distance toward blue-green, warm the midground.
-27. **Raise the terrain texture amplitude** and vary its *hue*, not only its
-    value — the passes already exist and just need to survive the haze.
-28. **Separate unit grading from world grading.** Haze should bite hard on
-    background layers and lightly on soldiers, so men stay legible against the
-    ground rather than dissolving into it.
+
+> **STATUS: written, NOT verified, NOT deployed.** Committed locally only. The
+> live site is unaffected and still serves the last verified build. Nobody has
+> looked at a single frame of any of this — see "how to finish it" below.
+
+26. ✅ *(written)* **Widened the palettes.** Measured before/after hue spread:
+
+    | map | before | after | what changed |
+    |---|---|---|---|
+    | cuchi | 30° | **127°** | red laterite soil under green canopy — the tunnels were dug through it |
+    | iadrang | 43° | **195°** | blue-grey Chu Pong massif behind golden elephant grass |
+    | khesanh | 36° | **80°** | highland green + grey ridge against the red mud; trees to deep shadow |
+    | hill937 | 123° | 122° | hue was fine; **luminance range 45 → 58** — lifted the cloud deck, dropped the canopy |
+
+    mekong (72°) left alone — it already passed.
+27. ✅ *(written)* **Terrain texture amplitude and hue.** Found the actual cause:
+    `_shade()` moves R, G and B by the *same* amount, so every texture pass built
+    on it landed on the exact hue of the fill underneath and vanished into it.
+    Added `_tint()` for per-channel shifts, then: soil grit warm / pits cool at
+    alpha 0.12 → 0.22, scour warm at 0.14 → 0.26, turf blades greener at
+    0.28 → 0.34. The passes were always there; they just could not be seen.
+28. ~~Separate unit grading from world grading.~~ **Withdrawn — see above.** The
+    premise was a misread screenshot.
+
+**How to finish P7 (next session, ~20 min):**
+1. `preview_start` the `vietnam65` config, then for each of the five maps render a
+   frame and eyeball it. The palette numbers say the frames *should* read; that
+   is a prediction, not a result.
+2. Watch specifically for: red laterite reading as *mud* and not as *brick*; the
+   blue Ia Drang ridge reading as distance and not as a painted backdrop; Khe
+   Sanh still legible after the night wash multiplies everything down.
+3. Run the self-test suite (`SelfTest.ready()` → `SelfTest.run(55)`) — palettes
+   should not affect the sim, so a failure means something unexpected is coupled.
+4. Only then push. Pushing `main` auto-publishes to GitHub Pages.
 
 ### P8 — Sprite material *(needs a Blender re-render, ~3 min/unit)*
 29. **Directional key + rim light** on the render. The men are lit flatly now, so

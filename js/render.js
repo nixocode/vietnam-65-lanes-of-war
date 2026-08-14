@@ -792,17 +792,25 @@ const Renderer = {
     ctx.lineTo(WORLD_W, CANVAS_H);
     ctx.closePath(); ctx.fill();
 
-    // soil texture: speckles + faint strata under the surface
+    /* Soil texture: speckles + faint strata under the surface.
+     *
+     * This was drawn in pure black and white at alpha 0.12 — value-only noise on
+     * a same-hue fill, which is to say very nearly invisible, and the reason the
+     * ground read as cardboard despite all the work below. Grit is now warm and
+     * the pits between it are cool, at roughly twice the amplitude, so the
+     * surface survives both the depth haze and the full-screen grade. */
     ctx.save();
-    ctx.globalAlpha = 0.12;
-    for (let i = 0; i < WORLD_W / 6; i++) {
+    ctx.globalAlpha = 0.22;
+    const grit = this._tint(p.laneBody[lane], 46, 30, 12);   // warm, sunlit
+    const pit  = this._tint(p.laneBody[lane], -22, -14, 2);  // cool, in shadow
+    for (let i = 0; i < WORLD_W / 5; i++) {
       const x = rng() * WORLD_W;
       const y = groundY(map, lane, x) + 6 + rng() * 60;
-      ctx.fillStyle = rng() < 0.5 ? '#000' : '#fff';
-      ctx.fillRect(x, y, 1.6 + rng() * 2, 1 + rng());
+      ctx.fillStyle = rng() < 0.5 ? pit : grit;
+      ctx.fillRect(x, y, 1.6 + rng() * 2.4, 1 + rng() * 1.3);
     }
-    ctx.globalAlpha = 0.08;
-    ctx.strokeStyle = '#000';
+    ctx.globalAlpha = 0.13;
+    ctx.strokeStyle = this._tint(p.laneBody[lane], -26, -20, -8);
     ctx.lineWidth = 1;
     for (let s = 1; s <= 3; s++) {
       ctx.beginPath();
@@ -824,17 +832,19 @@ const Renderer = {
       const y0 = groundY(map, lane, x);
       const slope = (groundY(map, lane, x + 12) - y0) / 12;
       if (Math.abs(slope) > 0.14) {
-        ctx.globalAlpha = 0.14 + rng() * 0.12;
-        ctx.fillStyle = this._shade(p.laneBody[lane], -18);
+        // scoured ground shows the subsoil, which runs warmer than the turf
+        ctx.globalAlpha = 0.26 + rng() * 0.18;
+        ctx.fillStyle = this._tint(p.laneBody[lane], 24, 2, -14);
         ctx.fillRect(x, y0 + 1, 7 + rng() * 6, 3 + rng() * 6);
         if (rng() < 0.16) {
           ctx.globalAlpha = 0.34;
           ctx.fillStyle = '#4a4a42';
           ctx.fillRect(x + rng() * 5, y0 + 2 + rng() * 6, 2 + rng() * 3, 1.5 + rng() * 2);
         }
-      } else if (rng() < 0.36) {
-        ctx.globalAlpha = 0.28 + rng() * 0.22;
-        ctx.strokeStyle = this._shade(p.laneTop[lane], 18);
+      } else if (rng() < 0.42) {
+        // standing turf catches the light greener than the flat it grows from
+        ctx.globalAlpha = 0.34 + rng() * 0.26;
+        ctx.strokeStyle = this._tint(p.laneTop[lane], 4, 30, -6);
         ctx.lineWidth = 1;
         const h = 2 + rng() * 4;
         ctx.beginPath();
@@ -1153,6 +1163,17 @@ const Renderer = {
     const n = parseInt(hex.slice(1), 16);
     const r = clamp((n >> 16) + amt, 0, 255), g = clamp(((n >> 8) & 255) + amt, 0, 255), b = clamp((n & 255) + amt, 0, 255);
     return `rgb(${r},${g},${b})`;
+  },
+
+  /* Per-channel version of _shade. _shade moves R, G and B by the same amount,
+   * which changes value and nothing else — so every terrain pass built on it
+   * landed on the exact hue of the fill underneath and disappeared into it. Real
+   * ground does not work that way: exposed subsoil runs warmer than the turf
+   * over it, and shaded hollows run cooler. Shifting channels independently is
+   * what lets the texture read at all. */
+  _tint(hex, dr, dg, db) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgb(${clamp((n >> 16) + dr, 0, 255)},${clamp(((n >> 8) & 255) + dg, 0, 255)},${clamp((n & 255) + db, 0, 255)})`;
   },
 
   _tree(ctx, map, rng, x, y, depth) {

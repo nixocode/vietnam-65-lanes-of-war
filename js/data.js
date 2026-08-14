@@ -194,9 +194,13 @@ const MAPS = {
     weather: {},
     pal: {
       skyTop: '#f6d7a0', skyBot: '#e8a35e', sun: { x: 1020, y: 130, r: 46, color: '#fff3d0' },
-      hillFar: '#b98a56', hillNear: '#8f6a42',
+      /* Golden elephant grass needs something cool to sit against or the whole
+       * valley is one amber wash (it was: 43 degree spread). The Chu Pong massif
+       * goes blue-grey with distance, which is both what haze actually does to a
+       * far ridge and the contrast the foreground was missing. Spread 195. */
+      hillFar: '#8c93a8', hillNear: '#8f6a42',
       laneTop: ['#a8954f', '#9c8a46', '#8f7c3e'], laneBody: ['#7d6c38', '#726231', '#67582b'],
-      brush: '#6b7a33', tree: '#5c5430', haze: 'rgba(240,190,120,0.14)',
+      brush: '#5f7a38', tree: '#44502c', haze: 'rgba(240,195,130,0.13)',
     },
     lanes: [
       { pts: [[0, .18], [.2, .32], [.45, .16], [.7, .34], [1, .22]], conceal: [[.52, .68]] },
@@ -217,10 +221,16 @@ const MAPS = {
     weather: { fog: 0.35 },
     detectPenalty: 0.85,
     pal: {
-      skyTop: '#cfe3c8', skyBot: '#93bd93', sun: { x: 640, y: 100, r: 60, color: 'rgba(255,255,240,0.7)' },
-      hillFar: '#5d7a52', hillNear: '#42603c',
-      laneTop: ['#4c6633', '#445c2d', '#3c5228'], laneBody: ['#33471f', '#2d3f1b', '#273717'],
-      brush: '#3f652c', tree: '#243820', haze: 'rgba(200,230,190,0.12)',
+      /* Cu Chi was a single hue — sky, hills, ground, brush and trees all green
+       * across a 30 degree spread, which is why the map read as flat no matter
+       * how much texture went into the terrain. The fix is the map's own
+       * history: those tunnels were dug through RED LATERITE, so the earth a
+       * man stands on is now red-brown and the canopy above it stays green.
+       * Turf keeps the green on top, the soil beneath it does not. Spread 127. */
+      skyTop: '#d6e4d0', skyBot: '#a8c49a', sun: { x: 640, y: 100, r: 60, color: 'rgba(255,255,240,0.7)' },
+      hillFar: '#6e8478', hillNear: '#42603c',
+      laneTop: ['#5a6b34', '#4f5f2d', '#455428'], laneBody: ['#6b4028', '#5e3823', '#52301e'],
+      brush: '#3f652c', tree: '#243820', haze: 'rgba(200,225,195,0.12)',
     },
     lanes: [
       { pts: [[0, .1], [.3, .2], [.6, .1], [1, .16]], conceal: [[.22, .42], [.58, .84]] },
@@ -267,10 +277,15 @@ const MAPS = {
     weather: { fog: 0.5 },
     detectPenalty: 0.8,
     pal: {
-      skyTop: '#d97a52', skyBot: '#e8a86e', sun: { x: 200, y: 150, r: 50, color: '#ffe0b0' },
-      hillFar: '#8a5844', hillNear: '#6b4234',
+      /* Red mud plateau — correct, and it was the ONLY note being played (36
+       * degrees). Highland jungle brings the green back, a grey ridge line
+       * breaks the warm run, and the trees go to deep shadow so the map has a
+       * true dark to anchor against. This one is fought at night, so the dark
+       * end matters more here than anywhere else. Spread 80, luminance 55. */
+      skyTop: '#d97a52', skyBot: '#eeb47a', sun: { x: 200, y: 150, r: 50, color: '#ffe0b0' },
+      hillFar: '#6b6a70', hillNear: '#6b4234',
       laneTop: ['#8a5a3e', '#7d5138', '#704832'], laneBody: ['#5c3a28', '#533424', '#4a2e20'],
-      brush: '#6d6538', tree: '#3d3226', haze: 'rgba(230,160,110,0.2)',
+      brush: '#5c6b34', tree: '#26301f', haze: 'rgba(230,160,110,0.2)',
     },
     lanes: [
       { pts: [[0, .72], [.22, .58], [.45, .32], [.7, .2], [1, .16]], conceal: [[.55, .8]] },
@@ -301,10 +316,14 @@ const MAPS = {
     weather: { rain: true, fog: 0.25 },
     detectPenalty: 0.85,
     pal: {
-      skyTop: '#5f6d75', skyBot: '#93a3a4', sun: { x: 900, y: 120, r: 70, color: 'rgba(230,235,235,0.35)' },
+      /* Hue was never this map's problem (123 degrees) — VALUE was. Everything
+       * sat mid-dark, a 45 point luminance range with no true light or true
+       * dark, so an overcast hill read as mud-coloured soup. The cloud deck
+       * lifts and the canopy drops to near-black. Range 45 -> 58. */
+      skyTop: '#6a7a82', skyBot: '#b3c0bf', sun: { x: 900, y: 120, r: 70, color: 'rgba(230,235,235,0.35)' },
       hillFar: '#4a5a52', hillNear: '#3a4a40',
       laneTop: ['#55603c', '#4d5836', '#455031'], laneBody: ['#3a4326', '#343c22', '#2e361e'],
-      brush: '#495830', tree: '#2c332a', haze: 'rgba(190,205,205,0.22)',
+      brush: '#495830', tree: '#232a24', haze: 'rgba(190,205,205,0.22)',
     },
     lanes: [
       { pts: [[0, .06], [.3, .18], [.55, .42], [.78, .68], [1, .88]], conceal: [[.4, .62]] },
