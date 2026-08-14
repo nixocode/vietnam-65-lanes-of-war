@@ -334,6 +334,90 @@ is the tell, and it is fixable without touching gameplay.
 
 ---
 
+## 2A. NEXT — the "still raw" pass
+
+Owner, after the GitHub Pages deploy: *game is still really raw.* Correct. The
+sim is in good shape and the mechanics register below is largely ticked, so what
+is left is almost entirely **how the frame reads**. Diagnosed from a captured
+frame plus the palette data rather than from taste, because "looks cheap" is not
+actionable and "three of five maps are single-hue" is.
+
+### Evidence
+
+Measured hue spread and luminance range per map palette:
+
+| map | colours | hue spread | luminance range |
+|---|---|---|---|
+| cuchi | 12 | **30°** | 68 |
+| khesanh | 13 | **36°** | 65 |
+| iadrang | 13 | **43°** | 63 |
+| mekong | 14 | 72° | 65 |
+| hill937 | 12 | 123° | 45 |
+
+A hue spread under ~60° reads as a single-hue image. **Three of five maps are
+effectively monochrome green** — sky, hills, ground, brush and trees all sit in
+one narrow band, and a green haze fill goes over the top of that. Luminance range
+is fine; the problem is hue, not value.
+
+Two findings that correct assumptions worth writing down:
+
+- **The terrain is not an untextured flat fill.** I assumed it was from the
+  screenshot. `_buildLane` already lays down speckle, sub-surface strata, and
+  slope-driven turf/scour/standing water derived from `groundY`. It reads as flat
+  because every pass runs at `globalAlpha` 0.08–0.14 in shades of *the same base
+  colour* — the detail is present and nearly invisible. That makes this a cheap
+  amplitude-and-hue fix, not a "build terrain texture" project.
+- **US troops wash out to near-white.** Visible in the captured frame on the
+  watchtower. Depth haze and the full-screen grade are applied uniformly, so
+  units take the same lift as the background they are supposed to stand against.
+
+### P7 — Make the frame read *(no new assets; highest impact per hour)*
+26. **Widen the palettes** on cuchi, khesanh, iadrang to ≥70° spread. Vietnam has
+    red laterite soil, ochre dust and muddy brown water; cuchi currently has zero
+    earth tones. Cool the distance toward blue-green, warm the midground.
+27. **Raise the terrain texture amplitude** and vary its *hue*, not only its
+    value — the passes already exist and just need to survive the haze.
+28. **Separate unit grading from world grading.** Haze should bite hard on
+    background layers and lightly on soldiers, so men stay legible against the
+    ground rather than dissolving into it.
+
+### P8 — Sprite material *(needs a Blender re-render, ~3 min/unit)*
+29. **Directional key + rim light** on the render. The men are lit flatly now, so
+    they read as stickers; a rim separates them from the treeline for free.
+30. **Period-correct uniform colour** — US olive drab and flak jacket, VC black
+    and indigo, NVA khaki. Currently US reads as pale grey and VC as blue-grey.
+31. **Lighter outlines.** The near-black uniform outline is the loudest "flash
+    game" tell in a close crop.
+
+### P9 — A squad should look like five men, not one man five times
+32. **Per-man pose and phase offset** on idle/aim, extending the existing
+    `gaitOff` idea to clip selection — in the captured frame all five men in a
+    cell hold an identical pose.
+33. **Crouch/kneel stance.** Also closes a standing Known Limitation: there is no
+    crouch in the sim at all, only standing and prone.
+
+### P10 — Scenery
+34. **Profile-rendered foliage** through the props pipeline to replace the
+    overlapping-blob trees.
+35. **Foreground occluder band** — something in front of the action sells depth
+    faster than anything behind it.
+
+### P11 — HUD *(includes the owner's decal note, #15)*
+36. Health bars are flat rectangles and rank chevrons are plain carets. The HUD is
+    the last programmer art in the game.
+
+### P12 — Gameplay depth
+37. **Inter-squad spacing** — separate squads still overlap where they converge.
+38. **Delete `js/rig.js` and `tools/cut_figures.py`** — dead weight now that the
+    3D path is trusted.
+
+### Still blocked
+- **A real frame-rate number.** Everything performance-related remains measured
+  work-per-frame, not wall-clock. The `` ` ``/F3 overlay reports FPS, ms, p95 and
+  render scale; that reading has to come off the owner's machine.
+
+---
+
 ## 3. Known limitations
 
 - No crouch stance between standing and prone; the sim has no crouch state either.
