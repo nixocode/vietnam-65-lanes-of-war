@@ -334,6 +334,75 @@ is the tell, and it is fixable without touching gameplay.
 
 ---
 
+## 2B. MEKONG REVAMP — measured baseline
+
+Scope is now **one map, Mekong Delta**. Everything below is instrumented by
+`tools/capture.js`, which pins `Math.random` to a seeded PRNG, steps the sim by
+hand and parks the camera, so two runs produce byte-identical worlds — verified,
+not assumed. Before/after comparisons are the *same frame*, not two battles.
+
+### Baseline at 1600×900, 53 live units, mekong
+
+| metric | measured | cap | note |
+|---|---|---|---|
+| source Mpx/frame | **13.03** | 13 | **already at the cap** |
+| destination Mpx | 10.53 | — | |
+| draw calls | 268 | — | |
+| atlas decoded | **96 MB** | — | PNGs are ~10 MB *on disk* |
+| props decoded | 21 MB | — | |
+| total decoded | **117 MB** | 130 | 13 MB of headroom |
+| live particles | 129 | 220 | |
+
+**Two corrections to the approved plan.** Its budget section was built on
+figures that had not been instrumented:
+
+- The **≤18 MB atlas cap was meaningless** — it came from the ~10 MB
+  PNG-on-disk size, but decoded to RGBA in memory the atlases are **96 MB**.
+  Memory is what a machine has to hold, so the cap is restated as **130 MB
+  decoded**, against 117 MB used. Consequence for §3: the re-render must buy
+  quality with **lighting and materials at the existing 128 px cell**, not with
+  resolution. Raising the cell would blow the budget immediately.
+- **Source Mpx is 13.03, not the 10.9 the plan assumed** — that number came from
+  an ad-hoc measurement in an earlier session under different conditions. The
+  game is already *at* its cap with zero headroom, so §7 (VFX) must buy any new
+  sampling by reclaiming some first.
+
+### Where the frame cost actually goes
+
+| bucket | Mpx | calls |
+|---|---|---|
+| world-width layers (lane / decal / parallax) | **5.60** | 6 |
+| screen-width layers | 2.76 | 3 |
+| pre-scaled prop canvases (all sizes) | ~3.4 | ~180 |
+| **soldier atlases** | **0.61** | 37 |
+
+**The soldiers are under 5% of the frame.** This confirms the plan's central
+premise directly: re-rendering them with three-point lighting and detailed
+uniforms is genuinely free at frame time. The cost is dominated by full-width
+layer blits (64%), which is where any reclamation for §7 must come from.
+
+### Headless measurement caveat
+
+`Renderer.fitDPR` sizes off `canvas.clientWidth`, which is **0** in a hidden
+automation pane — the canvas collapses to 1×1 and every destination figure
+becomes fiction. `Capture.forceSize()` exists for exactly this. Source rects
+survive a degenerate pane (lane and parallax layers are built from `WORLD_W` /
+`CANVAS_H` constants, not from the display canvas), which is why source Mpx
+stays meaningful either way. None of this rasterises to a screen: **it measures
+work, not wall-clock, and the FPS number still has to come off the in-game
+overlay on real hardware.**
+
+### §8 finding: the delta has no visible water
+
+Mekong renders paddies only where `elevAt(map, lane, x) < 0.085`, which covers
+**19% / 30% / 47%** of lanes 0 / 1 / 2 — so a third of the map is nominally
+flooded. But the paddy is drawn as a **6 px strip** (`fillRect(x, y+3, 17, 6)`),
+which at lane scale is a hairline. The captured frame of a *rice-paddy map at
+sunset* contains no water a player would notice. The geometry is right and the
+presentation is a rounding error — §8's single highest-value fix.
+
+---
+
 ## 2A. NEXT — the "still raw" pass
 
 Owner, after the GitHub Pages deploy: *game is still really raw.* Correct. The

@@ -5,6 +5,16 @@ const WORLD_W = 2560;                  // battlefield width — scroll to see it
 // Vertical scale of the lane elevation profiles. At 96 a whole map moved a
 // soldier about 30px — the ground read as flat. This gives real hills and
 // terraces without touching any map's authored shape.
+/* Seconds to drop to the ground or get back up.
+ *
+ * This lived as a bare 0.45 in three separate files — the sim that sets the
+ * timer (game.js), the sprite path that reads it (sprite3d.js) and the vector
+ * fallback (render.js). Three copies of one number is three chances to change
+ * two of them. Shortened to 0.28 because the old value read as a man lowering
+ * himself thoughtfully under fire; going to ground is faster than that.
+ */
+const STANCE_TRANS = 0.28;
+
 const ELEV_PX = 230;
 // a little more air between the tiers, so raised ground reads as levels
 const LANE_BASE = [388, 520, 664];

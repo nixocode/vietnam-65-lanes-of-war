@@ -118,10 +118,18 @@ const Sprite3D = {
       }
     }
     if ((o.transT || 0) > 0 && C.dive && C.dive.length) {
-      // going to ground: a dive rather than a pop between standing and prone
-      const p = 1 - Math.min(1, (o.transT || 0) / 0.45);
+      /* Going to ground is a dive rather than a pop between standing and prone.
+       *
+       * Getting up is that same dive PLAYED BACKWARDS. This used to run the clip
+       * forward in both directions, so a man standing up threw himself at the
+       * floor to do it — which, cross-faded against the standing pose he was
+       * heading for, is what read as soldiers spinning in firefights. The vector
+       * fallback in render.js had the direction term all along; the sprite path
+       * never got it. transDir: +1 dropping, -1 rising. */
+      const p = 1 - Math.min(1, (o.transT || 0) / STANCE_TRANS);
+      const q = (o.transDir || 1) > 0 ? p : 1 - p;
       const n = C.dive.length;
-      return ['dive', Math.min(n - 1, Math.floor(p * n))];
+      return ['dive', Math.min(n - 1, Math.max(0, Math.floor(q * n)))];
     }
     if ((o.hitT || 0) > 0) {
       // two flinches, chosen per soldier, so a squad taking fire is not one loop

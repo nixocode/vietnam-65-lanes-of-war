@@ -161,7 +161,7 @@ function resolvePose(sk, sheet, o, key) {
   if ((o.transT || 0) > 0 && TRANS_ANIMS[sk]) {
     const seq = Assets.anim(TRANS_ANIMS[sk]);
     if (seq && seq.length) {
-      const p = clamp(1 - o.transT / 0.45, 0, 0.999);
+      const p = clamp(1 - o.transT / STANCE_TRANS, 0, 0.999);
       const idx = Math.floor((o.transDir > 0 ? p : 1 - p) * seq.length);
       return ['trans', seq[clamp(idx, 0, seq.length - 1)], TRANS_ANIMS[sk]];
     }
@@ -342,7 +342,10 @@ function muzzlePoint(u) {
       muzzleT: u.muzzleT || 0, deadT: u.deadT, phase: u.phase,
       dist: u.dist || 0, spd: u.spd || 0,
       gaitOff: u.gaitOff || 0, gaitK: u.gaitK || 1,
-      hitT: u.hitT || 0, transT: u.transT || 0, time: Renderer._time || 0,
+      // transDir too, or the flash is placed off a different frame than the one
+      // being drawn whenever a man fires mid-transition
+      hitT: u.hitT || 0, transT: u.transT || 0, transDir: u.transDir || 1,
+      time: Renderer._time || 0,
     });
   }
   if (typeof Rig !== 'undefined' && Rig.enabled) {

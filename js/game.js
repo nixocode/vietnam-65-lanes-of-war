@@ -601,19 +601,37 @@ class Game {
         m.stanceT = (m.stanceT || 0) + dt;
         if (!m.stance) m.stance = 'stand';
         let want = m.stance;
+        /* Being CLOSE to the enemy is not a reason to stand up.
+         *
+         * This used to read `nearFoe < 150 -> stand`, which meant every man rose
+         * to his feet in exactly the situation where he should be lowest: a
+         * close-range firefight. It was the single most visible wrongness in the
+         * game. Only ASSAULTING justifies standing at that range — closing the
+         * distance is worth the exposure, trading shots at 100px is not. */
         if (m.moving || s._advancing) want = 'stand';
-        else if (nearFoe < 150) want = 'stand';          // point blank: stay on your feet
         else if (s.inCover && (engaged || s.underFireT > 0)) want = 'prone'; // gun on the parapet
         else if (s.pinned) want = 'prone';
+        else if (nearFoe < 150 && (engaged || s.underFireT > 0)) want = 'prone';
         else if ((m.combatT || 0) > 0 && mi < 2) want = 'prone'; // front rank drops at range
         else if (s.underFireT <= 0 && (m.combatT || 0) <= 0 && m.stanceT > 3) want = 'stand';
+        /* The commitment lock exists so nobody yo-yos.
+         *
+         * `|| m.moving` bypassed it for ANY change, in either direction. Because
+         * `moving` flickers on and off as men settle into squad slots, dropping
+         * prone could retrigger every few frames — a man pumping up and down on
+         * the spot. But the bypass was not pointless: a prone man told to move
+         * has to be able to get up NOW, or he pops back down the moment he
+         * stops. So it survives in exactly that one direction. Getting up to
+         * move plays no transition frames because the run cycle already covers
+         * it; everything else serves its commitment. */
         const lock = m.stance === 'prone' ? 2.4 : 1.1;
-        if (want !== m.stance && (m.stanceT >= lock || m.moving)) {
+        const rising = m.stance === 'prone' && want === 'stand';
+        if (want !== m.stance && (m.stanceT >= lock || (m.moving && rising))) {
           m.stance = want;
           m.stanceT = 0;
           if (!m.moving) { // play the drop/rise transition frames
             m.transDir = want === 'prone' ? 1 : -1;
-            m.transT = 0.45;
+            m.transT = STANCE_TRANS;
           }
         }
         m.pose = m.stance === 'prone' && !m.moving ? 'prone' : null;

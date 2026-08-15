@@ -68,6 +68,14 @@ window.SelfTest = {
       : ['nvasq', 'cell', 'rpdteam', 'sapperu', 'marksmanu'];
 
     let minCP = Infinity, badY = 0, nan = 0, maxMuzzle = 0;
+    /* Stance churn. Men used to pump up and down on the spot because the
+     * commitment lock could be bypassed by a `moving` flag that flickers as
+     * squads settle into their slots. Sampled every frame, because the whole
+     * failure mode is sub-second and a 0.5s sampler would not see it.
+     * standUnderFire counts the other half of the bug: rising to your feet
+     * while being shot at, which is what `nearFoe < 150 -> stand` used to do. */
+    let flips = 0, manFrames = 0, standUnderFire = 0;
+    const lastStance = new Map();
     if (!this._clock) this._clock = performance.now();
 
     for (let i = 0; i < secs * 60; i++) {
@@ -79,6 +87,16 @@ window.SelfTest = {
       try { App._frame(this._clock); }
       catch (e) { errs.push('FRAME ' + e.message); break; }
 
+      for (const u of g.units) {
+        if (u.deadT != null || !u.stance || UNITS[u.key].vehicle) continue;
+        manFrames++;
+        const prev = lastStance.get(u);
+        if (prev && prev !== u.stance) flips++;
+        lastStance.set(u, u.stance);
+        const sq = u.squad;
+        if (u.stance === 'stand' && !u.moving && sq && !sq._advancing &&
+            (sq.underFireT > 0 || (u.combatT || 0) > 0)) standUnderFire++;
+      }
       if (i % 30 === 0) {
         minCP = Math.min(minCP, g.cp.us, g.cp.vc);
         for (const u of g.units) {
@@ -108,6 +126,9 @@ window.SelfTest = {
     window.onerror = prevOnError;
     return {
       map: mapId, side, secs, errs, kills, maxXp, ranked,
+      // per man-minute, so the numbers compare across runs of different length
+      flipRate: manFrames ? (flips * 3600) / manFrames : 0,
+      standUnderFireRate: manFrames ? (standUnderFire * 100) / manFrames : 0,
       shots: g.units.reduce((a, u) => a + (u.shots || 0), 0),
       units: g.units.length,
       us: g.units.filter((u) => u.side === 'us').length,
@@ -167,6 +188,11 @@ window.SelfTest = {
         ok(r.maxMuzzle < 200, `${tag} muzzle point ${r.maxMuzzle.toFixed(0)}px off the man`);
         ok(r.us > 0 && r.vc > 0, `${tag} one side never fielded anyone`);
         ok(r.maxXp > 0, `${tag} no squad earned any XP — veterancy is not wired`);
+        // a man changing stance more than ~6x a minute is fidgeting, not fighting
+        ok(r.flipRate < 6, `${tag} stance churn ${r.flipRate.toFixed(1)}/man-min (limit 6)`);
+        // standing still, on your feet, while being shot at
+        ok(r.standUnderFireRate < 12,
+          `${tag} ${r.standUnderFireRate.toFixed(0)}% of man-frames stood up under fire (limit 12)`);
       }
     }
 
