@@ -339,6 +339,64 @@ is the tell, and it is fixable without touching gameplay.
 
 ---
 
+## SESSION HANDOFF — read this first
+
+*Last updated 2026-08-12, end of session.*
+
+### Where the tree stands
+
+**Three commits ahead of `origin/main`, none pushed.** The live site at
+https://nixocode.github.io/vietnam-65-lanes-of-war/ still serves the build from
+before all of this. Pushing `main` auto-publishes, so the push IS the deploy —
+and the standing rule is no deploy without explicit approval.
+
+| commit | what | verified? |
+|---|---|---|
+| `9c9c89a` | §3 outline + weapon proportions | ✅ suite, budget, A/B frame |
+| `39d412a` | §1 capture harness, §2 stance bugs | ✅ suite + targeted assertions |
+| `a5a055b` | palette widening + `_tint()` terrain | ⚠️ **NOT verified, nobody has looked at a frame** |
+
+`a5a055b` is the odd one out: written before the revamp plan existed, never
+eyeballed. Either verify it (render each map, check the Cu Chi laterite reads as
+mud and not brick) or drop it. Do not push it blind.
+
+### Pick up here
+
+Next is **§5 portraits** — front-camera renders from the same 3D heads, which
+then feed **§6 the HUD**. §8's water fix is the cheapest big visual win still
+outstanding.
+
+### Things that cost time this session — do not relearn them
+
+1. **Do not read colour or fine detail off a lossy screenshot crop.** Three
+   claims died this way: "US troops wash out to near-white" (all 12 atlases
+   sample 21–32 luminance), "the ground is an untextured flat fill" (the
+   texture passes were there, just at 0.08–0.14 alpha in one hue), and "the men
+   are lit flatly, add a rim light" (a full three-point rig already existed).
+   Sample the source — the atlas PNG, the GLB, the palette table.
+2. **The Bash tool runs zsh**, which does not word-split unquoted variables.
+   `for u in $pair` passed `"arvn engineer"` as one name and Blender created
+   sprite directories with spaces; the packer published them and the manifest
+   listed 18 units. Quote or iterate explicitly.
+3. **Blender is cheap now** — ~11 s per 125-frame unit, two at a time peaking
+   near 130% of 1400% CPU. Standing rule 5 below describes an older, heavier
+   config and overstates the risk. Batch freely within the owner's 90% ceiling.
+4. **`Renderer.fitDPR` sizes off `clientWidth`**, which is 0 in a hidden pane —
+   the canvas collapses to 1×1 and every destination measurement is fiction.
+   Call `Capture.forceSize(1600, 900)` before measuring anything.
+
+### The tools you want
+
+```js
+// same frame every time — seeded PRNG, hand-stepped sim, parked camera
+fetch('tools/capture.js').then(r=>r.text()).then(eval)
+Capture.forceSize(1600, 900)
+Capture.budget({ map: 'mekong' })       // src Mpx, decoded MB, particles vs caps
+Capture.shot({ map: 'mekong', name: 'whatever' })   // writes assets/debug/
+```
+
+---
+
 ## 2. CURRENT PLAN — THE MEKONG REVAMP
 
 **This is the active plan. Everything above it is history; everything below the
