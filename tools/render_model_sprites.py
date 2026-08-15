@@ -275,6 +275,31 @@ WEAPON_LEN = {'m16': 0.99, 'ak': 0.87, 'm60': 1.10, 'svd': 1.20, 'm40': 1.16,
 FOREGRIP_F = {'m16': 0.42, 'ak': 0.38, 'm60': 0.34, 'svd': 0.44, 'm40': 0.44,
               'rpg': 0.30}
 
+# Cross-section as (height / length, width / length), including magazine and
+# sights — i.e. the silhouette the side camera actually sees.
+#
+# WHY THIS EXISTS. The donor meshes are stylised and CHUNKY. Measured off
+# weapons.glb, their own height/length ratios are: SMG 0.542, AK 0.513,
+# RocketLauncher 0.574 (and 0.360 wide). Scaling such a mesh uniformly to a
+# correct 0.99 m length therefore produced an M16 standing 0.54 m TALL — half a
+# metre of receiver. The result was measured in the shipped atlases: near-black
+# weapon mass accounted for 38-60% of every soldier's visible pixels, up to 60%
+# for the guerrilla and marksman. The men read as blobs with legs because the
+# gun genuinely was most of them.
+#
+# Length was never wrong, so the fix is to stop scaling uniformly and squash the
+# cross-section to the real figures below. A real M16A1 with a 20-round magazine
+# is about 0.24 m tall against its 0.99 m length; an AK's curved 30-round
+# magazine makes it deeper at 0.32; an RPG-7 is a 40 mm tube.
+WEAPON_ASPECT = {
+    'm16': (0.24, 0.055),
+    'ak':  (0.32, 0.055),   # the curved magazine is most of the depth
+    'm60': (0.26, 0.075),   # belt-fed and bipodded, legitimately bulkier
+    'svd': (0.20, 0.050),
+    'm40': (0.17, 0.050),   # bolt gun, internal magazine, slenderest of them
+    'rpg': (0.22, 0.045),
+}
+
 
 _WPN_CACHE = {}
 
@@ -393,9 +418,19 @@ def _rifle(kind, scale):
         return None
     _orient_weapon(me)
 
+    # Length was always right; the cross-section was not. Scale each axis to its
+    # own target rather than uniformly — see WEAPON_ASPECT for the measurements
+    # and why. _orient_weapon has already laid the bore down +X with the
+    # magazine below, so X is length, Z is height and Y is width.
     want = WEAPON_LEN.get(kind, 0.99) * scale
+    ah, aw = WEAPON_ASPECT.get(kind, (0.24, 0.055))
     xs = [v.co.x for v in me.vertices]
-    me.transform(Matrix.Scale(want / max(1e-4, max(xs) - min(xs)), 4))
+    ys = [v.co.y for v in me.vertices]
+    zs = [v.co.z for v in me.vertices]
+    sx = want / max(1e-4, max(xs) - min(xs))
+    sz = (want * ah) / max(1e-4, max(zs) - min(zs))
+    sy = (want * aw) / max(1e-4, max(ys) - min(ys))
+    me.transform(Matrix.Diagonal((sx, sy, sz, 1.0)))
 
     xs = [v.co.x for v in me.vertices]
     ys = [v.co.y for v in me.vertices]
