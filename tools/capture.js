@@ -73,7 +73,7 @@ window.Capture = {
       for (let i = 0; i < o.secs * 60; i++) {
         g.update(1 / 60);
         if (i % 150 === 0) {
-          for (const l of [0, 1, 2]) {
+          for (const l of LANES) {
             g.trySpawn('us', us[((i / 150) + l) % us.length | 0], l);
             g.trySpawn('vc', vc[((i / 150) + l) % vc.length | 0], l);
           }

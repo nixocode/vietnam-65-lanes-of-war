@@ -127,7 +127,7 @@ const UI = {
   _buildPips() {
     this.els.flagPips.innerHTML = '';
     this.pipEls = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < LANE_N; i++) {
       const p = document.createElement('div');
       p.className = 'flag-pip';
       this.els.flagPips.appendChild(p);
@@ -194,10 +194,12 @@ const UI = {
   },
 
   _laneAt(y) {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < LANE_N; i++) {
       if (y >= LANE_BANDS[i][0] && y < LANE_BANDS[i][1]) return i;
     }
-    return y >= LANE_BANDS[2][1] ? 2 : null;
+    // below the last band still counts as the front lane, so a click near the
+    // bottom edge is not dead space
+    return y >= LANE_BANDS[LANE_N - 1][1] ? LANE_N - 1 : null;
   },
 
   _onMove(e) {

@@ -83,7 +83,9 @@ window.SelfTest = {
     for (let i = 0; i < secs * 60; i++) {
       this._clock += 16.7;
       if (i % 300 === 0) {
-        try { g.trySpawn(side, buy[(i / 300) % buy.length | 0], (i / 300) % 3 | 0); }
+        // lane count is data now (LANE_N) — hardcoding 3 here spawned into a
+        // lane the map no longer defines and every map threw on `pts`
+        try { g.trySpawn(side, buy[(i / 300) % buy.length | 0], (i / 300) % LANE_N | 0); }
         catch (e) { errs.push('SPAWN ' + e.message); }
       }
       try { App._frame(this._clock); }

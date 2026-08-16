@@ -639,7 +639,7 @@ const Renderer = {
     const midW = Math.ceil(CANVAS_W + (WORLD_W - CANVAS_W) * this.MID_PARA);
     this.midLayer = this._makeLayer(midW, CANVAS_H);
     this._drawMid(this.midLayer.getContext('2d'), map, midW);
-    for (let l = 0; l < 3; l++) {
+    for (let l = 0; l < LANE_N; l++) {
       this.dirty[l] = true;
       this.decalLayers[l] = this._makeLayer(WORLD_W, CANVAS_H);
       this.decalUsed = this.decalUsed || [false, false, false];
@@ -1448,7 +1448,7 @@ const Renderer = {
     ctx.translate(-camX + shx, shy);
 
     const sx = Math.max(0, Math.floor(camX) - 8), sw = Math.min(WORLD_W - sx, CANVAS_W + 16);
-    for (let lane = 0; lane < 3; lane++) {
+    for (let lane = 0; lane < LANE_N; lane++) {
       if (this.dirty[lane]) this._buildLane(game, lane);
       ctx.drawImage(this.laneLayers[lane], sx, 0, sw, CANVAS_H, sx, 0, sw, CANVAS_H);
       // an untouched decal layer is transparent — skip the full-screen blit
@@ -2707,7 +2707,7 @@ const Renderer = {
     ctx.fillStyle = 'rgba(18,20,14,0.85)';
     ctx.fillRect(0, 0, W, H);
     // terrain silhouettes per lane
-    for (let l = 0; l < 3; l++) {
+    for (let l = 0; l < LANE_N; l++) {
       const yBase = 12 + l * 14;
       ctx.strokeStyle = game.map.pal.laneTop[l];
       ctx.globalAlpha = 0.8;
@@ -2746,7 +2746,7 @@ const Renderer = {
    * point, so a lane being lost reads at a glance without counting dots. */
   _drawFrontline(ctx, game, W, H, kx) {
     const y0 = H - 5;
-    for (let l = 0; l < 3; l++) {
+    for (let l = 0; l < LANE_N; l++) {
       const y = y0 - (2 - l) * 4;
       // the contested point: between the deepest US push and the deepest VC push
       let usF = null, vcF = null;
@@ -2913,7 +2913,7 @@ function drawMapThumb(canvas, map) {
   g.addColorStop(1, map.pal.skyBot);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 150, 44);
-  for (let l = 0; l < 3; l++) {
+  for (let l = 0; l < LANE_N; l++) {
     ctx.fillStyle = map.pal.laneBody[l];
     ctx.beginPath();
     ctx.moveTo(0, 44);

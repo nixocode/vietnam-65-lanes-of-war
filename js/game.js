@@ -85,7 +85,7 @@ function buildSettlement(map, s, structures) {
 
 class Game {
   constructor(cfg) {
-    this.map = MAPS[cfg.mapId];
+    this.map = normaliseMap(MAPS[cfg.mapId]);
     this.player = cfg.playerSide;
     this.enemy = other(this.player);
     this.aiSide = this.enemy;
@@ -326,7 +326,7 @@ class Game {
       const spot = this.addCover(lane, x, kind === 'tower' ? 'towerpos' : 'nestpos', true);
       if (spot) spot.structRef = st;
     };
-    for (let lane = 0; lane < 3; lane++) {
+    for (let lane = 0; lane < LANE_N; lane++) {
       // tower on the highest ground in the lane's forward half
       let bestX = WORLD_W * 0.5, bestE = -1;
       for (let x = WORLD_W * 0.24; x < WORLD_W * 0.78; x += 40) {
@@ -340,7 +340,7 @@ class Game {
     }
 
     // TRENCH LINES astride every objective — the ground both sides must fight for
-    for (let lane = 0; lane < 3; lane++) {
+    for (let lane = 0; lane < LANE_N; lane++) {
       const fx = this.flags[lane].x;
       this.addCover(lane, fx - 96, 'trench', true);
       this.addCover(lane, fx + 96, 'trench', true);
@@ -348,7 +348,7 @@ class Game {
 
     // VC JUNGLE HIDES: firing positions inside the brush. VC only, and they keep
     // their concealment while occupied, so the ambush doctrine has real estate.
-    for (let lane = 0; lane < 3; lane++) {
+    for (let lane = 0; lane < LANE_N; lane++) {
       for (const z of this.conceal[lane]) {
         const x0 = z.x0 * WORLD_W, x1 = z.x1 * WORLD_W;
         const n = Math.max(1, Math.round((x1 - x0) / 260));
@@ -378,7 +378,7 @@ class Game {
       this.addCover(s.lane, cx + 118, 'wall', true);
     }
 
-    for (let lane = 0; lane < 3; lane++) {
+    for (let lane = 0; lane < LANE_N; lane++) {
       let x = WORLD_W * 0.16 + rng() * 120;
       while (x < WORLD_W * 0.86) {
         // don't bury cover in flags or settlements
@@ -1914,7 +1914,7 @@ class Game {
 
     const side = this.aiSide, foe = other(side);
     const cp = this.cp[side];
-    const powers = [0, 1, 2].map(l => ({
+    const powers = LANES.map(l => ({
       lane: l,
       mine: this._lanePower(side, l),
       theirs: this._lanePower(foe, l),
@@ -1966,7 +1966,7 @@ class Game {
   _aiUS(cp, hot, weak) {
     const side = 'us';
     // artillery / arclight on clusters
-    for (const l of [0, 1, 2]) {
+    for (const l of LANES) {
       const foes = this._visibleFoesIn(l, side);
       if (foes.length >= 3 && cp >= CALLINS.arty.cost && (this.cool[side].arty || 0) <= 0) {
         const cx = foes.reduce((s, u) => s + u.x, 0) / foes.length;
@@ -1981,7 +1981,7 @@ class Game {
     }
     // napalm where hidden threats hurt us
     let worst = 0, worstLane = -1;
-    for (const l of [0, 1, 2]) if (this.hiddenLoss[l] > worst) { worst = this.hiddenLoss[l]; worstLane = l; }
+    for (const l of LANES) if (this.hiddenLoss[l] > worst) { worst = this.hiddenLoss[l]; worstLane = l; }
     if (worst >= 2 && cp >= CALLINS.napalm.cost && (this.cool[side].napalm || 0) <= 0) {
       const zone = this.conceal[worstLane].find(z => !z.burned);
       if (zone) {

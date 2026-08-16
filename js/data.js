@@ -33,9 +33,31 @@ const MOVE_HOLD = 0.16;
 
 const ELEV_PX = 230;
 // a little more air between the tiers, so raised ground reads as levels
-const LANE_BASE = [388, 520, 664];
-const LANE_DEPTH = [0.84, 0.96, 1.1];
-const LANE_BANDS = [[288, 458], [458, 584], [584, 720]];
+/* HOW MANY LANES ARE IN PLAY.
+ *
+ * Dropped from three to two on the owner's call: the front lane's ground line
+ * sat at y 664 of 720 — 92% of the way down the frame, with only 56px beneath
+ * it — so the card bar covered it completely and you could not see the men
+ * fighting there. The lane spacing told the same story: 132px between lanes 0
+ * and 1, 144px between 1 and 2, then 56px of nothing. The front lane was never
+ * given room.
+ *
+ * Everything lane-indexed derives from LANE_N, and map data still declares
+ * three lanes — anything pinned to a lane at or beyond LANE_N is filtered out
+ * on load (see Game._laneOK). So this is one number to put back to 3, not a
+ * one-way removal, and the maps keep their third lane on disk in the meantime.
+ */
+const LANE_N = 2;
+const LANES = Array.from({ length: LANE_N }, (_, i) => i);
+
+/* Re-spaced for two lanes, and pulled UP so both clear the HUD. A standing man
+ * is 84px, so his head is ~92px above the ground line at these depths: the
+ * front lane now tops out around y 445 and his feet at 545, well clear of the
+ * bottom ~18% of the frame that the card bar occupies. */
+const LANE_BASE = [400, 545];
+const LANE_DEPTH = [0.92, 1.08];
+// click bands, split around the new lane positions and reaching the frame edges
+const LANE_BANDS = [[280, 476], [476, 700]];
 const BASE_X = { us: 52, vc: WORLD_W - 52 };
 
 /* unit key → sliced sprite sheet (assets/manifest.js). Missing sheet = procedural. */
@@ -431,6 +453,38 @@ function _roll(lane, nx) {
   return Math.sin(nx * 21.7 + lane * 1.7) * 0.042 +
          Math.sin(nx * 47.3 + lane * 3.1) * 0.018 +
          Math.sin(nx * 9.1 + lane * 0.6) * 0.030;
+}
+
+/* Trim a map definition down to the lanes actually in play.
+ *
+ * The map tables still declare three lanes, and settlements, pre-placed units,
+ * tunnel mouths and traps are all pinned to a lane index. Rather than teach
+ * every consumer to check, the map is normalised once here: lane-indexed arrays
+ * are truncated to LANE_N and anything pinned to a lane beyond it is dropped.
+ * That keeps the third lane on disk — put LANE_N back to 3 and the maps return
+ * intact, with no data to re-author.
+ *
+ * Cached per map id, because this runs on every match start and the result is
+ * immutable.
+ */
+const _MAP_CACHE = {};
+function normaliseMap(map) {
+  if (!map) return map;
+  if (LANE_N >= (map.lanes ? map.lanes.length : 0)) return map;
+  if (_MAP_CACHE[map.id]) return _MAP_CACHE[map.id];
+  const keep = (arr) => (arr || []).filter(e => (e.lane == null) || e.lane < LANE_N);
+  const m = Object.assign({}, map, {
+    lanes: map.lanes.slice(0, LANE_N),
+    flags: (map.flags || []).slice(0, LANE_N),
+    settlements: keep(map.settlements),
+    prePlaced: keep(map.prePlaced),
+    pal: Object.assign({}, map.pal, {
+      laneTop: (map.pal.laneTop || []).slice(0, LANE_N),
+      laneBody: (map.pal.laneBody || []).slice(0, LANE_N),
+    }),
+  });
+  _MAP_CACHE[map.id] = m;
+  return m;
 }
 
 function elevAt(map, lane, x) {
