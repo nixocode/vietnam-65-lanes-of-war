@@ -44,6 +44,12 @@ const S3_WALK_SPD = 22;        // world px/s below which a soldier is picking hi
  * tell in the game — the sim underneath is fine, the presentation just popped. */
 const S3_BLEND = 0.18;
 
+/* Minimum time a clip is held before another may replace it. Slightly longer
+ * than the cross-fade, so a blend always has time to finish before the next one
+ * starts — the previous behaviour let a new change begin while the last was
+ * still resolving, which is what stacked up into visible chatter. */
+const S3_CLIP_HOLD = 0.24;
+
 /* Seconds to pivot when a soldier reverses. Flipping the sprite in one frame is
  * a teleport; easing the horizontal scale through zero reads as a man turning on
  * the spot, which is most of the difference between a token and a soldier. */
@@ -146,7 +152,16 @@ const Sprite3D = {
       // sized to the ground actually covered rather than to a fixed rate. Units
       // cross the lane slowly relative to their own height, so a walk is the
       // honest cycle for a normal advance; only genuinely quick movement runs.
-      const running = (o.spd || 0) > S3_WALK_SPD;
+      /* Hysteresis on the gait threshold. A bare `spd > S3_WALK_SPD` chattered
+       * for anyone advancing at close to that speed — which is most of a squad
+       * most of the time — giving `walk>run run>walk` over and over. Break into
+       * a run a little above the line and drop back to a walk a little below
+       * it, so a man hovering on the boundary keeps whichever gait he is in. */
+      const sp = o.spd || 0;
+      const r = o.ref;
+      const wasRun = r ? !!r._runV : sp > S3_WALK_SPD;
+      const running = wasRun ? sp > S3_WALK_SPD * 0.86 : sp > S3_WALK_SPD * 1.14;
+      if (r) r._runV = running;
       const c = running ? pick(o.combat ? 'runfire' : 'run', 'run', 'walk')
         : pick('walk', 'run');
       const n = C[c].length;
@@ -202,12 +217,37 @@ const Sprite3D = {
       st.dirV += Math.sign(want - st.dirV) * step;
       if (Math.abs(st.dirV - want) < step) st.dirV = want;
     }
-    if (clip !== st.clip) {
+    /* MINIMUM DWELL. Every input that picks a clip is a hard threshold with no
+     * hysteresis — `moving` on/off, `spd > S3_WALK_SPD` for run-vs-walk, combat
+     * for runfire, pose for prone — and in a firefight all of them sit right on
+     * their boundary and chatter. Measured, that produced sequences like
+     * `run>walk walk>idle2 idle2>walk walk>run` and clip changes 60-80 times a
+     * minute on the worst men. A cross-fade of 0.18s cannot resolve a change
+     * every 0.7s, so the blend never lands and the man looks like he is
+     * vibrating between poses. That is the "jank".
+     *
+     * Debouncing each input separately was whack-a-mole — fixing `moving` just
+     * moved the chatter onto the speed threshold. One dwell here covers all of
+     * them at once, because this is the single point they all funnel through.
+     *
+     * Clips that MUST interrupt still do: getting shot, hitting the dirt,
+     * throwing, and dying are all events the player must see on the frame they
+     * happen. Everything else waits its turn. */
+    const URGENT = st._urgent || (st._urgent = {
+      death: 1, hit: 1, hit2: 1, dive: 1, throw: 1, melee: 1,
+    });
+    st.holdT = Math.max(0, (st.holdT || 0) - (Renderer._fdt || 0.016));
+    const maySwitch = st.holdT <= 0 || URGENT[clip] || URGENT[st.clip];
+    if (clip !== st.clip && maySwitch) {
       st.prev = st.clip;
       st.prevFi = st.fi;
       st.t = 0;
       st.clip = clip;
+      st.holdT = S3_CLIP_HOLD;
     }
+    // while holding, keep advancing the clip we are actually showing rather than
+    // freezing on a stale frame index from the clip we declined to switch to
+    if (clip !== st.clip) return st;
     st.fi = fi;
     if (st.t < 1) st.t = Math.min(1, st.t + (Renderer._fdt || 0.016) / S3_BLEND);
     return st;

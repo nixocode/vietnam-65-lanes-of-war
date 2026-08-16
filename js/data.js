@@ -15,6 +15,22 @@ const WORLD_W = 2560;                  // battlefield width — scroll to see it
  */
 const STANCE_TRANS = 0.28;
 
+/* How long the ANIMATION keeps believing a man is moving after the sim says he
+ * stopped.
+ *
+ * `u.moving` is a per-frame intent flag and it flickers hard: measured, a third
+ * of its state runs last under 6 frames (100 ms) and the worst man toggles it
+ * 114 times a minute. Because `pose` is derived from it, and clip selection
+ * from `pose`, that flicker was reaching the screen as a clip change every 0.7s
+ * on the worst men — faster than the 0.18s cross-fade can resolve, which is
+ * exactly what reads as jank. Sequences like `prone>idle2 idle2>prone` over and
+ * over came straight from it.
+ *
+ * The sim keeps its twitchy flag; the renderer gets a debounced one. 0.16s is
+ * long enough to swallow the sub-100ms runs and short enough that a man who
+ * genuinely halts still settles promptly. */
+const MOVE_HOLD = 0.16;
+
 const ELEV_PX = 230;
 // a little more air between the tiers, so raised ground reads as levels
 const LANE_BASE = [388, 520, 664];
@@ -233,14 +249,21 @@ const MAPS = {
     pal: {
       /* Cu Chi was a single hue — sky, hills, ground, brush and trees all green
        * across a 30 degree spread, which is why the map read as flat no matter
-       * how much texture went into the terrain. The fix is the map's own
-       * history: those tunnels were dug through RED LATERITE, so the earth a
-       * man stands on is now red-brown and the canopy above it stays green.
-       * Turf keeps the green on top, the soil beneath it does not. Spread 127. */
+       * how much texture went into the terrain. The answer is the map's own
+       * history: those tunnels were dug through RED LATERITE.
+       *
+       * But laterite belongs in `soil`, NOT in laneBody. laneBody is the entire
+       * visible ground plane, so putting the clay there painted the whole map
+       * red — one monochrome traded for another, reading like a quarry rather
+       * than jungle floor. Real ground here is vegetated with the red earth
+       * showing THROUGH it on paths, scours and bare patches, which is exactly
+       * what the texture passes draw. Spread 125 either way, so the variety is
+       * kept and the map stops looking like Mars. */
       skyTop: '#d6e4d0', skyBot: '#a8c49a', sun: { x: 640, y: 100, r: 60, color: 'rgba(255,255,240,0.7)' },
       hillFar: '#6e8478', hillNear: '#42603c',
-      laneTop: ['#5a6b34', '#4f5f2d', '#455428'], laneBody: ['#6b4028', '#5e3823', '#52301e'],
+      laneTop: ['#5a6b34', '#4f5f2d', '#455428'], laneBody: ['#54502a', '#4a4624', '#413d1f'],
       brush: '#3f652c', tree: '#243820', haze: 'rgba(200,225,195,0.12)',
+      soil: '#7a4526',
     },
     lanes: [
       { pts: [[0, .1], [.3, .2], [.6, .1], [1, .16]], conceal: [[.22, .42], [.58, .84]] },

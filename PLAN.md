@@ -525,11 +525,132 @@ quote or iterate explicitly.)*
 - Tracers with streak geometry and falloff; shaped muzzle flash with a light cast; rising, drifting, thinning smoke columns; fire with shimmer; **water splashes and mud kick**.
 - Every emitter capped and distance-culled. **The frame is already at 13.03/13 src Mpx, so this section must reclaim before it spends** — the 64% spent on full-width layer blits is where to look.
 
-### 8. Mekong terrain and scenery depth
-- **The delta has no visible water.** Paddies draw only below elevation 0.085 — 19/30/47% of the three lanes, so a third of the map is nominally flooded — but as a **6 px strip**, a hairline at lane scale. A rice-paddy map at sunset with no water a player notices. Highest-value fix here, and cheap.
+### 8. Mekong terrain and scenery depth — *water done, rest outstanding*
+
+✅ **The delta now has water.** It took three wrong attempts, each instructive:
+
+1. *Grew the 6 px strip.* Visible at last — as a **bright orange fence**.
+   `pal.water` is a saturated sunset tone that was fine as a hairline and
+   became a stripe the moment it had area.
+2. *Darkened it and made it translucent.* Now a muddy brown band that read as
+   a **dirt track**. Brown beside green earth is just more earth.
+3. *Made the surface flat.* This was the structural fix — a band drawn at a
+   fixed offset **below the ground curve follows every undulation**, and no
+   colour choice can make an undulating ribbon look like standing water.
+   `groundY = LANE_BASE - elev * ELEV_PX`, so the waterline is a constant y per
+   lane; fill from there down to the ground and basins appear on their own.
+   But it nearly vanished, because depth is now `groundY - waterY` and the old
+   0.085 waterline floods lane 0 at a mean depth of **2.8 px**.
+
+   The waterline had never been chosen against the terrain. Measured across
+   candidates, **0.14** floods 63/65/74% of the three lanes at mean depths of
+   10.1 / 15.2 / 16.8 px — ankle-to-shin on an 84 px soldier.
+
+   Final piece: the body is **cool grey-blue**, not a darkened sunset tone, with
+   the reflection carried by a bright sheen line on the flat surface. The jump
+   in value from dark body to hot sheen is what reads as water at this scale —
+   more than hue does.
+
+Still outstanding: mud with puddles, wet/dry variation, churned ground, the
+foreground occluder band, and profile-rendered foliage to replace the
+overlapping-blob trees.
 - Mud with puddles and reflection, wet/dry variation, churned ground.
 - Foreground occluder band; profile-rendered foliage to replace overlapping-blob trees.
 - Fold in the drafted `_tint()` terrain work (commit `a5a055b`, still unverified).
+
+### 2b. The jank had one root cause, and it was not stance ✅
+
+Owner reported the *same* bugs after §2 shipped — "jankyness and spiralling
+soldiers when in fights". §2 had fixed real defects but not the one that
+actually reaches the eye. Measured properly this time, by recording which
+animation clip the renderer would show, frame by frame:
+
+**Worst man was changing clip 82 times a minute — one every 0.73s**, against a
+0.18s cross-fade. The blend could never land, so the man visibly vibrated
+between poses. Traces were unmistakable: `prone>idle2 idle2>prone prone>idle2…`
+and `idle2>hit2 hit2>idle2` twelve times running.
+
+The cause: **every input to clip selection is a hard threshold with no
+hysteresis** — `moving` on/off, `spd > S3_WALK_SPD`, combat, pose — and in a
+firefight all of them sit on their boundary and chatter. `u.moving` alone
+toggled 114 times a minute on the worst man, with **33% of its state runs
+shorter than 100ms**.
+
+Fixed in four places, each measured:
+
+| change | worst clip changes/min |
+|---|---|
+| *(baseline)* | **81.9** |
+| `MOVE_HOLD` — debounced `moving` for animation only | 62.1 |
+| `_updatePose()` — derive pose ONCE after units move | — |
+| `S3_CLIP_HOLD` — minimum clip dwell, urgent clips exempt | 37.7 |
+| `hitCd` — one flinch per burst, not per bullet | **35.4** |
+
+**Two lessons worth keeping.** Debouncing inputs one at a time was whack-a-mole
+— fixing `moving` just moved the chatter onto the speed threshold; the dwell in
+`_anim` fixed all of them at once because that is the single point they funnel
+through. And `pose` was being computed in the squad pass, which runs *before*
+units move, so it disagreed with the frame it belonged to and manufactured
+phantom states like `prone > walk > idle2 > prone` out of nothing.
+
+Stopping at 35/min deliberately: that is a change every 1.7s, which the 0.18s
+blend resolves comfortably. Below that, further damping starts costing
+responsiveness. Adding hysteresis to the speed threshold moved it 35.4 → 35.7,
+i.e. nothing — worth recording so nobody tries it again.
+
+### 8b. The bottom lane is hidden behind the HUD *(owner-reported)*
+
+Owner, 2026-08-12: *"the bottom lane is so hard to see, we can remove it
+entirely or make it higher up."* Confirmed by measurement, not opinion:
+
+| lane | ground line | as % of canvas height | clear space below |
+|---|---|---|---|
+| 0 | y 388 | 53.9% | — |
+| 1 | y 520 | 72.2% | — |
+| 2 | **y 664** | **92.2%** | **56 px of 720** |
+
+A standing man in lane 2 occupies y 572–664, i.e. the bottom 8% of the frame.
+The card bar overlays roughly the bottom 15–20% of the viewport, so it covers
+him completely — and the lane spacing shows the same story: 132 px between
+lanes 0 and 1, 144 px between 1 and 2, then only **56 px** below lane 2. The
+front lane was never given room.
+
+**Two options, and they are not equal.**
+
+- **Move the lanes up** *(recommended)*. `LANE_BASE` `[388, 520, 664]` →
+  roughly `[352, 468, 584]`: keeps three lanes, keeps even ~116 px spacing, and
+  leaves ~136 px of clear canvas under the front lane for the HUD. Small,
+  data-only change in `js/data.js`. Needs a check that `ELEV_PX` (230) relief
+  and tall props still fit above lane 0, since everything shifts up.
+- **Drop to two lanes**. Much larger change: the game is called *Lanes of War*,
+  the AI, `_advance`, cover placement, minimap and the frontline HUD bar all
+  assume three, and it removes a third of the tactical surface to solve what is
+  a layout problem. Not recommended unless the owner wants the pace change too.
+
+Worth doing **before** §6, since the HUD rebuild should be designed against the
+final playfield height rather than the current one.
+
+### 8c. Owner requests — buildings and squad orders *(queued, not started)*
+
+Owner, 2026-08-12: *"soldiers should also come in front of buildings, or go in
+them (make interactive, go in and out of doors, add these animations); when
+clicking on squads you should be able to make them hold, stay, move forward."*
+
+- **Draw order vs buildings.** Within a lane the order is structures → covers →
+  emplacements → units, so a man *should* already paint over a building in his
+  own lane. Needs reproducing before fixing — likely either a man in lane N
+  behind a structure in lane N+1 (correct depth, wrong-looking), or the stilt
+  houses' raised floor putting the man behind the wall. Measure which before
+  touching draw order.
+- **Entering buildings.** The `window` cover type already puts men *inside*
+  firing out through a cut opening, so the tactical half exists. What is missing
+  is the transition — a door, and a walk-in/walk-out. No door animation exists in
+  the clip set; `walk` plus an alpha fade through the doorway would avoid a
+  re-render.
+- **Squad orders.** `orderSquad(s, order, arg)` already exists and takes an
+  order; check what verbs it supports before adding any. The ask is HOLD / STAY /
+  MOVE FORWARD surfaced on click — so this may be mostly a HUD job (§6) rather
+  than a sim one. Confirm before building.
 
 ### 9. A squad should look like five men
 - Per-man pose and clip-phase offset — all five men in a cell currently hold an identical pose.

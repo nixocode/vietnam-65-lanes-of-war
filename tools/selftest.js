@@ -76,6 +76,8 @@ window.SelfTest = {
      * while being shot at, which is what `nearFoe < 150 -> stand` used to do. */
     let flips = 0, manFrames = 0, standUnderFire = 0;
     const lastStance = new Map();
+    // per-man, so the pathological tail can be separated from the aggregate
+    const manFlips = new Map(), manLife = new Map();
     if (!this._clock) this._clock = performance.now();
 
     for (let i = 0; i < secs * 60; i++) {
@@ -90,8 +92,12 @@ window.SelfTest = {
       for (const u of g.units) {
         if (u.deadT != null || !u.stance || UNITS[u.key].vehicle) continue;
         manFrames++;
+        manLife.set(u, (manLife.get(u) || 0) + 1);
         const prev = lastStance.get(u);
-        if (prev && prev !== u.stance) flips++;
+        if (prev && prev !== u.stance) {
+          flips++;
+          manFlips.set(u, (manFlips.get(u) || 0) + 1);
+        }
         lastStance.set(u, u.stance);
         const sq = u.squad;
         if (u.stance === 'stand' && !u.moving && sq && !sq._advancing &&
@@ -129,6 +135,21 @@ window.SelfTest = {
       // per man-minute, so the numbers compare across runs of different length
       flipRate: manFrames ? (flips * 3600) / manFrames : 0,
       standUnderFireRate: manFrames ? (standUnderFire * 100) / manFrames : 0,
+      /* The WORST man, not the average one. Measured distribution: the median
+       * soldier never changes stance at all and two thirds never do, so an
+       * aggregate rate is set almost entirely by a handful of men in sustained
+       * contact — where changing stance every several seconds is behaviour, not
+       * a defect. The bug this suite exists to catch looked like median 0 with a
+       * worst man at 34 flips/min, one every 1.8s. That signal lives in the
+       * tail, and averaging hides it. */
+      worstManFlipRate: (() => {
+        let worst = 0;
+        for (const [u, frames] of manLife) {
+          if (frames < 540) continue;             // ignore men who barely lived
+          worst = Math.max(worst, ((manFlips.get(u) || 0) * 3600) / frames);
+        }
+        return worst;
+      })(),
       shots: g.units.reduce((a, u) => a + (u.shots || 0), 0),
       units: g.units.length,
       us: g.units.filter((u) => u.side === 'us').length,
@@ -188,8 +209,23 @@ window.SelfTest = {
         ok(r.maxMuzzle < 200, `${tag} muzzle point ${r.maxMuzzle.toFixed(0)}px off the man`);
         ok(r.us > 0 && r.vc > 0, `${tag} one side never fielded anyone`);
         ok(r.maxXp > 0, `${tag} no squad earned any XP — veterancy is not wired`);
-        // a man changing stance more than ~6x a minute is fidgeting, not fighting
-        ok(r.flipRate < 6, `${tag} stance churn ${r.flipRate.toFixed(1)}/man-min (limit 6)`);
+        /* Two stance limits, because they catch different things.
+         *
+         * The tail is the real detector. When the rising bypass could collapse
+         * the drop/rise cycle, the median man still never changed stance while
+         * the worst flipped 34 times a minute — an average would have shrugged
+         * at that. Post-fix the worst observed is ~15 (one change per 4s, which
+         * respects the 2.4s/1.1s locks); 22 leaves headroom without letting the
+         * old pathology back through.
+         *
+         * The aggregate stays as a coarse net, calibrated from measurement
+         * rather than taste: it rises with match length as men crowd together
+         * (~1.4/man-min at 40s, ~2.0 at 55s, up to ~5.6 at 70s), so 6 flagged
+         * ordinary late-game fighting. 12 is roughly twice the busiest measured
+         * run. */
+        ok(r.worstManFlipRate < 22,
+          `${tag} worst man flips stance ${r.worstManFlipRate.toFixed(1)}/min (limit 22)`);
+        ok(r.flipRate < 12, `${tag} stance churn ${r.flipRate.toFixed(1)}/man-min (limit 12)`);
         // standing still, on your feet, while being shot at
         ok(r.standUnderFireRate < 12,
           `${tag} ${r.standUnderFireRate.toFixed(0)}% of man-frames stood up under fire (limit 12)`);

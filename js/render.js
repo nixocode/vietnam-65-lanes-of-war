@@ -338,7 +338,7 @@ function muzzlePoint(u) {
     // the same state the draw used, so the flash sits on the frame being shown
     return Sprite3D.muzzle(u.key, {
       x: u.x, y: u.y + (u.yj || 0) - lift, dir: u.dir, scale,
-      moving: u.moving, combat: true, pose: u.pose,
+      moving: u.movingVis != null ? u.movingVis : u.moving, combat: true, pose: u.pose,
       muzzleT: u.muzzleT || 0, deadT: u.deadT, phase: u.phase,
       dist: u.dist || 0, spd: u.spd || 0,
       gaitOff: u.gaitOff || 0, gaitK: u.gaitK || 1,
@@ -835,9 +835,12 @@ const Renderer = {
       const y0 = groundY(map, lane, x);
       const slope = (groundY(map, lane, x + 12) - y0) / 12;
       if (Math.abs(slope) > 0.14) {
-        // scoured ground shows the subsoil, which runs warmer than the turf
+        /* Scoured ground shows the subsoil. A map may name that soil outright —
+         * Cu Chi's red laterite — and where it does, this is where the colour
+         * belongs: exposed on the steep bits, with vegetation everywhere else.
+         * Painting it into laneBody instead turns the whole map that colour. */
         ctx.globalAlpha = 0.26 + rng() * 0.18;
-        ctx.fillStyle = this._tint(p.laneBody[lane], 24, 2, -14);
+        ctx.fillStyle = p.soil || this._tint(p.laneBody[lane], 24, 2, -14);
         ctx.fillRect(x, y0 + 1, 7 + rng() * 6, 3 + rng() * 6);
         if (rng() < 0.16) {
           ctx.globalAlpha = 0.34;
@@ -867,9 +870,10 @@ const Renderer = {
     }
     ctx.restore();
 
-    // dirt trail with wheel ruts along the lane
+    // dirt trail with wheel ruts along the lane — a worn path is bare earth, so
+    // it takes the map's soil colour where one is named
     ctx.save();
-    const trailCol = this._shade(p.laneTop[lane], 10);
+    const trailCol = p.soil || this._shade(p.laneTop[lane], 10);
     ctx.globalAlpha = 0.28;
     ctx.fillStyle = trailCol;
     ctx.beginPath();
@@ -898,30 +902,97 @@ const Renderer = {
     for (let x = 0; x <= WORLD_W; x += 16) ctx.lineTo(x, groundY(map, lane, x) + 2);
     ctx.stroke();
 
-    // water paddies with dikes and rice rows (delta)
+    /* Water paddies with dikes and rice rows (delta).
+     *
+     * The geometry here was always right — 19%/30%/47% of the three Mekong
+     * lanes sit below the waterline — but it drew as a SIX PIXEL strip, which
+     * at lane scale is a hairline. A captured frame of a rice-paddy map at
+     * sunset contained no water a player would notice. The map is named for the
+     * delta and had no visible delta in it.
+     *
+     * So: depth now scales with how far the ground drops below the waterline
+     * rather than being a constant sliver, the surface carries a sky reflection
+     * (which is what actually reads as "water" rather than "a coloured band"),
+     * and the dikes stand proud between the fields. */
     if (p.water) {
-      for (let x = 0; x <= WORLD_W - 16; x += 16) {
-        if (elevAt(map, lane, x) < 0.085) {
-          const y = groundY(map, lane, x);
-          ctx.globalAlpha = 0.8;
-          ctx.fillStyle = p.water;
-          ctx.fillRect(x, y + 3, 17, 6);
-          ctx.globalAlpha = 0.35;
-          ctx.fillRect(x + rng() * 8, y + 10, 10, 1.4);
-          // rice sprout rows
+      /* WATER LIES FLAT. That is the whole trick, and getting it wrong is why
+       * two earlier attempts failed: a band drawn at a fixed offset BELOW the
+       * ground curve follows every undulation, so it reads as a painted stripe
+       * or an orange fence — never as a pool. Standing water has one level
+       * across a basin and the ground rises out of it.
+       *
+       * groundY = LANE_BASE - elev * ELEV_PX, so the waterline is simply a
+       * constant y for the lane. Fill from that flat surface down to the
+       * ground, and the basins appear on their own wherever the terrain dips
+       * under it — no extra geometry, and it tracks the elevation profile
+       * exactly because it IS the elevation profile. */
+      /* The waterline was 0.085, chosen before anything measured what that
+       * produced. Against this elevation profile it floods 15/29/45% of the
+       * three lanes at mean depths of 2.8 / 13 / 9.8 px — and 2.8 px on the
+       * back lane is nothing, which is why the delta had no visible water even
+       * once the drawing was fixed. 0.14 floods 63/65/74% at 10.1 / 15.2 /
+       * 16.8 px: ankle-to-shin against an 84 px soldier, which is what a rice
+       * paddy actually is, with dikes standing between the fields.
+       * Purely presentational — this layer is static art, so nothing in the sim
+       * moves with it. */
+      const WL = 0.14;
+      const waterY = LANE_BASE[lane] - WL * ELEV_PX;
+      /* The body must not be a darkened version of the sunset tone. Tried that:
+       * it lands on muddy brown, and brown beside green earth reads as MORE
+       * EARTH — the pools rendered correctly and looked like dirt tracks. Water
+       * reads from two things, a cool dark body and a bright sheen on top, so
+       * the depths go cool grey-blue and the reflected sunset is carried only
+       * by the surface line. */
+      const body = 'rgb(54,66,72)';
+      const step = 8;
+      for (let x = 0; x <= WORLD_W - step; x += step) {
+        const gy = groundY(map, lane, x);
+        if (gy <= waterY + 1) continue;          // ground stands above the water
+        const depth = gy - waterY;
+
+        // the body: cool and dark, so it separates from the earth around it
+        ctx.globalAlpha = 0.72;
+        ctx.fillStyle = body;
+        ctx.fillRect(x, waterY, step + 1, depth);
+
+        // sunset caught on a flat surface. Bright, and on one straight line —
+        // the value jump from dark body to hot sheen is what actually says
+        // "water" at this scale, more than any hue does.
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = p.water;
+        ctx.fillRect(x, waterY, step + 1, 2.2);
+        if (rng() < 0.5) {
+          ctx.globalAlpha = 0.34;
+          ctx.fillRect(x + rng() * 4, waterY + 3 + rng() * Math.min(12, depth * 0.6),
+                       4 + rng() * 6, 1.2);
+        }
+
+        // rice standing out of the flood, rooted at the bottom not the surface
+        if (depth > 4) {
           ctx.globalAlpha = 0.7;
           ctx.strokeStyle = '#5f7a2e';
           ctx.lineWidth = 1;
-          for (let sx = x + 3; sx < x + 16; sx += 5) {
-            ctx.beginPath(); ctx.moveTo(sx, y + 6); ctx.lineTo(sx + 0.6, y + 2.5); ctx.stroke();
-          }
-          ctx.globalAlpha = 1;
-          // dike wall where the paddy ends
-          if (elevAt(map, lane, x + 16) >= 0.085) {
-            ctx.fillStyle = this._shade(p.laneBody[lane], -14);
-            ctx.fillRect(x + 15, y - 1, 4, 9);
+          for (let sx = x + 1; sx < x + step; sx += 4) {
+            const h = 4 + rng() * 5;
+            ctx.beginPath();
+            ctx.moveTo(sx, waterY + 1);
+            ctx.lineTo(sx + (rng() - 0.5) * 1.8, waterY + 1 - h);
+            ctx.stroke();
           }
         }
+        ctx.globalAlpha = 1;
+      }
+
+      /* Dikes: the raised earth walls that make a delta read as FIELDS rather
+       * than as flooding. One wherever the ground crosses the waterline. */
+      for (let x = step; x <= WORLD_W - step; x += step) {
+        const a = groundY(map, lane, x - step) > waterY;
+        const b = groundY(map, lane, x) > waterY;
+        if (a === b) continue;
+        ctx.fillStyle = this._tint(p.laneBody[lane], 26, 12, -8);
+        ctx.fillRect(x - 2, waterY - 4, 5, 10);
+        ctx.fillStyle = this._tint(p.laneTop[lane], 8, 20, -4);
+        ctx.fillRect(x - 2, waterY - 5, 5, 2);
       }
     }
 
@@ -2264,7 +2335,10 @@ const Renderer = {
         : 0;
       drawSoldier(ctx, u.key, {
         x: u.x, y: u.y + (u.yj || 0) - towerLift, dir: u.dir, scale,
-        moving: u.moving, phase: u.phase, dist: u.dist || 0, spd: u.spd || 0,
+        // debounced (see MOVE_HOLD) — the raw flag flickers sub-100ms and that
+        // reached the screen as clip thrash
+        moving: u.movingVis != null ? u.movingVis : u.moving,
+        phase: u.phase, dist: u.dist || 0, spd: u.spd || 0,
         gaitOff: u.gaitOff || 0, gaitK: u.gaitK || 1,
         pose, deadT: u.deadT, alpha,
         flash: u.muzzleT > 0,

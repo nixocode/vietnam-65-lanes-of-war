@@ -626,7 +626,23 @@ class Game {
          * it; everything else serves its commitment. */
         const lock = m.stance === 'prone' ? 2.4 : 1.1;
         const rising = m.stance === 'prone' && want === 'stand';
-        if (want !== m.stance && (m.stanceT >= lock || (m.moving && rising))) {
+        /* The rising bypass keys off the SQUAD advancing, not off the man's
+         * per-frame `moving` flag.
+         *
+         * `moving` flickers as men settle into slots, and every flicker was a
+         * licence to stand straight back up — so a man dropped prone, bounced
+         * up, dropped again, about once a second. Measured, that left a tail
+         * flipping 34 times a MINUTE while the median man never changed stance
+         * at all, so the average looked perfectly healthy and hid it. Putting a
+         * time floor on the bypass only slowed the bounce (34 -> 27/min, still
+         * a flip every 2.2s, still faster than the 2.4s + 1.1s locks allow),
+         * because it treated the symptom rather than the flickering input.
+         *
+         * `_advancing` is squad-level and stable across frames, and it is the
+         * thing the exemption was always FOR: a prone squad ordered forward has
+         * to get on its feet at once. A lone man's slot-shuffle is not that. */
+        if (want !== m.stance &&
+            (m.stanceT >= lock || (rising && s._advancing && m.stanceT >= 0.35))) {
           m.stance = want;
           m.stanceT = 0;
           if (!m.moving) { // play the drop/rise transition frames
@@ -634,8 +650,37 @@ class Game {
             m.transT = STANCE_TRANS;
           }
         }
-        m.pose = m.stance === 'prone' && !m.moving ? 'prone' : null;
+        // pose is NOT set here — see _updatePose, which runs after the men have
+        // actually moved. Deriving it in this pass read last frame's movement.
       }
+    }
+  }
+
+  /* Presentation state, derived ONCE per frame after everything has moved.
+   *
+   * This used to be computed inside the squad pass, which runs BEFORE units
+   * move — so `pose` was decided from last frame's movement and then disagreed
+   * with this frame's. The disagreement manufactured phantom intermediate
+   * states: a man went `prone > walk > idle2 > prone` where nothing but a
+   * one-frame mismatch had happened, and every one of those is a clip change
+   * the 0.18s cross-fade cannot resolve. Measured, the worst men were changing
+   * animation 60-80 times a minute, which is what reads as jank.
+   *
+   * Snipers and grenade-throwers own their own pose and are left alone here,
+   * exactly as the squad pass leaves them alone.
+   */
+  _updatePose(dt) {
+    for (const u of this.units) {
+      if (u.deadT != null) continue;
+
+      // debounced movement for animation only — the raw flag flickers sub-100ms
+      if (u.moving) u.moveHoldT = MOVE_HOLD;
+      else u.moveHoldT = Math.max(0, (u.moveHoldT || 0) - dt);
+      u.movingVis = !!u.moving || u.moveHoldT > 0;
+
+      if (u.sniperUnit || (u.nadeT || 0) > 0) continue;
+      if (UNITS[u.key].vehicle) { u.pose = null; continue; }
+      u.pose = (u.stance === 'prone' && !u.movingVis) ? 'prone' : null;
     }
   }
 
@@ -933,6 +978,7 @@ class Game {
     this._spottingPass(dt);
     this._updateSquads(dt);
     this._updateUnits(dt);
+    this._updatePose(dt);      // presentation, derived once the men have moved
     this._updateNades(dt);
     this._updateSmokes(dt);
     this._updateHoles(dt);
@@ -1198,7 +1244,21 @@ class Game {
     }
     t.hp -= dmg;
     if (t.hp <= 0 && t.deadT == null) this._kill(t, killer, opts);
-    else if (t.deadT == null && !t.isHole) t.hitT = Math.max(t.hitT || 0, 0.16);
+    else if (t.deadT == null && !t.isHole) {
+      /* One flinch per burst, not one per round.
+       *
+       * A man under sustained fire was taking a fresh 0.16s flinch on every
+       * bullet, so the animation ran idle>hit>idle>hit… — measured at 37 clip
+       * changes a minute on the worst man, the single largest remaining source
+       * of visible chatter. The flinch is deliberately exempt from the clip
+       * dwell (being shot has to register on the frame it happens), so the
+       * limit has to live here instead: react, then absorb the rest of the
+       * burst. */
+      if ((t.hitCd || 0) <= 0) {
+        t.hitT = Math.max(t.hitT || 0, 0.16);
+        t.hitCd = 0.62;
+      }
+    }
   }
 
   _kill(t, killer, opts = {}) {
@@ -1284,6 +1344,7 @@ class Game {
       u.revealT = Math.max(0, u.revealT - dt);
       u.spotT = Math.max(0, u.spotT - dt);
       u.hitT = Math.max(0, (u.hitT || 0) - dt);
+      u.hitCd = Math.max(0, (u.hitCd || 0) - dt);
       u.combatT = Math.max(0, (u.combatT || 0) - dt);
       u.transT = Math.max(0, (u.transT || 0) - dt);
 
