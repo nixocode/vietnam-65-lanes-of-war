@@ -472,12 +472,29 @@ function normaliseMap(map) {
   if (!map) return map;
   if (LANE_N >= (map.lanes ? map.lanes.length : 0)) return map;
   if (_MAP_CACHE[map.id]) return _MAP_CACHE[map.id];
-  const keep = (arr) => (arr || []).filter(e => (e.lane == null) || e.lane < LANE_N);
+
+  /* Anything pinned to a lane that no longer exists is DROPPED, including
+   * pre-placed squads.
+   *
+   * Re-homing them into a surviving lane was tried and is wrong. Hill 937
+   * pre-places one defending squad per lane — nvasq / rpdteam / nvasq — and
+   * wrapping the third into lane 0 gives that lane two squads and two tunnel
+   * mouths while lane 1 keeps one. Denser than authored, and lopsided: the
+   * light lane becomes the obvious way in. Dropping keeps the density PER LANE
+   * that the author set, which is the property that actually matters — fewer
+   * lanes should mean proportionately fewer defenders, not the same defenders
+   * squeezed together.
+   *
+   * (It also did not do what it was tried for. First casualties on hill937/vc
+   * stayed at 0 by the 50s mark either way; the real story there was that the
+   * map's first contact lands at ~53s and the test was asking too early.) */
+  const drop = (arr) => (arr || []).filter(e => (e.lane == null) || e.lane < LANE_N);
+
   const m = Object.assign({}, map, {
     lanes: map.lanes.slice(0, LANE_N),
     flags: (map.flags || []).slice(0, LANE_N),
-    settlements: keep(map.settlements),
-    prePlaced: keep(map.prePlaced),
+    settlements: drop(map.settlements),
+    prePlaced: drop(map.prePlaced),
     pal: Object.assign({}, map.pal, {
       laneTop: (map.pal.laneTop || []).slice(0, LANE_N),
       laneBody: (map.pal.laneBody || []).slice(0, LANE_N),

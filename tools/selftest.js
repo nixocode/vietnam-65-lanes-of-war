@@ -163,7 +163,19 @@ window.SelfTest = {
   },
 
   run(secs) {
-    secs = secs || 60;
+    /* Floor of 60s, because the casualty assertion is only meaningful after a
+     * map's first contact can physically have happened.
+     *
+     * Hill 937 is an assault with a 780s limit and a long uphill approach —
+     * measured, its first shot lands at 51.5s and its first kill at 53.1s, i.e.
+     * 6.8% into the match. Running the suite at 50s therefore failed
+     * `hill937/vc no casualties` while the game was behaving exactly as
+     * designed. The bar was wrong, not the map.
+     *
+     * (Dropping to two lanes did shift that contact a few seconds later, which
+     * is what made a previously-passing 50s run start failing. The shift is
+     * real but small; the assertion was already asking too early.) */
+    secs = Math.max(60, secs || 60);
     const out = [], fails = [];
     const ok = (cond, label) => { if (!cond) fails.push(label); return cond; };
 

@@ -342,9 +342,15 @@ function muzzlePoint(u) {
       muzzleT: u.muzzleT || 0, deadT: u.deadT, phase: u.phase,
       dist: u.dist || 0, spd: u.spd || 0,
       gaitOff: u.gaitOff || 0, gaitK: u.gaitK || 1,
-      // transDir too, or the flash is placed off a different frame than the one
-      // being drawn whenever a man fires mid-transition
+      /* transDir AND ref, or the flash is placed off a different frame than the
+       * one being drawn. `ref` matters because the walk/run hysteresis keeps its
+       * state on the unit (`_runV`): without it this path falls back to a bare
+       * `spd > S3_WALK_SPD` test and can choose `walk` while the draw path,
+       * which does pass ref, is showing `runfire`. Different clip, different
+       * frame, muzzle point tens of pixels off the barrel — worst on the night
+       * map, where the muzzle glow is most of the light in the scene. */
       hitT: u.hitT || 0, transT: u.transT || 0, transDir: u.transDir || 1,
+      ref: u,
       time: Renderer._time || 0,
     });
   }
@@ -1128,8 +1134,10 @@ const Renderer = {
     this._usBaseWorks(ctx, map, lane, rng);
     this._vcBaseWorks(ctx, map, lane, rng);
 
-    // near-lane depth tint
-    if (lane === 2) {
+    // Near-lane depth tint — the FRONT lane, whichever index that now is.
+    // Hardcoded as `lane === 2`, this quietly became dead code when LANE_N
+    // dropped to 2 and the nearest lane stopped being index 2.
+    if (lane === LANE_N - 1) {
       ctx.fillStyle = 'rgba(0,0,0,0.05)';
       ctx.beginPath();
       ctx.moveTo(0, CANVAS_H); ctx.lineTo(0, groundY(map, lane, 0));

@@ -872,6 +872,18 @@ class Game {
   }
 
   callinValid(side, key, lane, x) {
+    /* Validate the LANE, not just the position.
+     *
+     * This checked x-bounds and the trap cap but never the lane index, so a
+     * caller passing a lane that does not exist got a silent success: CP was
+     * spent, the trap was pushed, and it then sat in a lane nothing iterates —
+     * never triggered, never drawn, never cleaned up, yet still counted against
+     * MAX_TRAPS. Ten of those and every subsequent punji and mine placement
+     * fails, which quietly disables VC ground doctrine mid-match.
+     *
+     * The proximate cause was one stale `randi(0, 2)`, now fixed. This check is
+     * here so the next stale lane literal fails loudly instead of leaking. */
+    if (!(lane >= 0 && lane < LANE_N)) return false;
     const lo = WORLD_W * 0.06, hi = WORLD_W * 0.94;
     if (x < lo || x > hi) return false;
     if (key === 'tunnel') {
@@ -2004,7 +2016,9 @@ class Game {
     const side = 'vc';
     // trap seeding ahead of the US advance
     if (cp >= 30 && (this.cool[side].punji || 0) <= 0 && Math.random() < 0.65) {
-      const lane = randi(0, 2);
+      // randi is INCLUSIVE at both ends, so the old randi(0, 2) kept returning
+      // lane 2 after the drop to LANE_N = 2
+      const lane = randi(0, LANE_N - 1);
       const front = this._usFront(lane);
       const x = clamp(front + rand(140, 420), WORLD_W * 0.1, WORLD_W * 0.9);
       this.tryCallin(side, 'punji', lane, x);

@@ -343,16 +343,44 @@ is the tell, and it is fixable without touching gameplay.
 
 *Last updated 2026-08-12, end of session.*
 
-### ⚠ OPEN: one self-test failure, unresolved
+### RESOLVED: the hill937 failure, and what a cloud review caught with it
 
-`hill937/vc no casualties in 50s` (and the XP assertion that follows from it).
-It **passed at 55s** in the same session, and every other map/side passes at
-both lengths, so the likely reading is that dropping to two lanes slowed the
-opening on the hardest map enough that 50s no longer reaches first contact.
-**That is a hypothesis, not a finding** — the run to confirm it (kills across
-several seeds at 50s vs 55s) timed out before it completed. Do that first next
-session. If it is run length, the honest fix is to raise the suite's default
-duration and say why, not to loosen the casualty assertion.
+**hill937/vc "no casualties in 50s" — the test was wrong, not the game.**
+Hill 937 is an *assault* map with a 780s limit and a deliberately long uphill
+approach. Measured: first shot at **51.5s**, first kill at **53.1s** — 6.8% into
+the match. Asserting first blood by 50s was asking before contact could
+physically happen. `SelfTest.run()` now floors at 60s with that reasoning
+written down.
+
+Two lanes *did* shift contact a few seconds later (three lanes gave 2/2/2 kills
+at 50s, two lanes 0/0/1), which is what turned a passing run into a failing one
+— but the assertion was already asking too early. Both facts are true and only
+one of them is a defect.
+
+**A wrong turn worth recording.** The first explanation looked much better than
+it was: hill937 pre-places one squad per lane (nvasq / rpdteam / nvasq), so
+`normaliseMap` dropping lane 2 removed a third of the prepared defence. I
+changed it to *re-home* those units into surviving lanes instead — and measured
+no improvement at all (still 0 kills at 50s). Worse, it was the wrong design:
+re-homing gives lane 0 two squads and two tunnel mouths while lane 1 keeps one,
+which is **denser than authored and lopsided**. Dropping preserves density *per
+lane*, which is the property that matters. Reverted.
+
+**Cloud review findings, both real, both mine, both fixed:**
+
+| | what | fix |
+|---|---|---|
+| `_aiVC` | `randi(0, 2)` survived the lane drop — and `randi` is inclusive, so ~⅓ of VC punji traps went to nonexistent lane 2, where they never trigger and never draw but **still count against `MAX_TRAPS`**. Ten of those and all VC trap placement silently fails mid-match. | `randi(0, LANE_N - 1)`, **plus** a lane-bounds check in `callinValid` so the next stale literal fails loudly instead of leaking. Verified: 0 orphaned traps over 4 simulated minutes, all 10 in live lanes. |
+| `muzzlePoint` | Did not pass `ref: u`, so the walk/run hysteresis (which keeps `_runV` on the unit) fell back to a bare threshold and could pick a different clip than the draw path — putting the flash, casings and muzzle light tens of pixels off the barrel. Worst on the night map. | Pass `ref: u`. Verified the divergence directly: at spd 21 the draw path shows `runfire` frame 16, the muzzle path picked `walk` frame 4. |
+
+**Found by my own sweep afterwards:** `render.js` branched on `lane === 2` for
+the near-lane depth tint, which became dead code the moment the front lane
+stopped being index 2. Now `LANE_N - 1`. Lesson: when a count becomes data,
+grep for the literal in *every* form — `< 3`, `=== 2`, `randi(0, 2)`, `% 3` —
+because each reads differently and no single search finds them all.
+
+**Side benefit:** one fewer full-width lane blit took the frame from **13.13 to
+10.4 src Mpx**, which is the headroom §7's VFX work needed.
 
 ### Where the tree stands
 
