@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- user-scalable=no: pinch-zoom fights a canvas game that does its own panning,
+     and a stray double-tap zoom leaves the player stuck at 2x with no way back.
+     viewport-fit=cover lets the stage reach under the notch once fullscreen. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0c0e09">
 <title>VIETNAM '65 — LANES OF WAR</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="css/style.css">
@@ -34,6 +41,7 @@
         <button id="btn-pause" title="Pause [P]">II</button>
         <button id="btn-speed" title="Speed [F]">1×</button>
         <button id="btn-mute" title="Mute [M]">SND</button>
+        <button id="btn-fullscreen" title="Fullscreen">⤢</button>
       </div>
 
       <div id="banner"></div>
@@ -213,6 +221,16 @@
   </div>
 </div>
 
+<!-- Shown only when a touch device is held upright. A 16:9 stage in portrait
+     collapses to about a quarter of the screen, so asking for a rotation beats
+     shipping an unplayable letterbox. -->
+<div id="rotate-prompt">
+  <div class="rotate-icon">⟳</div>
+  <div class="rotate-title">ROTATE YOUR DEVICE</div>
+  <div class="rotate-sub">Vietnam '65 is played in landscape</div>
+  <div class="rotate-skip">tap to play anyway</div>
+</div>
+
 <script src="assets/manifest.js"></script>
 <script src="assets/rig_manifest.js"></script>
 <script src="js/data.js"></script>
@@ -226,6 +244,7 @@
 <script src="js/perks.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/mobile.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

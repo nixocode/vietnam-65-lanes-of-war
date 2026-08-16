@@ -18,8 +18,13 @@
 
 html, body {
   width: 100%; height: 100%;
+  /* dvh tracks the mobile URL bar as it hides and shows; without it the stage
+     is sized against a viewport that is briefly wrong on every scroll gesture */
+  height: 100dvh;
   background: #0c0e09;
   overflow: hidden;
+  /* stop the page itself rubber-banding when a drag reaches the canvas edge */
+  overscroll-behavior: none;
   font-family: var(--font-mono);
   color: var(--paper);
 }
@@ -43,6 +48,59 @@ html, body {
   width: 100%; height: 100%;
   display: block;
   cursor: crosshair;
+  /* THE reason a drag could never pan the map: without this the browser claims
+     the gesture for document scrolling and pinch-zoom before touchmove is even
+     dispatched. `none` hands every touch to the game. */
+  touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------------------------------------------------------------- mobile ---
+ * The stage is 16:9 and centred, which is right on a desktop and wrong on a
+ * phone: `min(100vw, 100vh*16/9)` on a 390x844 screen gives 390x219, so the
+ * game occupied about a quarter of the display. In landscape the same rule is
+ * correct, so the fix is to fill the short axis and let the notch be covered
+ * rather than to change the aspect.
+ */
+#app { padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+body.touch #stage { box-shadow: none; }
+
+/* Touch targets. 44px is the usual floor for a finger; the HUD buttons were
+   sized for a mouse pointer. */
+body.touch #hud-controls button {
+  min-width: 44px; min-height: 40px; font-size: 15px;
+}
+body.touch .card { min-height: 44px; }
+
+#btn-fullscreen { font-size: 15px; line-height: 1; }
+
+/* Rotate prompt — only ever visible on a touch device held upright. */
+#rotate-prompt {
+  position: fixed; inset: 0; z-index: 9999;
+  display: none;
+  flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: #0c0e09;
+  color: var(--paper);
+  text-align: center;
+  padding: 24px;
+}
+body.portrait #rotate-prompt { display: flex; }
+.rotate-icon {
+  font-size: 54px; color: var(--brass, #c9a86a);
+  animation: rotate-hint 2.4s ease-in-out infinite;
+}
+@keyframes rotate-hint {
+  0%, 55%, 100% { transform: rotate(0deg); }
+  25%, 45%      { transform: rotate(-90deg); }
+}
+.rotate-title { font-size: 17px; letter-spacing: 2px; }
+.rotate-sub { font-size: 12px; opacity: .65; letter-spacing: 1px; }
+.rotate-skip {
+  margin-top: 18px; font-size: 11px; letter-spacing: 1px;
+  opacity: .42; text-decoration: underline;
 }
 
 .hidden { display: none !important; }

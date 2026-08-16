@@ -343,6 +343,17 @@ is the tell, and it is fixable without touching gameplay.
 
 *Last updated 2026-08-12, end of session.*
 
+### ⚠ OPEN: one self-test failure, unresolved
+
+`hill937/vc no casualties in 50s` (and the XP assertion that follows from it).
+It **passed at 55s** in the same session, and every other map/side passes at
+both lengths, so the likely reading is that dropping to two lanes slowed the
+opening on the hardest map enough that 50s no longer reaches first contact.
+**That is a hypothesis, not a finding** — the run to confirm it (kills across
+several seeds at 50s vs 55s) timed out before it completed. Do that first next
+session. If it is run length, the honest fix is to raise the suite's default
+duration and say why, not to loosen the casualty assertion.
+
 ### Where the tree stands
 
 **Three commits ahead of `origin/main`, none pushed.** The live site at
@@ -359,6 +370,38 @@ and the standing rule is no deploy without explicit approval.
 `a5a055b` is the odd one out: written before the revamp plan existed, never
 eyeballed. Either verify it (render each map, check the Cu Chi laterite reads as
 mud and not brick) or drop it. Do not push it blind.
+
+### 8d. Mobile ✅
+
+Three separate problems, only one of which was input:
+
+- **No panning.** The camera moved on `wheel`, which touch never fires, and
+  there was no touch handling anywhere. `js/mobile.js` adds drag-to-pan, scaled
+  through the element's rendered width (a CSS pixel is not a world pixel on a
+  letterboxed canvas, or the map crawls on a phone and races on a desktop).
+- **Not fullscreen — and fullscreen was not the fix.** `#stage` is 16:9 via
+  `min(100vw, 100vh*16/9)`, which on a 390×844 phone upright resolves to
+  **375×211**: a quarter of the screen. Verified in a mobile viewport. Landscape
+  fills 82%×100%, so the answer is a rotate prompt plus a fullscreen button,
+  not an aspect change.
+- **The page itself moved.** No `touch-action`, so the browser claimed drags for
+  document scrolling before `touchmove` was dispatched. `touch-action: none` on
+  the canvas is what actually made panning possible.
+
+Taps are left to the browser — only `touchmove` is prevented, so the synthetic
+click still fires and every existing handler (cards, squad select, minimap)
+keeps working. Only the click at the *end* of a drag is swallowed, via a
+capture-phase listener. Verified: a 4px tap pans 0 and keeps its click; a 70px
+drag pans 134 and suppresses it; panning clamps at the world edge.
+
+The rotate prompt is dismissable **on purpose**. It covers the whole screen, and
+`resize` does not fire in every environment — a stale class would lock the
+player out of their own game. It listens on resize, orientationchange,
+visibilitychange and a matchMedia query, and still offers "tap to play anyway".
+
+Not done: iOS Safari has no element fullscreen outside video, so the button is a
+no-op there (handled silently — the game is fine windowed). Landscape lock is
+best-effort and rejects on many browsers.
 
 ### Pick up here
 

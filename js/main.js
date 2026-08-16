@@ -29,6 +29,9 @@ const App = {
     window.addEventListener('orientationchange', () => setTimeout(() => this._fitUI(), 120));
     Renderer.init(canvas);
     UI.init(canvas);
+    // after UI, so the drag-suppression click listener is registered against a
+    // canvas that already has UI's own handler on it
+    Mobile.init();
     this._wireMenus();
     const status = document.getElementById('load-status');
     Sprite3D.load();                  // soldiers rendered off the 3D rig
