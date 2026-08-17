@@ -1,9 +1,13 @@
 # VIETNAM '65 — LIVING PLAN
 
-> ### ▶ Active work: [§2 CURRENT PLAN — THE MEKONG REVAMP](#2-current-plan--the-mekong-revamp)
-> Ten steps, one map. Steps 1–3 landed (step 4 part-done with them); step 5
-> (portraits) is next. Sections above it are history, sections below the
-> baseline are superseded.
+> ### ▶ Start here: [ISSUE QUEUE](#issue-queue--work-these-in-order-one-at-a-time)
+> An ordered list of what to fix next, one at a time, each marked for what is
+> known versus assumed. Next up: **squad orders are unreachable on touch**,
+> which makes the game unplayable on the mobile support just added.
+>
+> Background: [§2 THE MEKONG REVAMP](#2-current-plan--the-mekong-revamp) — ten
+> steps, one map. Steps 1–3 landed, 4 part-done. Sections above it are history;
+> sections below the baseline are superseded.
 
 **This is the single running plan. Update it as work lands.** The other docs are
 references, not plans:
@@ -336,6 +340,121 @@ is the tell, and it is fixable without touching gameplay.
 - **Real frame-rate numbers.** Everything above is measured work-per-frame, not
   wall-clock. The `` ` ``/F3 overlay now reports FPS, ms, p95 and the current
   render scale — that reading has to come from the owner's machine.
+
+---
+
+## ISSUE QUEUE — work these in order, one at a time
+
+Each item states what is **known** versus **assumed**, because several plan
+entries this project has failed on contact with the source. Nothing here is
+started until the one above it is verified and committed.
+
+---
+
+### 1. Squad orders are unreachable on touch  ◀ next
+**Impact: mobile-blocking. Cost: small — the sim is already done.**
+
+`orderSquad()` already implements **advance / hold / fallback / moveto** and
+they are bound to `A` / `H` / `B` plus click-to-move (`js/ui.js:249,329-331`).
+Verified by reading the implementation, not assumed. A phone has no keyboard, so
+right now a mobile player can buy units and pan the map but **cannot give a
+single order** — the game is unplayable on the platform we just added support
+for.
+
+- Surface the four orders as on-screen buttons in the squad panel, shown when a
+  squad is selected.
+- Touch targets ≥44px (the `body.touch` rules already exist in `style.css`).
+- Keep the keys working — this is additive.
+- Owner asked for "hold, stay, move forward"; `hold` and `advance` cover two,
+  `moveto` is "go here", `fallback` is the fourth. No new sim verbs needed.
+
+**Done when:** every order is reachable by finger on a 812×375 viewport, the
+keys still work, and the suite is green.
+
+---
+
+### 2. Land or drop the unverified palette commit `a5a055b`
+**Impact: it sits at the BOTTOM of the stack, so it rides on any push.**
+
+Partly resolved already: Cu Chi was verified, found overdone (a red quarry) and
+fixed by moving laterite into `pal.soil`; Ia Drang and Hill 937 were eyeballed
+and are good. **Mekong and Khe Sanh have still never been looked at.**
+
+**Done when:** a captured frame of each of the five maps has been viewed and
+judged, or the commit is dropped.
+
+---
+
+### 3. §5 Portraits from the same 3D heads
+Gates §6. Front-camera preset in the existing Blender pipeline so the HUD face
+is literally the man on the field. Plumbing exists (`SQUADS[].portrait` →
+`Assets.img()` → `js/ui.js`); only the pixels change. Render is ~11s/unit.
+
+**Done when:** all 12 portraits are rendered and the card bar shows them.
+
+---
+
+### 4. §6 HUD revamp to the reference layout
+The largest user-visible item, and it now has two new inputs: the playfield is
+**two lanes** (so the bottom quarter of the frame is free), and it must carry
+the order buttons from item 1. DOM + CSS, so it costs nothing per frame.
+
+**Done when:** unit info panel, category-grouped cards with stat pips, top bar
+and mission strip match the reference, and nothing overflows at 812×375.
+
+---
+
+### 5. §7 VFX — tracers, smoke, fire, water
+**Now unblocked:** dropping a lane took the frame from 13.13 to **10.4 src Mpx**
+against a cap of 13, so there is finally headroom to spend. Tracers first —
+that is where most of the reference's energy lives.
+
+**Done when:** tracers, shaped muzzle flash, rising smoke and water splashes are
+in, and `Capture.budget()` still reports ≤13 src Mpx and ≤220 particles.
+
+---
+
+### 6. §8 remaining terrain — mud, occluders, foliage
+Water is done. Left: mud with puddles and wet/dry variation, churned ground near
+fighting, a **foreground occluder band** (depth sells faster from something in
+front than anything behind), and profile-rendered foliage to replace the
+overlapping-blob trees.
+
+---
+
+### 7. §9 A squad should look like five men
+Per-man pose and clip-phase offset — all men in a cell currently hold an
+identical pose. Then **crouch**, which the sim has no state for at all, and
+inter-squad spacing.
+
+---
+
+### 8. §4 Real weapon meshes  *(polish — deliberately last)*
+Proportions are fixed; the meshes are still donor stand-ins (`SMG` playing an
+M16). Downgraded from blocking because the blob problem it was meant to solve
+turned out to be the outline, not the guns.
+
+---
+
+### BLOCKED — needs something only the owner can provide
+
+**B1. "Soldiers should come in front of buildings" — cannot reproduce.**
+Measured on Mekong with 47 live men and 16 structures: **0 men hidden by a
+later-lane structure**, and 10 overlapping a same-lane structure *drawn in
+front, correctly*. Draw order within a lane is structures → covers →
+emplacements → flag → units, so same-lane men are already on top. The report
+predates the two-lane change, which altered the geometry. **A screenshot of the
+case would settle it in minutes; guessing at it would waste an afternoon.**
+
+**B2. Going in and out of buildings with door animations.** Not started. The
+tactical half exists (`window` cover puts men inside firing out), but there is
+no door and no walk-in clip. Worth confirming the owner wants the animation
+work before spending a Blender pass on it.
+
+**B3. A real frame-rate number.** Everything performance-related is measured
+work-per-frame, never wall-clock — the automation pane does not rasterise. One
+reading off the `` ` ``/F3 overlay tells us whether adaptive resolution is
+pinned at its 0.62 floor.
 
 ---
 
@@ -701,27 +820,26 @@ front lane was never given room.
 Worth doing **before** §6, since the HUD rebuild should be designed against the
 final playfield height rather than the current one.
 
-### 8c. Owner requests — buildings and squad orders *(queued, not started)*
+### 8c. Owner requests — buildings and squad orders *(now measured)*
 
 Owner, 2026-08-12: *"soldiers should also come in front of buildings, or go in
 them (make interactive, go in and out of doors, add these animations); when
 clicking on squads you should be able to make them hold, stay, move forward."*
 
-- **Draw order vs buildings.** Within a lane the order is structures → covers →
-  emplacements → units, so a man *should* already paint over a building in his
-  own lane. Needs reproducing before fixing — likely either a man in lane N
-  behind a structure in lane N+1 (correct depth, wrong-looking), or the stilt
-  houses' raised floor putting the man behind the wall. Measure which before
-  touching draw order.
-- **Entering buildings.** The `window` cover type already puts men *inside*
-  firing out through a cut opening, so the tactical half exists. What is missing
-  is the transition — a door, and a walk-in/walk-out. No door animation exists in
-  the clip set; `walk` plus an alpha fade through the doorway would avoid a
-  re-render.
-- **Squad orders.** `orderSquad(s, order, arg)` already exists and takes an
-  order; check what verbs it supports before adding any. The ask is HOLD / STAY /
-  MOVE FORWARD surfaced on click — so this may be mostly a HUD job (§6) rather
-  than a sim one. Confirm before building.
+Both were investigated rather than assumed, and both turned out smaller or
+different than the request implied. **See ISSUE QUEUE item 1 and BLOCKED B1/B2
+at the top of this file** — these are the findings:
+
+- **Squad orders already exist.** `orderSquad()` implements advance / hold /
+  fallback / moveto, bound to `A` / `H` / `B` and click-to-move. Nothing is
+  missing from the sim. What is missing is that they are **keyboard-only**, so
+  they are unreachable on the phone support we just shipped. HUD job, not a sim
+  job — and mobile-blocking, which is why it is now first in the queue.
+- **Men behind buildings does not reproduce.** 47 live men against 16
+  structures on Mekong: zero hidden by a later-lane structure, ten overlapping a
+  same-lane structure and correctly drawn in front. Needs a screenshot.
+- **Doors are genuinely not started.** The `window` cover already puts men
+  inside firing out; the transition animation does not exist.
 
 ### 9. A squad should look like five men
 - Per-man pose and clip-phase offset — all five men in a cell currently hold an identical pose.
