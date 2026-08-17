@@ -69,11 +69,32 @@ html, body {
 body.touch #stage { box-shadow: none; }
 
 /* Touch targets. 44px is the usual floor for a finger; the HUD buttons were
-   sized for a mouse pointer. */
+   sized for a mouse pointer.
+ *
+ * These are expressed in DESIGN pixels, and the whole HUD is then scaled by
+ * --uiK (0.52 on a phone in landscape) — so a 44px design button lands at ~23
+ * real pixels, which is not a finger target at all. The order buttons measured
+ * exactly that. Sizes here are therefore divided back out by the scale, so the
+ * PHYSICAL target is right rather than the nominal one. */
 body.touch #hud-controls button {
-  min-width: 44px; min-height: 40px; font-size: 15px;
+  min-width: calc(44px / var(--uiK, 1)); min-height: calc(40px / var(--uiK, 1));
+  font-size: calc(15px / var(--uiK, 1));
 }
-body.touch .card { min-height: 44px; }
+body.touch .card { min-height: calc(44px / var(--uiK, 1)); }
+
+/* Squad orders — the controls a player uses most, and the ones that were
+   smallest. Kept legible as well as tappable. */
+body.touch #squad-panel button {
+  min-height: calc(42px / var(--uiK, 1));
+  /* width matters as much as height: the smoke button is a single letter and
+     measured 25px across — tall enough to hit and too narrow to */
+  min-width: calc(42px / var(--uiK, 1));
+  padding: calc(6px / var(--uiK, 1)) calc(12px / var(--uiK, 1));
+  font-size: calc(12px / var(--uiK, 1));
+}
+body.touch #squad-panel .sp-name { font-size: calc(12px / var(--uiK, 1)); }
+/* the keyboard hints are noise on a device with no keyboard */
+body.touch #squad-panel button i { display: none; }
 
 #btn-fullscreen { font-size: 15px; line-height: 1; }
 

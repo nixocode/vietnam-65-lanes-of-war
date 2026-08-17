@@ -2,8 +2,9 @@
 
 > ### ▶ Start here: [ISSUE QUEUE](#issue-queue--work-these-in-order-one-at-a-time)
 > An ordered list of what to fix next, one at a time, each marked for what is
-> known versus assumed. Next up: **squad orders are unreachable on touch**,
-> which makes the game unplayable on the mobile support just added.
+> known versus assumed. Item 1 is done — the mobile HUD was rendering entirely
+> off-screen. Next up: **item 2, land or drop the unverified palette commit**,
+> which sits at the bottom of the stack and rides on any push.
 >
 > Background: [§2 THE MEKONG REVAMP](#2-current-plan--the-mekong-revamp) — ten
 > steps, one map. Steps 1–3 landed, 4 part-done. Sections above it are history;
@@ -351,25 +352,40 @@ started until the one above it is verified and committed.
 
 ---
 
-### 1. Squad orders are unreachable on touch  ◀ next
-**Impact: mobile-blocking. Cost: small — the sim is already done.**
+### 1. The whole HUD was off-screen on a phone ✅
+**Not what this item said it was.** It was written as "orders are keyboard-only,
+add buttons". Wrong on both counts: the squad panel has had ADVANCE / HOLD /
+FALL BACK / GRENADE / SMOKE buttons with click handlers all along.
 
-`orderSquad()` already implements **advance / hold / fallback / moveto** and
-they are bound to `A` / `H` / `B` plus click-to-move (`js/ui.js:249,329-331`).
-Verified by reading the implementation, not assumed. A phone has no keyboard, so
-right now a mobile player can buy units and pan the map but **cannot give a
-single order** — the game is unplayable on the platform we just added support
-for.
+**The real bug was `--uiK`.** The HUD is laid out at a fixed 1280×720 and scaled
+to the stage by `transform: scale(var(--uiK))`. `App._fitUI()` sets that
+variable — but it ran at boot *before* the stylesheet had sized the stage, read
+the unstyled width, and committed **k = 1**. Nothing ever corrected it, because
+the `ResizeObserver` only fires when the stage CHANGES size and a phone loading
+straight into landscape never changes it.
 
-- Surface the four orders as on-screen buttons in the squad panel, shown when a
-  squad is selected.
-- Touch targets ≥44px (the `body.touch` rules already exist in `style.css`).
-- Keep the keys working — this is additive.
-- Owner asked for "hold, stay, move forward"; `hold` and `advance` cover two,
-  `moveto` is "go here", `fallback` is the fourth. No new sim verbs needed.
+Measured on an 812×375 viewport: `#hud` was **1280×720 against a 667×375
+stage**, putting the card bar at y 628 and the squad panel at y 578 — both
+several hundred pixels below the visible area. A mobile player could buy nothing
+and order nothing, not because the controls were missing but because they were
+rendered off the bottom of the screen.
 
-**Done when:** every order is reachable by finger on a 812×375 viewport, the
-keys still work, and the suite is green.
+- `_fitUI()` now ignores a zero/absent width instead of committing it, and
+  re-runs on `requestAnimationFrame` and `load` so a device that never resizes
+  still gets a real measurement.
+- Touch targets were a second, independent bug: sizes are in DESIGN pixels and
+  then scaled by 0.52, so the "44px" rules landed at ~23 real pixels. They are
+  divided back out by `--uiK` now, so the *physical* target is right. The smoke
+  button was 25px wide — width needed the same treatment as height.
+- Keyboard hints (`A`, `H`, `B`) are hidden on touch; they are noise on a device
+  with no keyboard.
+
+**Verified:** `--uiK` 0.521, `#hud` 667×375 matching the stage, panel and card
+bar fully on-screen, all five order buttons ≥42px, and an end-to-end tap on HOLD
+sets `order: 'hold'` / `playerHeld: true` while ADVANCE clears it. Suite green.
+
+*(A DOM screenshot was not possible — the automation pane does not composite, so
+the HUD was verified by geometry and dispatch rather than by eye.)*
 
 ---
 

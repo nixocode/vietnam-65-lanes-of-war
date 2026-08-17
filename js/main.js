@@ -11,17 +11,36 @@ const App = {
   resultDelay: 0,
   skirmish: { side: 'us', map: 'iadrang', diff: 'veteran' },
 
+  /* Scale the 1280x720 UI design to the real stage size.
+   *
+   * Guarded, because a bad reading here is invisible and permanent. Called at
+   * boot before layout has settled, `stage.clientWidth` reports the unstyled
+   * width and this computed k = 1 — leaving the HUD at its full 1280x720 on a
+   * 667x375 stage, with the card bar at y 628 and the squad panel at y 578,
+   * both far below a 375px viewport. Nothing corrected it afterwards, because
+   * the ResizeObserver only fires when the stage CHANGES size and a phone
+   * loading straight into landscape never changes it.
+   *
+   * So: ignore implausible widths rather than committing them, and re-run once
+   * layout is real (see boot).
+   */
   _fitUI() {
-    // scale the 1280x720 UI design to the real stage size
     const stage = document.getElementById('stage');
     if (!stage) return;
-    const k = stage.clientWidth / CANVAS_W;
-    stage.style.setProperty('--uiK', k);
+    const w = stage.clientWidth;
+    if (!(w > 0)) return;                 // pre-layout; a 0 here would blank the UI
+    stage.style.setProperty('--uiK', w / CANVAS_W);
   },
 
   boot() {
     const canvas = document.getElementById('game-canvas');
     this._fitUI();
+    /* Re-run once layout is real. The call above can land before the stylesheet
+     * has sized the stage, and the observer below only fires on a CHANGE — so a
+     * device that loads straight into its final size would keep the bad value
+     * forever. rAF covers the normal case, `load` covers a late stylesheet. */
+    requestAnimationFrame(() => this._fitUI());
+    window.addEventListener('load', () => this._fitUI());
     if (window.ResizeObserver) {
       new ResizeObserver(() => this._fitUI()).observe(document.getElementById('stage'));
     }
