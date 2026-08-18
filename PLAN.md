@@ -2,9 +2,10 @@
 
 > ### ▶ Start here: [ISSUE QUEUE](#issue-queue--work-these-in-order-one-at-a-time)
 > An ordered list of what to fix next, one at a time, each marked for what is
-> known versus assumed. Item 1 is done — the mobile HUD was rendering entirely
-> off-screen. Next up: **item 2, land or drop the unverified palette commit**,
-> which sits at the bottom of the stack and rides on any push.
+> known versus assumed. Items 1 and 2 are done — the mobile HUD was rendering
+> entirely off-screen, and the night wash was *erasing* Khe Sanh rather than
+> darkening it. Next up: **item 3, portraits rendered from the same 3D heads**,
+> which gates the HUD rebuild.
 >
 > Background: [§2 THE MEKONG REVAMP](#2-current-plan--the-mekong-revamp) — ten
 > steps, one map. Steps 1–3 landed, 4 part-done. Sections above it are history;
