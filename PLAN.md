@@ -431,12 +431,39 @@ Suite green; budget unaffected (khesanh 8.78 src Mpx, mekong 10.4).
 
 ---
 
-### 3. §5 Portraits from the same 3D heads
-Gates §6. Front-camera preset in the existing Blender pipeline so the HUD face
-is literally the man on the field. Plumbing exists (`SQUADS[].portrait` →
-`Assets.img()` → `js/ui.js`); only the pixels change. Render is ~11s/unit.
+### 3. §5 Portraits from the same 3D heads — TRIED, REJECTED ✅(closed)
 
-**Done when:** all 12 portraits are rendered and the card bar shows them.
+**The idea does not survive contact with the donors.** Built it, rendered it,
+compared it at the size a player actually sees, and it is *worse* than what is
+already shipping. Not adopted.
+
+`--portrait` now exists in `tools/render_model_sprites.py` (front camera at head
+height, its own near-frontal key light, one frame straight to
+`assets/ui/port_<unit>.png`) and works. The output is the problem:
+
+- **Three of twelve donors have no face at all.** Measured straight out of the
+  GLB material lists: `soldier` (rifleman, sniper) and `swat` (engineer) ship
+  no `Eye` or `Eyebrows` material. `SOURCE.txt` claims every donor but `swat`
+  has a face — that is **wrong**, and now corrected there. The engineer being
+  blank is arguably right, since the swat is masked; the rifleman being blank is
+  not, and he is the primary US card.
+- **Even the donors WITH eyes do not read.** Rendered `nva` (worker, which has
+  `Eye` and `Eyebrows`) and at 88×76 the pith-hat brim drops the whole face into
+  shadow. The eyes are present and invisible. Every unit wears headgear, and a
+  frontal camera puts every brim straight across the eyeline.
+- **The heads are low-poly.** There is no facial detail to survive the downscale
+  to card size; what arrives is a smooth tan mask.
+
+Side by side at 88×76, the existing hand-drawn vector portraits are clearly the
+best of the three — readable helmet, eyes, brows, mouth.
+
+**Kept:** the `--portrait` path, documented as not the shipping route, because
+it is correct and cheap to re-run if the donor heads are ever replaced with
+something that has a face worth photographing.
+
+**Consequence for §6:** the HUD rebuild uses the existing portrait art. The
+"card face is literally the man on the field" idea is dropped — it was a good
+premise defeated by the source material, not by the implementation.
 
 ---
 

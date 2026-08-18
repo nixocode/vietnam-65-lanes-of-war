@@ -46,6 +46,32 @@ ORTHO_K = 1.5
 CAM_ZK = 0.52
 ONLY = [c for c in (arg('--only', '') or '').split(',') if c]
 NORENDER = '--norender' in argv   # re-derive muzzle points without redrawing frames
+
+# ---- portrait mode — BUILT, EVALUATED, NOT THE SHIPPING PATH -------------
+# Renders a HUD portrait through THIS script rather than a separate one, so it
+# inherits the same donor, recolour, headgear and lighting. The intent was that
+# the face on the card would literally be the man on the field.
+#
+# It works, and the result is WORSE than the hand-drawn portraits it was meant
+# to replace, for reasons that are about the donors rather than the code:
+#   * `soldier` and `swat` ship no Eye/Eyebrows material at all, so rifleman,
+#     sniper and engineer render as blank masks (see art/models/SOURCE.txt).
+#   * Even donors that do have eyes lose them: every unit wears headgear, and a
+#     frontal camera puts the brim straight across the eyeline. Rendered `nva`
+#     at card size, the pith hat shadows the entire face.
+#   * The heads are low-poly with no detail that survives 88x76.
+#
+# Kept because it is correct and cheap to re-run if the donor heads are ever
+# replaced. Do not wire it into the build without re-checking the comparison —
+# see PLAN.md issue queue item 3.
+#
+# Usage:
+#   Blender -b --python tools/render_model_sprites.py -- --model auto \
+#     --unit nva --builtin --portrait --turn 180 \
+#     --portrait-z 0.925 --portrait-scale 0.26
+PORTRAIT = '--portrait' in argv
+PORTRAIT_K = float(arg('--portrait-scale', '0.30'))   # ortho span as a fraction of height
+PORTRAIT_Z = float(arg('--portrait-z', '0.90'))       # camera height as a fraction of height
 TURN = arg('--turn', '90')            # degrees about Z to face screen-right
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTDIR = os.path.join(ROOT, 'assets', 'sprites3d', UNIT)
@@ -746,6 +772,10 @@ def fit_and_stage():
     bpy.context.collection.objects.link(cam)
     cam.location = (0.0, -8.0, HEIGHT * CAM_ZK)
     cam.rotation_euler = (math.radians(90), 0, 0)
+    if PORTRAIT:
+        # head-and-shoulders, eye level, same lens and lights as the field sprite
+        cam_d.ortho_scale = HEIGHT * PORTRAIT_K
+        cam.location = (0.0, -8.0, HEIGHT * PORTRAIT_Z)
     bpy.context.scene.camera = cam
 
     key = bpy.data.lights.new('key', 'SUN'); key.energy = 3.6
@@ -758,6 +788,18 @@ def fit_and_stage():
     rim.color = (1.0, 0.96, 0.84)
     ro = bpy.data.objects.new('rim', rim); bpy.context.collection.objects.link(ro)
     ro.rotation_euler = (math.radians(112), 0, math.radians(-24))
+    if PORTRAIT:
+        # The field rig keys from 52 degrees off to one side, which is right for
+        # a profile sprite and wrong for a face: seen head-on, the helmet brim
+        # drops the whole face into shadow. Bring the key round to near-frontal
+        # and lift the fill so the features actually read at card size. A sun
+        # lamp points down -Z, so rx=90 sends it straight down the camera axis;
+        # 68 degrees keeps a little modelling on the cheekbones.
+        ko.rotation_euler = (math.radians(68), 0, math.radians(22))
+        key.energy = 3.2
+        fill.energy = 1.5
+        fo.rotation_euler = (math.radians(84), 0, math.radians(-42))
+        rim.energy = 2.0
     w = bpy.data.worlds.new('w'); w.use_nodes = True
     w.node_tree.nodes['Background'].inputs['Color'].default_value = (0.30, 0.34, 0.30, 1)
     w.node_tree.nodes['Background'].inputs['Strength'].default_value = 0.30
@@ -954,6 +996,37 @@ def main():
         clips = {'idle': (list(bpy.data.actions) or [None])[0]}
 
     attach_gear(UNIT, sc, clips.get('aim') or clips.get('idle'))
+
+    if PORTRAIT:
+        """One frame, head-on, straight to where the HUD looks for it.
+
+        Everything above this point has already built the man: donor body,
+        period tint, skin tone, headgear, weapon and the three-point rig. A
+        portrait is that same man under a closer camera, which is exactly why it
+        is rendered here instead of by a second script — there is no second
+        definition to drift out of sync.
+        """
+        act = None
+        for state, want in STATE_ACTIONS.items():
+            if state != 'idle':
+                continue
+            for a in bpy.data.actions:
+                if want.lower() in a.name.lower():
+                    act = a
+                    break
+        arm = arm_of()
+        if act and arm:
+            if not arm.animation_data:
+                arm.animation_data_create()
+            arm.animation_data.action = act
+            sc.frame_set(int(act.frame_range[0]))
+        bpy.context.view_layer.update()
+        out = os.path.join(ROOT, 'assets', 'ui', 'port_%s.png' % UNIT)
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        sc.render.filepath = out
+        bpy.ops.render.render(write_still=True)
+        print('PORTRAIT', UNIT, '->', out)
+        return
 
     index = {'unit': UNIT, 'res': RES, 'clips': {},
              'cam': {'ortho': HEIGHT * ORTHO_K, 'camz': HEIGHT * CAM_ZK, 'figH': HEIGHT}}

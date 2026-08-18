@@ -40,9 +40,17 @@ drop-in interchangeable in tools/render_model_sprites.py, while being visibly
 different people. That is what makes per-faction bodies possible at no cost to the
 animation pipeline.
 
-Critically, all of them EXCEPT swat carry separate head meshes with Skin, Eye,
-Eyebrows and Hair materials — they have faces. The swat is fully masked and gloved,
-which is why every soldier used to read as the same anonymous mannequin.
+Most of them carry separate head meshes with Skin, Eye, Eyebrows and Hair
+materials — they have faces. The swat is fully masked and gloved, which is why
+every soldier used to read as the same anonymous mannequin.
+
+CORRECTION (2026-08-18): this used to say "all of them EXCEPT swat". That is
+wrong. Read straight out of the GLB material lists, `soldier` has no Eye or
+Eyebrows either — its materials are Black, Swat, Skin, Grey, Hair_Brown, Brown.
+So rifleman and sniper are as faceless as the engineer. It does not matter at
+84px on the field, and it is exactly why the HUD-portrait experiment was
+rejected (see PLAN.md issue queue item 3). Faces present: casual, farmer,
+worker, adventurer, hoodie. Faces absent: soldier, swat.
 
 WHICH UNIT USES WHICH  (see MODEL_FOR in tools/render_model_sprites.py)
   casual      -> rifleman, arvn, m60, engineer   (plain shirt + trousers; webbing added)
