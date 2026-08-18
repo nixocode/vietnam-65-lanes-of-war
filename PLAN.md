@@ -389,15 +389,44 @@ the HUD was verified by geometry and dispatch rather than by eye.)*
 
 ---
 
-### 2. Land or drop the unverified palette commit `a5a055b`
-**Impact: it sits at the BOTTOM of the stack, so it rides on any push.**
+### 2. Verify the palette commit ✅ — and it caught something much worse
 
-Partly resolved already: Cu Chi was verified, found overdone (a red quarry) and
-fixed by moving laterite into `pal.soil`; Ia Drang and Hill 937 were eyeballed
-and are good. **Mekong and Khe Sanh have still never been looked at.**
+All five maps now viewed. Ia Drang (blue massif reads as distance), Hill 937
+(luminance lift works) and Mekong (contrast 113, saturation 0.52 — healthy) are
+good. Cu Chi had been overdone and was fixed by moving laterite into `pal.soil`.
 
-**Done when:** a captured frame of each of the five maps has been viewed and
-judged, or the commit is dropped.
+**Khe Sanh was not a palette problem. Night was erasing the map.**
+
+`_drawNight` washed a flat `rgba(11,16,33)` over the frame with `source-over` at
+alpha **0.88**. That is a linear lerp, so every pixel became
+`0.12 x itself + 0.88 x one navy` — compressing the entire 0-255 range into
+about 31 points. Measured on the captured frame: luminance spanned **47..68**,
+a p95-p5 contrast of **18** against ~113 on a daylight map. The map was not
+dark, it was *erased*: soldiers, buildings and hills all sat within a few points
+of each other and the battle could not be made out at all.
+
+Multiply is the right operator — it SCALES rather than replaces, so whatever was
+brighter stays brighter. An earlier note in the code had rejected it for giving
+"a brown night", but that only holds for a neutral factor: a blue-dominant one
+suppresses red and green harder than blue, cooling the frame *as* it darkens it.
+
+Tuning took two passes, and the first was wrong in an instructive way.
+`rgb(84,104,164)` doubled the contrast but made the frame *warmer*
+(blue-minus-red −5 → −10), because multiply preserves the source's hue
+dominance and Khe Sanh's palette is strongly red — red-mud lanes, orange sky.
+Only a much harder red suppression, `rgb(58,102,196)`, actually turned it cool.
+
+| | contrast (p95−p5) | std | blue−red |
+|---|---|---|---|
+| original, source-over 0.88 | **18** | 5.7 | −5 |
+| multiply `rgb(84,104,164)` | 35 | 10.9 | −10 *(warmer!)* |
+| multiply `rgb(58,102,196)` | **34** | 10.7 | **+3** |
+
+Lower than daylight on purpose — night *should* have less contrast. What
+matters is that it is now readable: soldiers, the bunker complex, the treeline,
+tracer and muzzle flashes all legible against blue-lit hills.
+
+Suite green; budget unaffected (khesanh 8.78 src Mpx, mekong 10.4).
 
 ---
 

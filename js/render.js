@@ -1737,12 +1737,27 @@ const Renderer = {
     if (!this._night) return;
     const k = this._nightK;
     ctx.save();
+    /* NIGHT DARKENS. It does not paint over.
+     *
+     * This used to be a source-over wash of rgba(11,16,33) at alpha 0.88, which
+     * is a linear lerp: every pixel became 0.12 x itself + 0.88 x one flat
+     * navy. That compresses the whole 0-255 range into about 31 points, and
+     * measurement bore it out exactly — the Khe Sanh frame spanned luminance
+     * 47..68, a p95-p5 contrast of 18 against ~113 on a daylight map. The map
+     * was not dark, it was ERASED: soldiers, buildings and hills all sat within
+     * a few points of each other and nothing could be made out.
+     *
+     * Multiply is the correct operator, because it SCALES rather than replaces
+     * and so preserves relative contrast — what was brighter stays brighter. An
+     * earlier note rejected it for giving "a brown night", but that is only true
+     * multiplying by a neutral: a blue-dominant factor suppresses red and green
+     * harder than blue, so it cools the frame as it darkens it. A light wash
+     * afterwards settles the blacks, since real night is not pure black. */
     ctx.globalCompositeOperation = 'multiply';
-    /* Multiply SCALES colour, it does not replace it — against a warm sunset
-     * palette that just produced a brown night. Washing over with source-over
-     * neutralises the daylight hue first; the cold gradient then owns the frame. */
+    ctx.fillStyle = 'rgb(58,102,196)';
+    ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = `rgba(11,16,33,${k})`;
+    ctx.fillStyle = `rgba(11,16,33,${k * 0.14})`;
     ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
     ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
