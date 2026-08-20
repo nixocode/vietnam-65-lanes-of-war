@@ -782,3 +782,60 @@ h2 {
 .perk-card.owned .pk-cost::after { content: ' ✔'; }
 .perk-card.locked { opacity: .45; cursor: not-allowed; }
 #perk-points { color: #d8c169; letter-spacing: .08em; }
+
+/* ============================================================
+   CARD STAT PIPS + UNIT INFO
+   Reference art shows what a unit is worth on the card itself and in a
+   detail panel, rather than making the player learn it by dying. Both are
+   built from UNITS/SQUADS at runtime, so they cannot disagree with the sim.
+   DOM, so they cost nothing per frame.
+   ============================================================ */
+.card-pips {
+  position: absolute; left: 4px; right: 4px; bottom: 15px;
+  display: flex; gap: 5px; justify-content: center;
+  pointer-events: none;
+}
+.pip-row { display: inline-flex; gap: 1.5px; align-items: center; }
+.pip-row i {
+  width: 4px; height: 5px; display: block;
+  background: rgba(255,255,255,.16);
+  border-radius: .5px;
+}
+.pip-row.fire  i.on { background: #d8a24e; }
+.pip-row.tough i.on { background: #8fae63; }
+
+#unit-info {
+  position: absolute; bottom: 132px; left: 50%; transform: translateX(-50%);
+  width: 300px; z-index: 8; pointer-events: none;
+  background: linear-gradient(180deg, rgba(26,32,19,.97), rgba(14,18,11,.98));
+  border: 1px solid rgba(201,168,106,.55);
+  box-shadow: 0 8px 26px rgba(0,0,0,.65);
+  padding: 9px 11px; border-radius: 2px;
+  font-family: var(--font-mono); color: var(--paper);
+}
+#unit-info.hidden { display: none; }
+#unit-info .ui-head { border-bottom: 1px solid rgba(201,168,106,.28); padding-bottom: 5px; margin-bottom: 6px; }
+#unit-info .ui-name { font-family: var(--font-head); font-size: 13px; letter-spacing: 1.5px; color: var(--brass); }
+#unit-info .ui-role { font-size: 9.5px; opacity: .66; margin-top: 2px; letter-spacing: .5px; }
+#unit-info .ui-stats div {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 9px; letter-spacing: 1px; opacity: .82; margin: 3px 0;
+}
+#unit-info .ui-stats em { display: inline-flex; gap: 2px; font-style: normal; }
+#unit-info .ui-stats i {
+  width: 13px; height: 5px; display: block;
+  background: rgba(255,255,255,.15); border-radius: .5px;
+}
+#unit-info .ui-stats i.on { background: var(--brass); }
+#unit-info .ui-trait {
+  margin-top: 6px; padding-top: 5px; font-size: 9.5px; line-height: 1.4;
+  border-top: 1px solid rgba(201,168,106,.22); opacity: .8; font-style: italic;
+}
+#unit-info .ui-cost {
+  margin-top: 7px; text-align: right;
+  font-family: var(--font-head); font-size: 12px; letter-spacing: 1px; color: var(--brass);
+}
+#unit-info .ui-cost.short { color: #c9694e; }
+
+/* on a phone the panel would cover the battlefield it is describing */
+body.touch #unit-info { display: none !important; }

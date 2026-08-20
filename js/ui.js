@@ -69,6 +69,103 @@ const UI = {
     this._buildPips();
   },
 
+  /* Turn a squad's real unit data into 0-4 pips.
+   *
+   * Read from UNITS rather than authored per card, so a stat tweak in data.js
+   * cannot silently disagree with what the card advertises. Firepower is
+   * damage x rate, because either alone is misleading — a sniper's 999 damage
+   * at 0.3 rounds/sec is not four pips of sustained fire, and an MG's 6 damage
+   * at 9 rounds/sec is.
+   */
+  _pips(key) {
+    const d = SQUADS[key];
+    const u = UNITS[d.comp[0]];
+    if (!u) return { fire: 0, tough: 0, reach: 0 };
+    const men = d.comp.length;
+    // sniper damage is a one-shot-kill sentinel; score it as high-but-finite
+    const dmg = u.dmg > 100 ? 26 : u.dmg;
+    const dps = dmg * (u.rof || 1) * men;
+    const q = (v, steps) => {
+      let n = 0;
+      for (const t of steps) if (v >= t) n++;
+      return Math.max(1, Math.min(4, n));
+    };
+    return {
+      fire:  q(dps,        [0, 60, 150, 300]),
+      tough: q(u.hp * men, [0, 90, 160, 240]),
+      reach: q(u.range,    [0, 290, 340, 600]),
+    };
+  },
+
+  _pipRow(key) {
+    const p = this._pips(key);
+    const row = (n, cls) => {
+      let h = `<span class="pip-row ${cls}">`;
+      for (let i = 0; i < 4; i++) h += `<i class="${i < n ? 'on' : ''}"></i>`;
+      return h + '</span>';
+    };
+    return row(p.fire, 'fire') + row(p.tough, 'tough');
+  },
+
+  /* Hover detail, in the spirit of the reference art: who they are, what they
+   * do, and what it costs — without making the player memorise a wiki. Built
+   * from UNITS and SQUADS so it cannot drift from the sim. */
+  _showInfo(key) {
+    const el = document.getElementById('unit-info');
+    if (!el) return;
+    const d = SQUADS[key];
+    const u = UNITS[d.comp[0]] || {};
+    const p = this._pips(key);
+    const g = this.game;
+    const bar = (n) => {
+      let h = '';
+      for (let i = 0; i < 4; i++) h += `<i class="${i < n ? 'on' : ''}"></i>`;
+      return h;
+    };
+    /* Order matters: the APC carries `mg` AND `vehicle`, so testing mg first
+     * labelled an armoured personnel carrier "Support / Suppression". Most
+     * specific class wins. */
+    const role = u.vehicle ? 'Armour' : u.sniper ? 'Marksman'
+      : u.at ? 'Anti-Armour' : u.sapper ? 'Demolition'
+      : u.engineer ? 'Engineer' : u.mg ? 'Support / Suppression'
+      : 'Line Infantry';
+    /* MOST DISTINCTIVE FIRST — the panel shows one line, and every VC unit
+     * carries `conceal`, so listing it early buried what actually makes each
+     * one different: the RPG team advertised "conceals in brush" instead of
+     * "rocket ignores armour". Shared traits go last. */
+    const traits = [];
+    if (u.at) traits.push('Rocket ignores armour');
+    if (u.sapper) traits.push('Satchel charge kills armour outright');
+    if (u.sniper) traits.push('One shot, one kill — but slow to lay the sight');
+    if (u.engineer) traits.push('Clears mines and punji stakes ahead of the advance');
+    if (u.armour) traits.push('Armoured — small arms barely scratch it');
+    if (u.detect) traits.push('Spots concealed enemies at range');
+    if (u.suppress) traits.push('Suppresses — slows and spoils their aim');
+    if (u.ambush > 1.4) traits.push('Hits hard from an ambush');
+    if (u.small) traits.push('Cheap and quick, but fragile');
+    if (u.conceal) traits.push('Conceals in brush until he fires');
+    if (!traits.length) traits.push('The backbone — no tricks, just rifles');
+    const affordable = g && g.cp[g.player] >= d.cost;
+    el.innerHTML = `
+      <div class="ui-head">
+        <div class="ui-name">${d.name.toUpperCase()}</div>
+        <div class="ui-role">${role} · ${d.comp.length === 1 ? '1 man' : d.comp.length + ' men'}</div>
+      </div>
+      <div class="ui-stats">
+        <div><span>FIREPOWER</span><em>${bar(p.fire)}</em></div>
+        <div><span>TOUGHNESS</span><em>${bar(p.tough)}</em></div>
+        <div><span>REACH</span><em>${bar(p.reach)}</em></div>
+      </div>
+      ${traits.length ? `<div class="ui-trait">${traits[0]}</div>` : ''}
+      <div class="ui-cost ${affordable ? '' : 'short'}">${d.cost} CP</div>`;
+    el.classList.remove('hidden');
+  },
+
+  _hideInfo() {
+    const el = document.getElementById('unit-info');
+    if (el) el.classList.add('hidden');
+  },
+
   _buildCards() {
     const g = this.game;
     this.els.unitCards.innerHTML = '';
@@ -99,8 +196,11 @@ const UI = {
          <div class="card-cost">${d.cost}</div>
          <div class="card-key">${i + 1}</div>
          <div class="card-men">×${d.comp.length}</div>
+         <div class="card-pips">${this._pipRow(key)}</div>
          <div class="card-cd"></div>`);
       card.addEventListener('click', () => this.armUnit(key));
+      card.addEventListener('mouseenter', () => this._showInfo(key));
+      card.addEventListener('mouseleave', () => this._hideInfo());
       this.els.unitCards.appendChild(card);
       this.cardEls[key] = card;
     });
