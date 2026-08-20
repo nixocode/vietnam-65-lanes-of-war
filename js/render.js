@@ -80,9 +80,42 @@ function tex(kind, i) {
 }
 
 /* bottom-center anchored texture draw */
+/* Pre-scaled copies of a texture, bucketed by drawn width.
+ *
+ * drawTex sampled the FULL source every call — a 512px plant drawn at 90px
+ * still made the driver read 512x512. Props solved this long ago with the same
+ * trick; the texture path never got it. It showed up the moment the foreground
+ * band got denser: source sampling jumped 10.3 -> 15.7 Mpx against a cap of 13,
+ * and almost all of it was re-sampling the same handful of plants.
+ *
+ * Bucketed to 8px so a hundred slightly different widths do not each mint their
+ * own canvas, and capped per texture so the cache cannot become its own leak.
+ */
+const _TEX_SCALED = new Map();
+function texScaled(img, w) {
+  const b = Math.max(8, Math.round(w / 8) * 8);
+  if (b >= img.width) return img;          // never upscale — that costs more, not less
+  let per = _TEX_SCALED.get(img);
+  if (!per) { per = new Map(); _TEX_SCALED.set(img, per); }
+  let c = per.get(b);
+  if (!c) {
+    const h = Math.max(1, Math.round(img.height * (b / img.width)));
+    c = document.createElement('canvas');
+    c.width = b; c.height = h;
+    const x = c.getContext('2d');
+    x.imageSmoothingEnabled = true;
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(img, 0, 0, b, h);
+    per.set(b, c);
+    if (per.size > 12) per.delete(per.keys().next().value);
+  }
+  return c;
+}
+
 function drawTex(ctx, kind, i, x, gy, w, opts = {}) {
-  const img = tex(kind, i);
-  if (!img) return false;
+  const src = tex(kind, i);
+  if (!src) return false;
+  const img = texScaled(src, w);
   const h = img.height * (w / img.width);
   ctx.save();
   if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
@@ -658,24 +691,56 @@ const Renderer = {
       this.clouds.push({ x: rng() * WORLD_W, y: 40 + rng() * 140, w: 90 + rng() * 160, sp: 3 + rng() * 6, a: 0.05 + rng() * 0.1 });
     }
     // foreground occlusion plants along the bottom edge (fast parallax = depth)
+    /* Foreground growth, denser and larger than it was.
+     *
+     * Dropping to two lanes freed the bottom quarter of the frame and left it
+     * as flat empty ground. Something in FRONT of the action is also the
+     * cheapest depth cue there is — far cheaper than anything behind it — so
+     * this band does double duty: it fills the space and it puts the battle
+     * behind a screen of growth, which is what the reference art does.
+     *
+     * Spacing roughly halved and sizes raised; a second, larger and darker
+     * layer sits closer still and takes a stronger parallax shift. */
     this.fgPlants = [];
     const kinds = ['tuft', 'fern', 'bush', 'plant', 'tuft', 'bush'];
     let px = 60 + rng() * 120;
     while (px < WORLD_W * 1.02) {
       this.fgPlants.push({
         x: px, kind: kinds[Math.floor(rng() * kinds.length)],
-        i: Math.floor(rng() * 4), w: 72 + rng() * 60, flip: rng() < 0.5,
+        i: Math.floor(rng() * 4), w: 86 + rng() * 74, flip: rng() < 0.5, near: false,
       });
-      px += 170 + rng() * 240;
+      px += 92 + rng() * 130;
+    }
+    // the near band — bigger, darker, faster-moving, and allowed off the edge
+    px = -40 + rng() * 160;
+    while (px < WORLD_W * 1.05) {
+      this.fgPlants.push({
+        x: px, kind: kinds[Math.floor(rng() * kinds.length)],
+        i: Math.floor(rng() * 4), w: 150 + rng() * 130, flip: rng() < 0.5, near: true,
+      });
+      px += 240 + rng() * 340;
     }
   },
 
   _drawForeground(ctx, camX) {
-    // drawn inside the world transform; extra 12% shift makes it float closer
+    // drawn inside the world transform; the extra shift makes it float closer,
+    // and the near band shifts harder still so the two read as separate depths
     for (const p of this.fgPlants) {
-      const dx = p.x * 1.12 - 0.12 * camX;
-      if (dx < camX - 90 || dx > camX + CANVAS_W + 90) continue;
-      drawTex(ctx, p.kind, p.i, dx, CANVAS_H - 36, p.w, { alpha: 0.96, flip: p.flip });
+      const k = p.near ? 1.26 : 1.12;
+      const dx = p.x * k - (k - 1) * camX;
+      if (dx < camX - 200 || dx > camX + CANVAS_W + 200) continue;
+      if (p.near) {
+        /* Nearest growth is out of the light and out of focus: darker, slightly
+         * transparent, and hanging below the frame edge so it reads as being
+         * between the camera and the field rather than standing in it. */
+        ctx.save();
+        ctx.globalAlpha = 0.92;
+        drawTex(ctx, p.kind, p.i, dx, CANVAS_H + 16, p.w, { flip: p.flip });
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.restore();
+      } else {
+        drawTex(ctx, p.kind, p.i, dx, CANVAS_H - 30, p.w, { alpha: 0.96, flip: p.flip });
+      }
     }
   },
 
