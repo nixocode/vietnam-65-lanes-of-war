@@ -670,6 +670,55 @@ class Game {
     }
   }
 
+  /* Keep converging squads out of each other's silhouette.
+   *
+   * Spacing WITHIN a squad comes from slot offsets, but nothing held two
+   * separate squads apart, so wherever they converged — a flag, a cover
+   * position, a choke — their men stood inside one another. Measured on mekong:
+   * 7.8% of same-side, same-lane man-pairs from different squads sat within
+   * 16px, and the worst were exactly co-located. At 84px tall that is one
+   * soldier wearing another.
+   *
+   * This separates the squad ANCHOR, not the men. A first attempt nudged each
+   * man's x after movement and made the figure slightly WORSE (7.8% -> 8.5%),
+   * because `_advance` drives every man toward `s.x` plus his slot offset each
+   * frame: correcting the output of that while leaving its input alone is a tug
+   * of war the correction loses. Moving the anchor moves what the slots are
+   * measured from, so the whole formation steps aside and the men keep their
+   * spacing relative to each other.
+   *
+   * Soft on purpose — a fraction of the shortfall per frame, so orders and
+   * cover still decide where a squad is going; they merely stop arriving on the
+   * same spot.
+   */
+  _separate(dt) {
+    const GAP = 26;              // clear ground between two formations
+    const RATE = 2.4;
+    const byLane = new Map();
+    for (const s of this.squads) {
+      const alive = this.squadAlive(s);
+      if (!alive.length || s.inCover) continue;   // a squad holding cover stays put
+      const k = s.side + ':' + s.lane;
+      let a = byLane.get(k);
+      if (!a) { a = []; byLane.set(k, a); }
+      a.push({ s, n: alive.length });
+    }
+    for (const arr of byLane.values()) {
+      if (arr.length < 2) continue;
+      arr.sort((a, b) => a.s.x - b.s.x);
+      for (let i = 1; i < arr.length; i++) {
+        const A = arr[i - 1], B = arr[i];
+        // half of each formation's own width, plus clear ground between them
+        const need = (A.n + B.n) * 0.5 * 34 + GAP;
+        const d = B.s.x - A.s.x;
+        if (d >= need) continue;
+        const push = (need - d) * 0.5 * Math.min(1, RATE * dt);
+        A.s.x = clamp(A.s.x - push, 20, WORLD_W - 20);
+        B.s.x = clamp(B.s.x + push, 20, WORLD_W - 20);
+      }
+    }
+  }
+
   /* Presentation state, derived ONCE per frame after everything has moved.
    *
    * This used to be computed inside the squad pass, which runs BEFORE units
@@ -1017,6 +1066,7 @@ class Game {
     this._spottingPass(dt);
     this._updateSquads(dt);
     this._updateUnits(dt);
+    this._separate(dt);        // keep converging squads from standing inside each other
     this._updatePose(dt);      // presentation, derived once the men have moved
     this._updateNades(dt);
     this._updateSmokes(dt);
