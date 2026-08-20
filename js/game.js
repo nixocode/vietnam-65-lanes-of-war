@@ -26,6 +26,20 @@ const FLAG_DRAIN = 0.22;
 const MORALE_LOSS = { us: 0.24, vc: 0.15 }; // per CP of unit lost — US is casualty-sensitive
 const MAX_TRAPS = 10;
 
+/* Squads a side may have in the field at once.
+ *
+ * The AI has always capped itself here (`_aiPickUnit` bailed above 7 squads).
+ * The PLAYER never had a cap, and that one-sided limit decided every match:
+ * measured on veteran, the AI's CP climbed to the 250 ceiling while its unit
+ * count sat flat at 19 and the player fielded 105 men. Whoever spams wins, and
+ * only one side could spam.
+ *
+ * A symmetric limit fixes three things at once — the AI stops hoarding and
+ * stays competitive, matches turn on position rather than volume, and the unit
+ * count stops climbing into a frame-rate problem. It is also the more honest
+ * model: a commander gets a company, not an unlimited draft. */
+const MAX_SQUADS = 8;
+
 /* Concealment is a posture, not a map coordinate. Brush hides a man who has
  * settled into it; it does not hide one crossing at a dead run. Gating on
  * position alone made VC blink out mid-stride whenever they entered a conceal
@@ -854,6 +868,19 @@ class Game {
   trySpawn(side, key, lane, opts = {}) {
     const d = SQUADS[key];
     if (!d || d.side !== side || this.over) return false;
+    /* Validate the lane before anything is spent.
+     *
+     * Same class as the trap leak in callinValid: an out-of-range lane sailed
+     * through and blew up deep inside the terrain lookup on `pts`, AFTER CP had
+     * been deducted and the cooldown set. A caller with a stale lane index
+     * therefore got charged for a squad that never existed. Rejecting up front
+     * keeps the failure cheap and total. */
+    if (!(lane >= 0 && lane < LANE_N)) return false;
+    // the field limit applies to the player too — see MAX_SQUADS
+    if (!opts.free &&
+        this.squads.filter(q => q.side === side && this.squadAlive(q).length).length >= MAX_SQUADS) {
+      return false;
+    }
     if (!opts.free) {
       if ((this.cool[side][key] || 0) > 0) return false;
       if (this.cp[side] < d.cost) return false;
@@ -2061,7 +2088,7 @@ class Game {
     const cp = this.cp[side];
     const foes = this._visibleFoesIn(lane, side);
     const mySquads = this.squads.filter(s => s.side === side && this.squadAlive(s).length).length;
-    if (mySquads > 7) return null;
+    if (mySquads >= MAX_SQUADS) return null;   // shared with the player, see MAX_SQUADS
     const foeSniper = foes.some(u => u.sniperUnit);
     const foeMg = foes.some(u => UNITS[u.key] && UNITS[u.key].mg);
     const cool = k => (this.cool[side][k] || 0) <= 0;
