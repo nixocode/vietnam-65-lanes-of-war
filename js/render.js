@@ -550,7 +550,7 @@ const Renderer = {
   canvas: null, ctx: null,
   sky: null, farLayer: null, midLayer: null,
   laneLayers: [null, null, null], decalLayers: [null, null, null],
-  dirty: [true, true, true],
+  dirty: [true, true, true],   // sized on init from LANE_N; see Renderer.init
   corpseCount: [0, 0, 0],
   clouds: [], menuLayer: null,
   minimapCanvas: null,
@@ -558,6 +558,8 @@ const Renderer = {
   FAR_PARA: 0.25, MID_PARA: 0.5,
 
   init(canvas) {
+    // one dirty flag per LIVE lane — a hardcoded three left a stale entry
+    this.dirty = LANES.map(() => true);
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.fitDPR();
@@ -882,6 +884,59 @@ const Renderer = {
     for (let x = 0; x <= WORLD_W; x += 16) ctx.lineTo(x, groundY(map, lane, x));
     ctx.lineTo(WORLD_W, CANVAS_H);
     ctx.closePath(); ctx.fill();
+
+    /* SHADE UNDER THE VEGETATION LINE.
+     *
+     * The frame measured 114 points of contrast and looked flat anyway, because
+     * all of it was in the sky: the GROUND band came in at 54-59 out of 255 on
+     * every daylight map. The playfield is where the player looks, and it was a
+     * single mid-tone wash with nothing dark in it.
+     *
+     * A band of shade immediately below each lane's ground line is the cheapest
+     * honest way to put a dark back into that band — it is what the treeline and
+     * undergrowth behind the lane would actually cast, it separates one lane
+     * from the next, and it gives the soldiers something darker than themselves
+     * to stand against. Strongest right under the line and gone within ~74px, so
+     * it reads as contact shade rather than a painted stripe.
+     */
+    /* A VALUE RAMP DOWN THE LANE.
+     *
+     * The frame measured 114 points of contrast and still looked flat, because
+     * all of it lived in the sky: the GROUND band came in at 54-59 out of 255 on
+     * every daylight map, and the ground is where the player looks.
+     *
+     * Dark where the lane meets the vegetation behind it, opening up toward the
+     * viewer. Drawn as ONE path with ONE gradient: a first attempt filled a
+     * separate gradient per 9px column and, because each column started at its
+     * own ground height, the gradients stepped against each other and striped
+     * the whole field with vertical seams. One path has no seams and is cheaper.
+     */
+    {
+      const strip = (lane < LANE_N - 1)
+        ? Math.max(90, LANE_BASE[lane + 1] - LANE_BASE[lane])
+        : CANVAS_H - LANE_BASE[lane] + 40;
+      let lo = 1e9, hi = -1e9;
+      for (let x = 0; x <= WORLD_W; x += 32) {
+        const y = groundY(map, lane, x);
+        if (y < lo) lo = y;
+        if (y > hi) hi = y;
+      }
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, groundY(map, lane, 0));
+      for (let x = 0; x <= WORLD_W; x += 12) ctx.lineTo(x, groundY(map, lane, x));
+      for (let x = WORLD_W; x >= 0; x -= 12) ctx.lineTo(x, groundY(map, lane, x) + strip);
+      ctx.closePath();
+      ctx.clip();
+      const gs = ctx.createLinearGradient(0, lo, 0, hi + strip);
+      gs.addColorStop(0, 'rgba(10,14,7,0.60)');
+      gs.addColorStop(0.34, 'rgba(10,14,7,0.24)');
+      gs.addColorStop(0.74, 'rgba(10,14,7,0.04)');
+      gs.addColorStop(1, 'rgba(255,240,200,0.06)');
+      ctx.fillStyle = gs;
+      ctx.fillRect(0, lo, WORLD_W, (hi + strip) - lo);
+      ctx.restore();
+    }
 
     /* Soil texture: speckles + faint strata under the surface.
      *
@@ -2635,7 +2690,7 @@ const Renderer = {
       } else if (p.type === 'smoke') {
         ctx.fillStyle = p.color === 'dark' ? `rgba(30,28,24,${0.4 * (1 - k)})`
           : p.color === 'blood' ? `rgba(110,26,16,${0.3 * (1 - k)})`
-          : `rgba(120,115,100,${0.35 * (1 - k)})`;
+          : `rgba(126,120,104,${0.42 * (1 - k)})`;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.6 + k), 0, 7); ctx.fill();
       } else if (p.type === 'flame') {
         ctx.save();

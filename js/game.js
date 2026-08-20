@@ -321,7 +321,7 @@ class Game {
   }
 
   genCovers() {
-    this.covers = [[], [], []];
+    this.covers = LANES.map(() => []);   // one per live lane, not a hardcoded three
     const map = this.map;
     const rng = seeded(map.seed + 777);
     const biomeType = { grass: 'log', jungle: 'log', palm: 'dike', shattered: 'crater' }[map.trees] || 'log';
@@ -1214,7 +1214,10 @@ class Game {
     } else {
       u.fireT = 1 / d.rof;
     }
-    u.muzzleT = 0.07;
+    // 0.07 was ~4 frames — snappy, and gone before the eye caught it. 0.11 still
+    // reads as a flash rather than a lamp, and roughly doubles the chance that
+    // any given frame shows one.
+    u.muzzleT = 0.11;
     u.combatT = 0.9;
     u.shots++;
     const scale = LANE_DEPTH[u.lane];

@@ -232,13 +232,21 @@ window.SelfTest = {
          * respects the 2.4s/1.1s locks); 22 leaves headroom without letting the
          * old pathology back through.
          *
+         * RECALIBRATED after 22 flaked. It had been set from a worst-observed of
+         * ~15, which under-sampled: drawing six runs of khesanh/us gives
+         * 6.7 / 7.5 / 10 / 14.4 / 19 / 21, so the natural spread reaches the low
+         * twenties on that map and a 22.8 was ordinary variance rather than a
+         * regression. 28 sits above the observed spread and still well below the
+         * 34/min that the original bug produced, which is the thing this
+         * assertion exists to catch.
+         *
          * The aggregate stays as a coarse net, calibrated from measurement
          * rather than taste: it rises with match length as men crowd together
          * (~1.4/man-min at 40s, ~2.0 at 55s, up to ~5.6 at 70s), so 6 flagged
          * ordinary late-game fighting. 12 is roughly twice the busiest measured
          * run. */
-        ok(r.worstManFlipRate < 22,
-          `${tag} worst man flips stance ${r.worstManFlipRate.toFixed(1)}/min (limit 22)`);
+        ok(r.worstManFlipRate < 28,
+          `${tag} worst man flips stance ${r.worstManFlipRate.toFixed(1)}/min (limit 28)`);
         ok(r.flipRate < 12, `${tag} stance churn ${r.flipRate.toFixed(1)}/man-min (limit 12)`);
         // standing still, on your feet, while being shot at
         ok(r.standUnderFireRate < 12,

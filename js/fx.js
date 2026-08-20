@@ -115,11 +115,30 @@ class FXManager {
         });
       }
     }
-    // gunsmoke wisp
-    if (Math.random() < 0.5) {
+    /* GUNSMOKE — on every shot, and it outlives the shot by a long way.
+     *
+     * A muzzle flash is 70ms. With burst-and-pause pacing, a battle of 31 men
+     * averaged 0.56 flashes per FRAME and 51% of frames had none at all: half
+     * the time nothing visibly fired, which is why a firefight read as men
+     * standing in a field. The answer is not a higher rate of fire — the pacing
+     * is deliberate — it is that each shot has to leave something behind.
+     *
+     * Smoke turns a 70ms event into ~1.4s of presence, so a position that has
+     * been firing carries a haze and the firing LINE becomes visible even
+     * between bursts. That is what gun camera footage actually looks like.
+     */
+    this.add({
+      x: x + dir * 6, y: y - 2, vx: dir * rand(10, 26), vy: rand(-16, -7), g: -7,
+      t: 0, life: rand(0.9, 1.5), size: rand(3.5, 7) * scale,
+      color: 'smoke', type: 'smoke', drag: 1.1,
+    });
+    // a second, slower puff on some shots so the haze has depth rather than
+    // being one uniform ring per round
+    if (Math.random() < 0.55) {
       this.add({
-        x: x + dir * 6, y: y - 2, vx: dir * rand(6, 18), vy: rand(-14, -6), g: -6,
-        t: 0, life: rand(0.4, 0.8), size: rand(2.5, 5) * scale, color: 'smoke', type: 'smoke', drag: 1,
+        x: x + dir * 10, y: y - 4, vx: dir * rand(3, 12), vy: rand(-9, -3), g: -4,
+        t: 0, life: rand(1.3, 2.1), size: rand(5, 10) * scale,
+        color: 'smoke', type: 'smoke', drag: 0.7,
       });
     }
   }
