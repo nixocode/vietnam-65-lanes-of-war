@@ -744,6 +744,23 @@ const Renderer = {
     }
   },
 
+  /* NO GHOST PASS HERE — deliberately.
+   *
+   * A soldier redraw for men hidden behind a nearer lane's building was written
+   * and then removed, because measurement showed the case cannot occur. After
+   * the drop to two lanes, LANE_BASE [400, 545] puts a front-lane structure's
+   * top edge BELOW a back-lane man's feet on every map:
+   *
+   *     iadrang -45px   cuchi -41px   mekong -24px   khesanh -34px   hill937 -40px
+   *
+   * (margin = building top relative to the back-lane man's feet; negative means
+   * it never reaches him.) Men fighting from inside a building are handled by
+   * the `window` cover, which cuts an opening and draws the man through it.
+   *
+   * Restore a ghost pass only if LANE_BASE moves or structures grow taller —
+   * and re-measure the margins above before assuming it is needed.
+   */
+
   _drawSkyBase(ctx, map) {
     const p = map.pal;
     const g = ctx.createLinearGradient(0, 0, 0, 460);
