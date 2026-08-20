@@ -133,7 +133,19 @@ class FXManager {
 
   /* a real projectile: bright core + streak flying at 1500 px/s; impact FX
      spawn where and WHEN the round actually arrives */
-  tracer(x1, y1, x2, y2, color = '#ffd98a', end = null) {
+  /* `bright` marks a TRACER round proper.
+   *
+   * Every round used to draw an identical glowing streak, which is not what a
+   * firefight looks like: belts are loaded roughly one tracer in four or five,
+   * and the rest of the rounds are invisible in flight. Drawing all of them the
+   * same way gives a uniform wall of light with no rhythm — the reference
+   * footage reads as a few long, bright streaks crossing a mostly dark field.
+   *
+   * The dim majority still draw, faintly and short, because they are the
+   * player's feedback that a man is shooting at all; they just stop competing
+   * with the round that is meant to be seen.
+   */
+  tracer(x1, y1, x2, y2, color = '#ffd98a', end = null, bright = true) {
     const dx = x2 - x1, dy = y2 - y1;
     const dist = Math.hypot(dx, dy) || 1;
     const sp = 1500;
@@ -141,7 +153,7 @@ class FXManager {
       x: x1, y: y1, x2, y2,
       vx: dx / dist * sp, vy: dy / dist * sp,
       t: 0, life: Math.max(0.04, dist / sp),
-      color, type: 'bullet', end,
+      color, type: 'bullet', end, bright,
     });
   }
 

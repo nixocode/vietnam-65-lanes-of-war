@@ -2514,9 +2514,15 @@ const Renderer = {
           alpha: p.alpha * fadeIn * fadeOut,
         });
       } else if (p.type === 'bullet') {
-        // flying round: hot core + fading streak behind it
+        /* Flying round: hot core + fading streak behind it.
+         *
+         * A TRACER streaks about three times as far as an ordinary round and
+         * carries a core; the rest are a thin dim line. That contrast is what
+         * makes a firefight read as tracer fire rather than as a uniform sheet
+         * of light — see Fx.tracer for why only some rounds are bright. */
+        const bright = p.bright !== false;
         const sp = Math.hypot(p.vx, p.vy) || 1;
-        const tail = Math.min(26, sp * 0.017);
+        const tail = bright ? Math.min(78, sp * 0.052) : Math.min(15, sp * 0.010);
         const tx = p.x - p.vx / sp * tail, ty = p.y - p.vy / sp * tail;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -2524,10 +2530,14 @@ const Renderer = {
         grad.addColorStop(0, 'rgba(255,180,90,0)');
         grad.addColorStop(1, p.color);
         ctx.strokeStyle = grad;
-        ctx.lineWidth = 2.2;
+        ctx.lineWidth = bright ? 2.4 : 1.1;
+        ctx.globalAlpha = bright ? 1 : 0.5;
         ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(p.x, p.y); ctx.stroke();
-        ctx.fillStyle = '#fff8e0';
-        ctx.beginPath(); ctx.arc(p.x, p.y, 1.3, 0, 7); ctx.fill();
+        ctx.globalAlpha = 1;
+        if (bright) {
+          ctx.fillStyle = '#fff8e0';
+          ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, 7); ctx.fill();
+        }
         ctx.restore();
       } else if (p.type === 'flash') {
         ctx.save();

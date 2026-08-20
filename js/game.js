@@ -1204,8 +1204,9 @@ class Game {
     if (Math.random() < 0.3) this.fx.smokePuffSmall(mx, my);
     if (hit) {
       const ty = t.y - (t.isHole ? 0 : 14 * LANE_DEPTH[t.lane]);
+      // roughly one round in four is a tracer, as a belt is actually loaded
       this.fx.tracer(mx, my, t.x + rand(-4, 4), ty + rand(-4, 4),
-        u.side === 'us' ? '#ffd98a' : '#ffb08a', 'spark');
+        u.side === 'us' ? '#ffd98a' : '#ffb08a', 'spark', ((u.shots || 0) % 4) === 0);
       const eu = elevAt(this.map, u.lane, u.x), ef = elevAt(this.map, t.lane, t.x);
       let dmg = d.dmg * (1 + 0.35 * clamp(eu - ef, -0.9, 0.9));
       if (wasHidden && d.ambush && d.ambush > 1) {
@@ -1240,7 +1241,8 @@ class Game {
       const ey = short ? gy : gy - rand(2, 26 * scale);
       this.fx.tracer(mx, my, ex + rand(-4, 4), ey,
         u.side === 'us' ? '#ffd98a' : '#ffb08a',
-        (short || Math.random() < 0.45) ? 'dirt' : null);
+        (short || Math.random() < 0.45) ? 'dirt' : null,
+        ((u.shots || 0) % 4) === 0);
       // impact debris by what is actually there: timber splinters off a building,
       // sparks off an emplacement, water out of a paddy, dirt everywhere else
       if (short || Math.random() < 0.5) {
