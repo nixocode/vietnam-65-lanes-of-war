@@ -211,16 +211,6 @@
    "aspect": 2.5234
   },
   {
-   "name": "scrub_a",
-   "hM": 1.01,
-   "wM": 2.013,
-   "groundY": 368.7,
-   "ppm": 223.1,
-   "res": 512,
-   "realH": 1.2,
-   "aspect": 1.9931
-  },
-  {
    "name": "stall",
    "hM": 0.893,
    "wM": 1.01,

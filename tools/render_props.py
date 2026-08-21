@@ -503,6 +503,15 @@ def main():
             m['realH'] = old['realH']
         m['aspect'] = round(m['wM'] / max(1e-4, m['hM']), 4)
         merged[m['name']] = m
+    # Drop entries whose PNG is gone.
+    #
+    # The merge above deliberately preserves hand-authored heights across a
+    # re-render, but it also preserved props that no longer exist: deleting
+    # `scrub_a` and its image left the entry in props.json, and the game then
+    # asked for a file that was never committed. A fresh clone would 404 on it.
+    # Only keep what is actually on disk.
+    merged = {k: v for k, v in merged.items()
+              if os.path.isfile(os.path.join(OUT, k + '.png'))}
     with open(pj, 'w') as fh:
         json.dump({'props': sorted(merged.values(), key=lambda q: q['name'])}, fh, indent=1)
     print('DONE', len(out), 'props')
