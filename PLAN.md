@@ -67,8 +67,12 @@ alpha 0.22 — present, and still not enough at this scale.
 ### 1.3 Palms repeat
 Four palm variants tiled across every map. Reads as wallpaper.
 
-- More silhouettes (banana, bamboo, dead//burnt trunk, scrub) — see
-  `docs/ASSET_PROMPT.md`, which is written and ready to generate against.
+- More silhouettes (banana, bamboo, dead/burnt trunk, scrub). **No image
+  generation involved** — grab CC0 `.glb` models from poly.pizza, drop them in
+  `art/props/`, and run `tools/render_props.py`, which renders them through the
+  same camera and lighting as the soldiers so the style match is structural.
+  Simple shapes (crates, fence runs, drying racks) need no model at all: `BUILT`
+  in that file makes them from boxes in code. See `docs/ASSET_PROMPT.md` §A.
 - Vary height far more aggressively; overlap them into clumps rather than
   spacing them evenly.
 
@@ -114,7 +118,10 @@ Men snap between aim and prone with little transitional weight.
 - **An FPS reading** off `` ` ``/F3. Everything else is work-per-frame.
 - **Does it feel right?** Mechanics are verified; feel is not something I can
   measure.
-- **Generated art** for §1.3 — `docs/ASSET_PROMPT.md` is ready to paste.
+- **Nothing, for art.** Corrected: §1.3 needs CC0 models run through the
+  existing Blender pipeline, not generated images. `docs/ASSET_PROMPT.md` §A has
+  the steps. Claude Design is the right tool only for the HUD (§B there), which
+  is DOM and CSS and so translates almost directly.
 
 ## 4. Current numbers
 
