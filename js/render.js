@@ -1199,17 +1199,40 @@ const Renderer = {
       if (typeof Props !== 'undefined' && Props.ready &&
           (map.trees === 'palm' || map.trees === 'jungle')) {
         // sparse: a palm is ~4x a man's height, so even a few fill the frame
-        const chance = map.trees === 'palm' ? 0.20 : 0.10;
+        const chance = map.trees === 'palm' ? 0.26 : 0.16;
         if (rng() < chance) {
-          const pick = ['palm_a', 'palm_b', 'palm_c', 'palm_d'][(rng() * 4) | 0];
-          if (Props.has(pick)) {
-            const gy = groundY(map, lane, x) + 2;
-            // a stand of palms is not a row of clones — vary the height a little
-            const h = Props.pxHeight(pick, LANE_DEPTH[lane]) * (0.72 + rng() * 0.40);
-            Props.draw(ctx, pick, x, gy, LANE_DEPTH[lane],
-              { fit: h, flip: rng() < 0.5, alpha: 0.92 });
-            continue;
+          /* EIGHT silhouettes, not four, and they arrive in CLUMPS.
+           *
+           * Four palms scattered on an even random x read as wallpaper — the eye
+           * finds the repeat immediately because every tree is the same distance
+           * from its neighbour and the same shape family. Real vegetation grows
+           * in stands with gaps between them.
+           *
+           * Bamboo, banana, dead trunks and grass are built procedurally through
+           * the same camera (see tools/render_props.py) rather than downloaded,
+           * so they cost nothing in licence risk and cannot drift out of style.
+           * Weighted so palms still lead and the new shapes accent. */
+          const bag = map.trees === 'jungle'
+            ? ['palm_a', 'palm_b', 'bamboo_a', 'bamboo_a', 'banana_a', 'deadtree_a',
+               'palm_c', 'grass_a']
+            : ['palm_a', 'palm_b', 'palm_c', 'palm_d', 'bamboo_a', 'banana_a',
+               'grass_a', 'deadtree_a'];
+          // a clump of 1-4, tighter and more varied than an even scatter
+          const clump = 1 + ((rng() * rng() * 4) | 0);
+          let ok = false;
+          for (let c = 0; c < clump; c++) {
+            const pick = bag[(rng() * bag.length) | 0];
+            if (!Props.has(pick)) continue;
+            const cx = x + (c === 0 ? 0 : (rng() - 0.5) * 128);
+            if (cx < 60 || cx > WORLD_W - 60) continue;
+            const gy = groundY(map, lane, cx) + 2;
+            // wider height spread — a stand has saplings and old growth in it
+            const h = Props.pxHeight(pick, LANE_DEPTH[lane]) * (0.58 + rng() * 0.72);
+            Props.draw(ctx, pick, cx, gy, LANE_DEPTH[lane],
+              { fit: h, flip: rng() < 0.5, alpha: 0.88 + rng() * 0.10 });
+            ok = true;
           }
+          if (ok) continue;
         }
       }
       // painted palms/banana groves mix into the procedural treeline

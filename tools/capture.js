@@ -135,6 +135,16 @@ window.Capture = {
       else { src += iw * ih; dst += iw * ih; }
       return real.call(this, img, ...a);
     };
+    /* Render TWICE and measure the second.
+     *
+     * The first render after a fresh stage bakes the lane layers — terrain,
+     * scenery, every prop — into their offscreen canvases. That is a one-time
+     * cost the player pays on map load, not per frame, and counting it made the
+     * budget read 16-17 Mpx where the steady state is 7.6-8.3. Several figures
+     * quoted earlier in this project were inflated for exactly this reason.
+     * The warm-up is drawn before instrumentation starts. */
+    Renderer.render(g, UI, Renderer._time || 0);
+    src = 0; dst = 0; calls = 0;
     try {
       Renderer.render(g, UI, Renderer._time || 0);
     } finally {

@@ -1,6 +1,26 @@
 {
  "props": [
   {
+   "name": "bamboo_a",
+   "hM": 4.805,
+   "wM": 2.574,
+   "groundY": 480.6,
+   "ppm": 93.47,
+   "res": 512,
+   "realH": 4.8,
+   "aspect": 0.5357
+  },
+  {
+   "name": "banana_a",
+   "hM": 2.267,
+   "wM": 2.273,
+   "groundY": 479.9,
+   "ppm": 197.59,
+   "res": 512,
+   "realH": 2.7,
+   "aspect": 1.0026
+  },
+  {
    "name": "cart_a",
    "hM": 0.98,
    "wM": 2.9,
@@ -9,6 +29,16 @@
    "res": 512,
    "realH": 1.1,
    "aspect": 2.9592
+  },
+  {
+   "name": "deadtree_a",
+   "hM": 4.46,
+   "wM": 1.795,
+   "groundY": 480.6,
+   "ppm": 100.7,
+   "res": 512,
+   "realH": 4.5,
+   "aspect": 0.4025
   },
   {
    "name": "frame_a",
@@ -39,6 +69,16 @@
    "res": 512,
    "realH": 2.9,
    "aspect": 0.7699
+  },
+  {
+   "name": "grass_a",
+   "hM": 2.012,
+   "wM": 2.722,
+   "groundY": 422.0,
+   "ppm": 164.98,
+   "res": 512,
+   "realH": 1.8,
+   "aspect": 1.3529
   },
   {
    "name": "hut_a",
@@ -169,6 +209,16 @@
    "res": 512,
    "realH": 0.55,
    "aspect": 2.5234
+  },
+  {
+   "name": "scrub_a",
+   "hM": 1.01,
+   "wM": 2.013,
+   "groundY": 368.7,
+   "ppm": 223.1,
+   "res": 512,
+   "realH": 1.2,
+   "aspect": 1.9931
   },
   {
    "name": "stall",

@@ -216,11 +216,120 @@ def build_m113():
     _box(dark, L * 0.55, -0.50, 1.70, L * 0.72, 0.50, 1.84)       # driver hatch
 
 
+# ---------------------------------------------------------------- foliage
+# The maps had four palm silhouettes and nothing else, tiled across every lane,
+# which reads as wallpaper the moment you look at the treeline. These are built
+# rather than downloaded: an unidentified model off a search page has no name,
+# no licence and no preview, and none of that belongs in a public repo.
+#
+# Box geometry suits these better than it suited the watchtower, which failed as
+# a lattice of loose sticks. Bamboo IS a bundle of tapered culms; a burnt trunk
+# IS a tapered pole with broken stubs; grass IS a fan of blades. The shapes are
+# already boxy, so nothing has to pretend.
+#
+# Every one is asymmetric on purpose — an even, mirrored plant reads as a
+# repeated stamp, and a repeated stamp is the problem being solved.
+
+def build_bamboo():
+    """A clump of culms. Vietnam's most characteristic screen of cover."""
+    cane = _pmat('bm_cane', (0.150, 0.170, 0.062))
+    dark = _pmat('bm_dark', (0.086, 0.104, 0.040))
+    leaf = _pmat('bm_leaf', (0.110, 0.155, 0.055))
+    culms = [(-0.62, 3.5, -0.10), (-0.30, 4.4, 0.05), (0.02, 3.9, -0.04),
+             (0.30, 4.8, 0.12), (0.60, 3.2, 0.18), (0.14, 2.6, -0.16)]
+    for i, (x, h, lean) in enumerate(culms):
+        m = cane if i % 3 else dark
+        _beam(m, x, 0.0, x + lean, h, t=0.055, y=(i % 3 - 1) * 0.07, yt=0.05)
+        # nodes — the joints are what say bamboo rather than reed
+        n = 3
+        for k in range(1, n + 1):
+            z = h * k / (n + 1.0)
+            _box(dark, x - 0.075, -0.055, z, x + 0.075, 0.055, z + 0.045)
+        # leaf sprays, upper third only
+        for k in range(3):
+            lz = h * (0.62 + 0.12 * k)
+            sx = 1 if (i + k) % 2 else -1
+            _beam(leaf, x + lean * 0.7, lz, x + lean * 0.7 + sx * (0.42 + 0.1 * k),
+                  lz + 0.30 - 0.1 * k, t=0.035, y=(k - 1) * 0.06, yt=0.03)
+
+
+def build_deadtree():
+    """A shell-stripped trunk. Reads instantly as a fought-over place."""
+    bark = _pmat('dt_bark', (0.088, 0.070, 0.048))
+    char = _pmat('dt_char', (0.040, 0.034, 0.028))
+    # tapered trunk, stacked so it narrows toward the break
+    # One trunk, not a stack. Switching material halfway up put a hard grey/brown
+    # seam across the middle and the whole thing read as blocks balanced on each
+    # other. The bark darkens gradually toward the burnt top instead.
+    seg = [(0.34, 0.0, 1.1), (0.27, 1.1, 2.3), (0.20, 2.3, 3.4), (0.14, 3.4, 4.2)]
+    for i, (r, z0, z1) in enumerate(seg):
+        lean = 0.05 * i
+        t = i / (len(seg) - 1.0)
+        m = _pmat('dt_seg%d' % i, (0.088 - 0.040 * t, 0.070 - 0.032 * t, 0.048 - 0.018 * t))
+        _box(m, -r + lean, -r * 0.7, z0, r + lean, r * 0.7, z1)
+    # broken stubs, none matching another
+    _beam(char, 0.10, 2.05, 0.95, 2.62, t=0.075, y=0.05, yt=0.06)
+    _beam(char, -0.05, 2.85, -0.78, 3.15, t=0.062, y=-0.04, yt=0.05)
+    _beam(char, 0.16, 3.55, 0.58, 3.98, t=0.048, y=0.02, yt=0.04)
+    _box(char, -0.16, -0.26, 4.20, 0.22, 0.26, 4.46)          # splintered top
+
+
+def build_banana():
+    """Broad drooping leaves — the shape nothing else on the map has.
+
+    First attempt paired two straight beams per leaf and produced a flat zigzag
+    lying on its side: 5.3 m wide and 1.9 m tall, when the plant is taller than
+    it is wide. A leaf needs to be a CURVE, so each one is walked out in short
+    segments that rise, flatten and then fall away at the tip.
+    """
+    stem = _pmat('bn_stem', (0.120, 0.140, 0.058))
+    leaf = _pmat('bn_leaf', (0.135, 0.190, 0.062))
+    dark = _pmat('bn_dark', (0.088, 0.125, 0.045))
+    import math as _m
+    _box(stem, -0.19, -0.17, 0.0, 0.19, 0.17, 1.25)           # pseudostem
+    _box(stem, -0.15, -0.14, 1.25, 0.15, 0.14, 1.70)
+    # (side, reach, base height, how far the tip falls)
+    fronds = [(-1, 1.05, 1.62, 0.95), (1, 0.92, 1.70, 0.80),
+              (-1, 0.74, 1.86, 0.55), (1, 0.66, 1.92, 0.45),
+              (-1, 1.15, 1.38, 1.15), (1, 1.02, 1.30, 1.02)]
+    for i, (sx, reach, z0, fall) in enumerate(fronds):
+        m = leaf if i % 2 else dark
+        y = (i - 2.5) * 0.055
+        segs = 5
+        px, pz = 0.0, z0
+        for k in range(1, segs + 1):
+            t = k / segs
+            # rises early, falls late — a quarter-sine arc tipped over
+            x = sx * reach * t
+            z = z0 + _m.sin(t * _m.pi * 0.9) * 0.34 - fall * (t ** 2.2)
+            _beam(m, px, pz, x, z, t=0.155 - 0.02 * k, y=y, yt=0.022)
+            px, pz = x, z
+
+
+def build_grass():
+    """Elephant grass. Chest high and the reason nobody sees anybody."""
+    pale = _pmat('gr_pale', (0.175, 0.180, 0.078))
+    deep = _pmat('gr_deep', (0.108, 0.130, 0.050))
+    import random as _r
+    _r.seed(4)
+    for i in range(44):
+        x = -1.05 + 2.1 * (i / 43.0)
+        h = 1.15 + _r.random() * 0.85
+        lean = (_r.random() - 0.5) * 0.85
+        _beam(deep if i % 3 else pale, x, 0.0, x + lean, h,
+              t=0.034, y=(_r.random() - 0.5) * 0.34, yt=0.026)
+
+
 BUILT = {
     'm113':       (build_m113, 2.6),
     'watchtower': (build_watchtower, 5.2),
     'well_a':     (build_well, 2.1),
     'cart_a':     (build_cart, 1.1),
+    # foliage — real heights, so they scale against a 1.8 m soldier
+    'bamboo_a':   (build_bamboo, 4.8),
+    'deadtree_a': (build_deadtree, 4.5),
+    'banana_a':   (build_banana, 2.7),
+    'grass_a':    (build_grass, 1.8),
 }
 
 

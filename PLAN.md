@@ -64,17 +64,22 @@ alpha 0.22 — present, and still not enough at this scale.
   layer that already exists.
 - Crop stubble and paddy rows with real contrast, not a same-hue whisper.
 
-### 1.3 Palms repeat
-Four palm variants tiled across every map. Reads as wallpaper.
+### 1.3 Foliage variety *(done — keep an eye on it)*
+Was four palm silhouettes tiled evenly across every lane, which reads as
+wallpaper because every tree is the same shape family the same distance from
+its neighbour. Now eight silhouettes arriving in **clumps of 1-4** with a much
+wider height spread (0.58-1.30x rather than 0.72-1.12x).
 
-- More silhouettes (banana, bamboo, dead/burnt trunk, scrub). **No image
-  generation involved** — grab CC0 `.glb` models from poly.pizza, drop them in
-  `art/props/`, and run `tools/render_props.py`, which renders them through the
-  same camera and lighting as the soldiers so the style match is structural.
-  Simple shapes (crates, fence runs, drying racks) need no model at all: `BUILT`
-  in that file makes them from boxes in code. See `docs/ASSET_PROMPT.md` §A.
-- Vary height far more aggressively; overlap them into clumps rather than
-  spacing them evenly.
+The four new ones — bamboo, banana, dead trunk, elephant grass — are **built
+procedurally** in `tools/render_props.py`, not downloaded. poly.pizza's search
+page is client-rendered and its API needs a key, so the only way to get models
+was to pull unidentified UUIDs with no name, no licence and no preview, which
+does not belong in a public repo. Box geometry suits these anyway: bamboo IS a
+bundle of tapered culms, a burnt trunk IS a pole with broken stubs.
+
+Still worth doing: the banana renders paler than everything around it, and a
+palm from a real model still reads better than anything built from boxes — if
+a properly licensed nature pack turns up, the pipeline takes it unchanged.
 
 ### 1.4 Gunfights *(partly fixed — keep going)*
 Measured before the fix: 31 men in a battle produced **0.56 muzzle flashes per
@@ -108,7 +113,6 @@ Men snap between aim and prone with little transitional weight.
 | 1 | Value structure (§1.1) | Biggest single cause of "mid" |
 | 2 | Ground detail (§1.2) | Second biggest; the eye spends most time here |
 | 3 | Impact + suppression FX (§1.4) | Makes fights *feel* like fights |
-| 4 | Foliage variety (§1.3) | Brief is written; needs generated assets |
 | 5 | Crouch stance (§1.5) | Sim work; closes a real gap |
 | 6 | HUD rebuild | Stat pips and info panel are in; frame/plate art is not |
 | 7 | Real weapon meshes | Proportions fixed; still donor stand-ins |
@@ -130,10 +134,16 @@ Budget, measured at 1600×900 with ~35 live units, against caps of 13 src Mpx /
 
 | map | src Mpx | particles |
 |---|---|---|
-| iadrang | 8.08 | 65 |
-| cuchi | 8.21 | 76 |
-| mekong | 9.11 | 114 |
-| khesanh | 8.11 | 58 |
-| hill937 | 8.00 | 87 |
+| iadrang | 8.03 | 65 |
+| cuchi | 7.52 | 76 |
+| mekong | 8.25 | 114 |
+| khesanh | 7.79 | 58 |
+| hill937 | 7.93 | 87 |
 
-Comfortable headroom — roughly 4 Mpx spare per frame to spend on §1.1 and §1.2.
+Memory 121 MB decoded against a 130 MB cap. Roughly 5 Mpx spare per frame.
+
+**These are STEADY-STATE figures.** `Capture.budget()` used to measure the
+first render after staging, which bakes every lane layer — a one-time map-load
+cost, not a per-frame one. That made it report 16-17 Mpx where the truth is
+7.5-8.3, and several numbers quoted earlier in this project were inflated for
+that reason. It now renders a warm-up frame before instrumenting.
