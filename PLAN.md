@@ -95,14 +95,30 @@ Still missing:
   identical.
 - **Shell and rocket impact** — currently underplayed for what it does.
 
-### 1.5 Animation reads stiff in contact
-Men snap between aim and prone with little transitional weight.
+### 1.5 Animation *(prone and transparency fixed; recoil still open)*
 
+**The prone CLIP is broken at source and is no longer used.** It was synthesised
+by pitching the body 84 degrees about the pelvis, but the arms hang off the
+chest and the rifle rides the right wrist, so the tip-over drove the weapon into
+the ground behind the man and folded his legs back through his torso. At game
+size: a tangle of limbs, barrel in the dirt, no visible head.
+
+Three Blender attempts each made it worse, and they are worth not repeating:
+counter-rotating the shoulders slid the rifle off the hands entirely (the weapon
+is bound to the wrist by a Child-Of whose inverse was captured at the original
+pose); a shallower 58-degree pitch gave a diagonal version of the same tangle;
+and the donor has no prone or crouch action to borrow — all 24 of its clips are
+upright.
+
+The game now draws prone men with the **aim** pose dropped 26px toward the
+ground. Clean art, and the height difference is what reads as "down" at 84px
+anyway. A proper prone clip needs either a real mocap source or hand-posed
+arms in Blender; until then this is the honest option.
+
+Still open:
 - Recoil: a per-shot kick on the upper body, not just a flash.
-- Crouch — the sim has *no* crouch state at all, only standing and prone, so a
-  man at close range has nothing between "upright" and "flat".
-- Reload/bolt beats that are visible at 84px.
-- Death variety — currently one death clip per unit.
+- A real crouch, between standing and prone.
+- Death variety — one death clip per unit.
 
 ---
 
@@ -113,9 +129,10 @@ Men snap between aim and prone with little transitional weight.
 | 1 | Value structure (§1.1) | Biggest single cause of "mid" |
 | 2 | Ground detail (§1.2) | Second biggest; the eye spends most time here |
 | 3 | Impact + suppression FX (§1.4) | Makes fights *feel* like fights |
-| 5 | Crouch stance (§1.5) | Sim work; closes a real gap |
-| 6 | HUD rebuild | Stat pips and info panel are in; frame/plate art is not |
-| 7 | Real weapon meshes | Proportions fixed; still donor stand-ins |
+| 4 | Recoil + crouch (§1.5) | Fights still read stiff |
+| 5 | HUD rebuild | Stat pips and info panel are in; frame/plate art is not |
+| 6 | Real weapon meshes | Proportions fixed; still donor stand-ins |
+| 7 | A real prone clip | Needs mocap or hand-posed arms; see §1.5 |
 
 ## 3. Blocked on the owner
 

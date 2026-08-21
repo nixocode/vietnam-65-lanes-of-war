@@ -53,6 +53,21 @@ const MAX_SQUADS = 8;
 const CONCEAL_SETTLE = 0.45;   // seconds of stillness before brush closes over him
 const CONCEAL_FADE = 0.40;     // seconds to dissolve out of sight once concealed
 
+/* How visible a concealed man stays. NOT zero.
+ *
+ * Concealment used to fade a man to nothing, and measured in a live battle 5%
+ * of all man-frames rendered at partial alpha with 580 of 659 of those FULLY
+ * INVISIBLE — one NVA spent 100% of his life unseeable. That is not an ambush,
+ * it is a unit the player can never see, and it reads as the renderer dropping
+ * frames rather than as an enemy hiding.
+ *
+ * The comment in the draw path has claimed for a long time that concealed men
+ * "settle to a dim shape in the brush" — this is that, finally made true. The
+ * tactical value is intact: at 0.22 you can tell something is there and not
+ * what it is or exactly where, which is what concealment should buy. What it
+ * should never buy is a man who is not drawn at all. */
+const CONCEAL_FLOOR = 0.22;
+
 /* structure archetypes: [w, hp] */
 const STRUCT_DEFS = {
   hooch:     { w: 42, hp: 60 },
@@ -490,7 +505,33 @@ class Game {
 
       if (s.emergeT > 0) continue;
 
-      const engaged = alive.some(m => (m.combatT || 0) > 0 || m.aiming);
+      /* A squad halts when it reaches the range its WEAPONS want, not the
+       * instant anything is technically in range. See ENGAGE_AT: halting on
+       * first contact left both sides trading fire at the edge of their reach,
+       * with the closest approach ever measured at 216px and zero man-frames
+       * inside 160px. The squad closes until its nearest visible enemy is
+       * inside the tightest preferred range among its living men — so a rifle
+       * team pushes in while the machine gun with it stops earlier and shoots
+       * them forward. */
+      let nearestFoe = 1e9;
+      for (const f of this.units) {
+        if (f.side === s.side || f.deadT != null || f.lane !== s.lane) continue;
+        if (!this.canSee(s.side, f)) continue;
+        nearestFoe = Math.min(nearestFoe, Math.abs(f.x - s.x));
+      }
+      /* TIGHTEST preferred range in the squad, not the loosest. Taking the max
+       * halts the squad at its longest-reaching weapon, which is the opposite of
+       * closing — it pushed the closest approach from 216px out to 255px. The
+       * min makes the riflemen's wish govern, so the squad advances until they
+       * are where they want to be. */
+      let wantDist = Infinity;
+      for (const m of alive) {
+        const md = UNITS[m.key];
+        wantDist = Math.min(wantDist, md.range * engageFrac(md));
+      }
+      if (!isFinite(wantDist)) wantDist = 0;
+      const atRange = nearestFoe <= wantDist;
+      const engaged = atRange && alive.some(m => (m.combatT || 0) > 0 || m.aiming);
       const sp = Math.min(...alive.map(m => UNITS[m.key].speed)) *
         (alive.some(m => m.slowT > 0) ? 0.45 : 1);
       const xBefore = s.x;
@@ -1336,6 +1377,20 @@ class Game {
       // decision — two is the trade that keeps sappers relevant.
       dmg *= opts.heavy ? 2.4 : (1 - arm) * 0.42;
     }
+    /* A sniper is very hard to answer at distance.
+     *
+     * `farArmour` is not armour in the vehicle sense — it stands for a man who
+     * is prone, concealed and a long way off, where rifle fire arriving at the
+     * edge of its own range is mostly noise. It falls away entirely as the
+     * range closes, which keeps the counterplay honest: rush him, flank him, or
+     * shell him — just do not expect to trade shots with him at 800px. Heavy
+     * ordnance ignores it, because a shell does not care how prone he is. */
+    const fa = !t.isHole && UNITS[t.key] && UNITS[t.key].farArmour;
+    if (fa && !opts.heavy && killer && killer.x != null) {
+      const r = UNITS[t.key].range || 700;
+      const far = clamp((Math.abs(killer.x - t.x) - r * 0.30) / (r * 0.55), 0, 1);
+      dmg *= 1 - fa * far;
+    }
     t.hp -= dmg;
     if (t.hp <= 0 && t.deadT == null) this._kill(t, killer, opts);
     else if (t.deadT == null && !t.isHole) {
@@ -1453,7 +1508,7 @@ class Game {
       // dissolves, so the brush reads as swallowing him rather than deleting him.
       const seen = this.visibleToPlayer(u) || u.combatT > 0 || u.muzzleT > 0;
       if (u.visA == null) u.visA = seen ? 1 : 0;
-      u.visA = seen ? 1 : Math.max(0, u.visA - dt / CONCEAL_FADE);
+      u.visA = seen ? 1 : Math.max(CONCEAL_FLOOR, u.visA - dt / CONCEAL_FADE);
 
       if (u.emergeT > 0) { u.emergeT -= dt; u.moving = false; continue; }
 

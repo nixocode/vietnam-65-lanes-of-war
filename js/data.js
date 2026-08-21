@@ -105,13 +105,52 @@ const DIFFS = {
    speed px/s, rof shots/s, range px, acc hit chance */
 /* rof = rounds/sec INSIDE a burst; burst = [min,max] rounds; pause = [min,max] s
    between bursts. Accuracy is per round — most rounds miss, as they did. */
+/* How close a unit WANTS to be before it stops advancing, as a fraction of its
+ * weapon range.
+ *
+ * A squad used to halt the instant anything was `engaged`, which is true the
+ * moment an enemy crosses the edge of maximum range. Both sides therefore
+ * stopped at arm's length of their longest weapon and traded fire across the
+ * gap. Measured on mekong: the closest two men ever came was 216px, the 0-80
+ * and 80-160px bands contained ZERO man-frames, and at 320px+ — where most of
+ * the match was spent — only 13% of men were firing at all. The close fight
+ * never happened, and most of the time nobody was shooting.
+ *
+ * Now each class closes to a distance that suits its weapon. A rifle squad
+ * pushes in; a machine gun sets up and stays back to shoot the riflemen in;
+ * a sniper never closes at all; a sapper has to reach what he intends to blow
+ * up. This is doctrine expressed as one number.
+ */
+const ENGAGE_AT = {
+  rifle:  0.55,   // line infantry close to where their rifles actually bite
+  mg:     0.85,   // support weapon: set up long, cover the advance
+  sniper: 0.95,   // never closes — the whole point is reach
+  at:     0.62,   // rocket needs a clear shot, not a duel
+  sapper: 0.30,   // has to get to the target
+  scout:  0.70,
+};
+
+function engageFrac(u) {
+  if (u.sniper) return ENGAGE_AT.sniper;
+  if (u.sapper) return ENGAGE_AT.sapper;
+  if (u.at) return ENGAGE_AT.at;
+  if (u.mg) return ENGAGE_AT.mg;
+  if (u.detect) return ENGAGE_AT.scout;
+  return ENGAGE_AT.rifle;
+}
+
 const UNITS = {
   rifleman: { side: 'us', name: 'Rifleman', sub: 'M16', cost: 10, cd: 4, hp: 55, dmg: 9, rof: 5, burst: [2, 4], pause: [0.9, 1.7], range: 320, speed: 42, acc: 0.4, hat: 'm1' },
   arvn:     { side: 'us', name: 'ARVN', sub: 'Light Inf.', cost: 7, cd: 2.5, hp: 40, dmg: 7, rof: 4.5, burst: [2, 3], pause: [1.0, 1.8], range: 280, speed: 46, acc: 0.33, hat: 'm1', small: true },
   m60:      { side: 'us', name: 'M60 Gunner', sub: 'MG', cost: 24, cd: 9, hp: 70, dmg: 6, rof: 9, burst: [6, 11], pause: [1.3, 2.2], range: 380, speed: 32, acc: 0.32, hat: 'm1', mg: true, suppress: true },
   engineer: { side: 'us', name: 'Engineer', sub: 'Demo', cost: 18, cd: 8, hp: 60, dmg: 8, rof: 4, burst: [1, 3], pause: [1.1, 1.9], range: 230, speed: 37, acc: 0.4, hat: 'm1', engineer: true, pack: true },
   recon:    { side: 'us', name: 'LRRP Recon', sub: 'Spotter', cost: 16, cd: 10, hp: 45, dmg: 8, rof: 4.5, burst: [2, 3], pause: [0.9, 1.6], range: 340, speed: 48, acc: 0.45, hat: 'boonie', detect: 325, antenna: true },
-  sniper:   { side: 'us', name: 'Scout Sniper', sub: 'M40', cost: 42, cd: 16, hp: 40, dmg: 999, rof: 0.3, range: 700, speed: 30, acc: 0.97, hat: 'boonie', sniper: true, aim: 2.6 },
+  /* The sniper is meant to be a threat you solve, not a rifleman with a scope.
+   * One shot kills outright (dmg 999 is the sentinel), he reaches half the map,
+   * and `farArmour` makes him very hard to answer at distance — see _damage.
+   * The counterweight is unchanged: he is slow, fragile up close, expensive,
+   * and takes 2.6s to lay each shot. */
+  sniper:   { side: 'us', name: 'Scout Sniper', sub: 'M40', cost: 42, cd: 16, hp: 40, dmg: 999, rof: 0.3, range: 860, speed: 30, acc: 0.99, hat: 'boonie', sniper: true, aim: 2.6, farArmour: 0.82 },
 
   /* Vehicles.
      A vehicle is a unit like any other so it inherits targeting, cover, morale
@@ -135,7 +174,7 @@ const UNITS = {
               conceal: true, ambush: 1, at: true, blast: 46 },
 
   sapper:   { side: 'vc', name: 'Sapper', sub: 'Satchel', cost: 20, cd: 10, hp: 55, dmg: 0, rof: 0, range: 38, speed: 56, acc: 1, hat: 'band', sapper: true, conceal: true, ambush: 1 },
-  marksman: { side: 'vc', name: 'Marksman', sub: 'Mosin', cost: 36, cd: 15, hp: 38, dmg: 999, rof: 0.3, range: 640, speed: 31, acc: 0.95, hat: 'conical', sniper: true, aim: 2.9, conceal: true, ambush: 1 },
+  marksman: { side: 'vc', name: 'Marksman', sub: 'Mosin', cost: 36, cd: 15, hp: 38, dmg: 999, rof: 0.3, range: 780, speed: 31, acc: 0.98, hat: 'conical', sniper: true, aim: 2.9, conceal: true, ambush: 1, farArmour: 0.82 },
 };
 
 /* ---------------- Squads ----------------

@@ -107,7 +107,30 @@ const Sprite3D = {
       return [c, Math.min(f.length - 1, Math.floor(p * (f.length - 1) + 0.0001))];
     }
     if (o.pose === 'prone' && (o.transT || 0) <= 0) {
-      const c = pick('prone', 'hit');
+      /* DOWN, not flat on his face.
+       *
+       * The rendered `prone` clip is broken and has been since it was made. It
+       * is synthesised by pitching the whole body 84 degrees about the pelvis,
+       * but the arms hang off the chest and the rifle rides the right wrist, so
+       * the tip-over carries the weapon into the ground behind him and folds the
+       * legs back through the torso. At game size it reads as a tangle of limbs
+       * with the barrel pointing at the dirt and no head to be seen — which is
+       * what "firing while prone looks awful" is describing.
+       *
+       * Three attempts to fix it in Blender each made it worse. Counter-rotating
+       * the shoulders slid the rifle off the hands entirely, because the weapon
+       * is bound to the wrist by a Child-Of whose inverse was captured at the
+       * original pose. A shallower 58-degree pitch just produced a diagonal
+       * version of the same tangle. And the donor has no prone or crouch action
+       * to borrow — all 24 of its clips are upright.
+       *
+       * So: use the AIM pose, which is clean, and drop the man toward the
+       * ground (see PRONE_DROP in render). He reads as hunkered down behind his
+       * weapon rather than lying in it, using art that is known good. The sim is
+       * untouched — `prone` is still the protection state, it just looks like a
+       * man who has gone to ground instead of a heap.
+       */
+      const c = pick('aim', 'idle');
       if (c) {
         // slow breathing, offset per man — a frozen frame reads as a bug
         const n = C[c].length;

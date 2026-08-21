@@ -2503,7 +2503,9 @@ const Renderer = {
       // ran and concealed men blinked out in a single frame.
       // The dead are always drawn: a body does not hide.
       const vis = u.deadT != null ? 1 : (u.visA != null ? u.visA : 1);
-      if (vis <= 0.01 && u.deadT == null) continue;
+      // never skip a living man entirely — see CONCEAL_FLOOR. Skipping was what
+      // made concealed enemies blink out of existence rather than fade into cover.
+      if (vis <= 0.001 && u.deadT == null) continue;
       const scale = LANE_DEPTH[lane] * (u.sj || 1);
       const concealed = u.side === 'vc' && game.isConcealed(u);
       const alpha = (concealed && u.side === game.player ? 0.55 : 1) * Math.min(1, vis);
@@ -2516,8 +2518,13 @@ const Renderer = {
       const towerLift = cv
         ? (cv.type === 'towerpos' ? 30 : (cv.lift || 0)) * LANE_DEPTH[lane]
         : 0;
+      /* A man who has gone to ground sits lower in the frame. The prone CLIP is
+       * unusable (see Sprite3D._sel), so the aim pose is used and dropped
+       * instead — the height difference is what sells "down" at 84px, not the
+       * limb arrangement. */
+      const proneDrop = u.pose === 'prone' ? 26 * scale : 0;
       drawSoldier(ctx, u.key, {
-        x: u.x, y: u.y + (u.yj || 0) - towerLift, dir: u.dir, scale,
+        x: u.x, y: u.y + (u.yj || 0) - towerLift + proneDrop, dir: u.dir, scale,
         // debounced (see MOVE_HOLD) — the raw flag flickers sub-100ms and that
         // reached the screen as clip thrash
         moving: u.movingVis != null ? u.movingVis : u.moving,
