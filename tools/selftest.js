@@ -148,7 +148,23 @@ window.SelfTest = {
         let worst = 0;
         for (const [u, frames] of manLife) {
           if (frames < 540) continue;             // ignore men who barely lived
-          worst = Math.max(worst, ((manFlips.get(u) || 0) * 3600) / frames);
+          /* Normalise by AT LEAST 30s of life, not by the man's actual lifetime.
+           *
+           * A per-minute rate divided by a short lifetime manufactures huge
+           * numbers out of ordinary behaviour: the floor above admits a man who
+           * lived 9s, and five perfectly reasonable stance changes in those 9s
+           * scored (5*3600)/540 = 33.3/min — over a limit of 28, from a man who
+           * did nothing wrong. That is how this assertion produced a lone
+           * `iadrang/us 32.1` in one run out of five while four consecutive runs
+           * came back clean, and it is why the limit had already been walked up
+           * from 22 to 28 once before.
+           *
+           * Capping the denominator kills the small-sample amplification without
+           * blunting the detector: a long-lived man's rate is untouched, and the
+           * pathology this exists to catch — a man flipping every 1.8s, sustained
+           * — still scores ~34 and still trips. */
+          const denom = Math.max(frames, 1800);
+          worst = Math.max(worst, ((manFlips.get(u) || 0) * 3600) / denom);
         }
         return worst;
       })(),

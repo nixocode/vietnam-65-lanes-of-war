@@ -52,12 +52,8 @@ const TEX = {
   treeline: ['t1_53', 't1_54', 't1_55'],
   villageSil: ['t2_54', 't2_56', 't2_57'],
   paddy: ['t1_12', 't1_14', 't1_16'],
-  tuft: ['t1_42', 't1_43', 't1_44'],
-  fern: ['t1_45', 't1_46'],
-  bush: ['t1_47', 't1_48', 't2_48'],
-  plant: ['t2_45'],
-  banana: ['t2_42', 't2_43'],
-  palm: ['t2_44'],
+  // tuft / fern / bush / plant / palm / banana are GONE — all vegetation now
+  // comes from the prop set via drawVeg(). See the comment there.
   dike: ['t1_02', 't1_04', 't1_05'],
   stonewall: ['t1_07', 't1_08', 't1_09'],
   sandbags: ['t2_08'],
@@ -71,6 +67,47 @@ const TEX = {
   watchtower: ['t2_01'],
   gate: ['t2_07'],
 };
+
+/* Ground vegetation, drawn from the 3D prop set instead of the inked sheets.
+ *
+ * All of this used to come off `TEX`, which is hand-drawn line art: black
+ * outlines, cross-hatching, illustrated botanical detail. Standing next to
+ * flat-shaded props off the same orthographic camera as the soldiers, that is
+ * two drawing systems in one frame, and it is what "some of it looks ass" was
+ * pointing at. A hand-inked fern beside a flat-shaded palm cannot be reconciled
+ * by tuning; they are drawn by different rules.
+ *
+ * Props are authored by REAL HEIGHT, not width, so this takes a height and lets
+ * the aspect follow — that is the whole point of the prop pipeline, and sizing
+ * them by the old art's widths would throw it away.
+ *
+ * Returns false if the set has not loaded, so callers keep their fallback. That
+ * is belt-and-braces: Props.load re-runs buildStatic, which marks every lane
+ * dirty, so a lane baked before the props arrive is always baked again after.
+ */
+const VEG = {
+  tuft:   ['tuft_a'],
+  fern:   ['fern_a'],
+  bush:   ['bush_low'],
+  plant:  ['vine_a'],
+  grass:  ['grass_a'],
+  palm:   ['palm_a', 'palm_b', 'palm_c', 'palm_d'],
+  banana: ['banana_a'],
+};
+
+function drawVeg(ctx, kind, i, x, gy, h, opts = {}) {
+  const list = VEG[kind];
+  if (!list || typeof Props === 'undefined' || !Props.ready) return false;
+  const name = list[((i % list.length) + list.length) % list.length];
+  if (!Props.has(name) || !(h > 0)) return false;
+  return Props.draw(ctx, name, x, gy, 1, Object.assign({}, opts, { fit: h }));
+}
+
+/* Natural on-screen height for a vegetation kind, before any variation. */
+function vegH(kind, scale) {
+  const list = VEG[kind];
+  return list && typeof Props !== 'undefined' ? Props.pxHeight(list[0], scale) : 0;
+}
 
 function tex(kind, i) {
   if (typeof Assets === 'undefined' || !Assets.done) return null;
@@ -688,9 +725,33 @@ const Renderer = {
       this.corpseCount[l] = 0;
     }
     const rng = seeded(map.seed);
+    /* Clouds in THREE DEPTHS, each a bank of lobes rather than two ellipses.
+     *
+     * The sky is 35-45% of the frame and it was the emptiest part of it: eight
+     * clouds, each drawn as two overlapping ellipses at alpha 0.05-0.15, which
+     * is a smudge, not a cloud. A cloud reads because it has a lit top and a
+     * heavier base — value structure, not an outline — so each one here carries
+     * a stack of lobes with the light coming off the map's own sun. */
     this.clouds = [];
-    for (let i = 0; i < 8; i++) {
-      this.clouds.push({ x: rng() * WORLD_W, y: 40 + rng() * 140, w: 90 + rng() * 160, sp: 3 + rng() * 6, a: 0.05 + rng() * 0.1 });
+    for (let i = 0; i < 16; i++) {
+      const band = i % 3;                       // 0 far/high, 2 near/low
+      const w = (70 + rng() * 130) * (1 + band * 0.55);
+      const lobes = [];
+      const n = 3 + ((rng() * 4) | 0);
+      for (let k = 0; k < n; k++) {
+        const t = k / (n - 1 || 1);
+        lobes.push({
+          dx: (t - 0.5) * w * 1.5,
+          dy: -Math.sin(t * Math.PI) * w * 0.20 + (rng() - 0.5) * w * 0.06,
+          r: w * (0.20 + rng() * 0.20) * (0.55 + Math.sin(t * Math.PI) * 0.65),
+        });
+      }
+      this.clouds.push({
+        x: rng() * WORLD_W, y: 34 + band * 52 + rng() * 60, w, lobes,
+        sp: (2 + rng() * 5) * (0.5 + band * 0.45),
+        a: (0.07 + rng() * 0.09) * (1 - band * 0.16),
+        para: 0.10 + band * 0.09,
+      });
     }
     // foreground occlusion plants along the bottom edge (fast parallax = depth)
     /* Foreground growth, denser and larger than it was.
@@ -704,7 +765,22 @@ const Renderer = {
      * Spacing roughly halved and sizes raised; a second, larger and darker
      * layer sits closer still and takes a stronger parallax shift. */
     this.fgPlants = [];
-    const kinds = ['tuft', 'fern', 'bush', 'plant', 'tuft', 'bush'];
+    /* Prop kinds only. `w` here is now a HEIGHT in px — props are authored by
+     * real height, so the aspect follows rather than being imposed.
+     *
+     * The two bands draw from DIFFERENT bags. The near band is big enough that a
+     * short wide prop is both wrong and expensive: a prop is framed in a square
+     * sized by its real height, so making a 0.68 m bush 280 px tall inflates the
+     * blit to 769x769 of which two thirds is empty — 0.59 Mpx an instance, on a
+     * band that redraws every frame. It also reads as a six-metre shrub. Near
+     * growth is tall growth: grass and hanging vine, which frame tightly and are
+     * what you would actually be looking through. */
+    const kinds = ['grass', 'fern', 'bush', 'plant', 'grass', 'bush'];
+    // No vine in the near band. Its leaves alternate at regular intervals down a
+    // near-straight strand, which at 260 px reads as a rope ladder rather than
+    // growth; at ground-clutter size the same regularity is invisible. Fern
+    // spray and grass are what actually read as undergrowth this close.
+    const nearKinds = ['grass', 'fern', 'grass'];
     let px = 60 + rng() * 120;
     while (px < WORLD_W * 1.02) {
       this.fgPlants.push({
@@ -717,8 +793,8 @@ const Renderer = {
     px = -40 + rng() * 160;
     while (px < WORLD_W * 1.05) {
       this.fgPlants.push({
-        x: px, kind: kinds[Math.floor(rng() * kinds.length)],
-        i: Math.floor(rng() * 4), w: 150 + rng() * 130, flip: rng() < 0.5, near: true,
+        x: px, kind: nearKinds[Math.floor(rng() * nearKinds.length)],
+        i: Math.floor(rng() * 4), w: 150 + rng() * 110, flip: rng() < 0.5, near: true,
       });
       px += 240 + rng() * 340;
     }
@@ -732,16 +808,21 @@ const Renderer = {
       const dx = p.x * k - (k - 1) * camX;
       if (dx < camX - 200 || dx > camX + CANVAS_W + 200) continue;
       if (p.near) {
-        /* Nearest growth is out of the light and out of focus: darker, slightly
-         * transparent, and hanging below the frame edge so it reads as being
-         * between the camera and the field rather than standing in it. */
-        ctx.save();
-        ctx.globalAlpha = 0.92;
-        drawTex(ctx, p.kind, p.i, dx, CANVAS_H + 16, p.w, { flip: p.flip });
-        ctx.globalCompositeOperation = 'source-atop';
-        ctx.restore();
+        /* Nearest growth is out of the light: darker, slightly transparent, and
+         * hanging below the frame edge so it reads as being between the camera
+         * and the field rather than standing in it.
+         *
+         * The darkening was DEAD CODE until now — globalCompositeOperation was
+         * set after the draw and immediately before restore(), so it applied to
+         * nothing. The band rendered at full brightness and read as bleached
+         * straw across the bottom of every frame. It is also the cheapest half
+         * of the value structure the whole frame is short of: something genuinely
+         * dark in the foreground is what gives the fight a lit pocket to sit in. */
+        drawVeg(ctx, p.kind, p.i, dx, CANVAS_H + 16, p.w,
+          { flip: p.flip, alpha: 0.94, shade: 0.78 });
       } else {
-        drawTex(ctx, p.kind, p.i, dx, CANVAS_H - 30, p.w, { alpha: 0.96, flip: p.flip });
+        drawVeg(ctx, p.kind, p.i, dx, CANVAS_H - 30, p.w,
+          { alpha: 0.96, flip: p.flip, shade: 0.46 });
       }
     }
   },
@@ -765,18 +846,43 @@ const Renderer = {
 
   _drawSkyBase(ctx, map) {
     const p = map.pal;
-    const g = ctx.createLinearGradient(0, 0, 0, 460);
-    g.addColorStop(0, p.skyTop);
-    g.addColorStop(1, p.skyBot);
+    /* A two-stop gradient is not a sky. Real ones are darkest overhead, lighten
+     * steadily, and then GLOW along the last few degrees above the horizon where
+     * you are looking through the most air — that horizon band is what gives a
+     * sky depth, and it is what makes the ridge line read as far away rather
+     * than as a shape pasted on a wall. */
+    const g = ctx.createLinearGradient(0, 0, 0, 470);
+    g.addColorStop(0, this._shade(p.skyTop, -14));
+    g.addColorStop(0.42, p.skyTop);
+    g.addColorStop(0.82, p.skyBot);
+    g.addColorStop(1, this._shade(p.skyBot, 16));
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, CANVAS_W, 460);
+    ctx.fillRect(0, 0, CANVAS_W, 470);
+
     const s = p.sun;
-    const sg = ctx.createRadialGradient(s.x, s.y, 4, s.x, s.y, s.r * 3);
+    /* Horizon glow, centred under the sun rather than on the frame — the air
+     * brightens toward the light, which is also the only cue in the whole
+     * background that says where the light IS. */
+    const hg = ctx.createRadialGradient(s.x, 430, 10, s.x, 430, CANVAS_W * 0.72);
+    hg.addColorStop(0, this._fade(s.color, 0.34));
+    hg.addColorStop(0.45, this._fade(s.color, 0.13));
+    hg.addColorStop(1, this._fade(s.color, 0));
+    ctx.fillStyle = hg;
+    ctx.fillRect(0, 250, CANVAS_W, 220);
+
+    // the disc, and a wide soft bloom around it
+    const bloom = ctx.createRadialGradient(s.x, s.y, s.r * 0.6, s.x, s.y, s.r * 6.5);
+    bloom.addColorStop(0, this._fade(s.color, 0.42));
+    bloom.addColorStop(0.30, this._fade(s.color, 0.14));
+    bloom.addColorStop(1, this._fade(s.color, 0));
+    ctx.fillStyle = bloom;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 6.5, 0, 7); ctx.fill();
+    const sg = ctx.createRadialGradient(s.x, s.y, 4, s.x, s.y, s.r * 2.2);
     sg.addColorStop(0, s.color);
-    sg.addColorStop(0.35, s.color);
-    sg.addColorStop(1, 'rgba(255,255,255,0)');
+    sg.addColorStop(0.42, this._fade(s.color, 0.7));
+    sg.addColorStop(1, this._fade(s.color, 0));
     ctx.fillStyle = sg;
-    ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 3, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 2.2, 0, 7); ctx.fill();
   },
 
   _drawFar(ctx, map, w) {
@@ -785,16 +891,34 @@ const Renderer = {
     let mx = -80 + rng() * 100;
     while (mx < w + 220) {
       const mw = 340 + rng() * 260;
-      drawTex(ctx, 'mtn', Math.floor(rng() * 3), mx, 288 + rng() * 18, mw, { alpha: 0.9 });
+      /* 0.9 made these read as cut-outs pasted on the sky: they are inked line
+       * art, they sit FARTHER away than the procedural ridges drawn over them,
+       * and they were arriving brighter and more saturated than those ridges.
+       * The farthest thing in the frame has to be the faintest. */
+      drawTex(ctx, 'mtn', Math.floor(rng() * 3), mx, 288 + rng() * 18, mw, { alpha: 0.52 });
       mx += mw * (0.55 + rng() * 0.3);
     }
     this._ridge(ctx, rng, w, 260, 70, map.pal.hillFar, 0.85);
     this._ridge(ctx, rng, w, 300, 55, map.pal.hillNear, 1);
-    // pull everything into the map's light
+    /* Blend the far band toward the SKY, not toward its own hill colour.
+     *
+     * This used to wash 42% of flat `hillFar` over the whole layer, which is why
+     * the blue-grey massif and the green ridge in front of it came out the same
+     * colour. Tinting toward `hillFar` also cannot make anything recede — the
+     * ridges were already that colour, so they kept full contrast against the
+     * sky and read as cut-outs pasted on it, worst of all at night.
+     *
+     * What distance actually does is wash everything toward the colour of the
+     * air between you and it, which is the sky. Strongest at the top of the band
+     * (farthest) and easing off toward the treeline. */
     ctx.globalCompositeOperation = 'source-atop';
-    ctx.globalAlpha = 0.42;
-    ctx.fillStyle = map.pal.hillFar;
+    const fg = ctx.createLinearGradient(0, 150, 0, 430);
+    fg.addColorStop(0, this._fade(map.pal.skyBot, 0.46));
+    fg.addColorStop(0.6, this._fade(map.pal.skyBot, 0.24));
+    fg.addColorStop(1, this._fade(map.pal.skyBot, 0.06));
+    ctx.fillStyle = fg;
     ctx.fillRect(0, 0, w, CANVAS_H);
+    ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
   },
@@ -1045,6 +1169,228 @@ const Renderer = {
     for (let x = 0; x <= WORLD_W; x += 16) ctx.lineTo(x, groundY(map, lane, x) + 2);
     ctx.stroke();
 
+    /* SLOPE SHADING — the ground takes its form from the LIGHT.
+     *
+     * Every map declares `sun: {x, y, r}` and, until now, nothing in the scene
+     * read it: the sun was a decorative blob in a sky that lit nothing. So the
+     * ground had no form. It had texture — speckles, strata, turf — but texture
+     * is not form, and a field with no lit and shaded faces reads as a flat slab
+     * however much grit is scattered on it.
+     *
+     * Ground that tilts toward the light warms and lifts; ground that tilts away
+     * cools and drops. Cooling means shifting BLUE UP as red comes down, not just
+     * darkening: that is what real shadow does, and on a frame measured at 0.0%
+     * of saturated pixels more than 30 degrees off the dominant hue, the shadows
+     * are the largest available source of honest colour variety. Derived from
+     * groundY, so it tracks the terrain exactly and bakes into the lane layer.
+     */
+    ctx.save();
+    /* One clipped fill with ONE horizontal gradient — never per-column rects.
+     *
+     * Drawing a rect per column striped the field with a seam every 6px, and
+     * smoothing the slope barely dented it (periodic power at 6px: 5.9 before
+     * the pass, 74 with it, 61 after smoothing). The seams were never the alpha
+     * jumps — they are ANTIALIASED RECT EDGES. Two abutting rects each lay down
+     * partial coverage on their shared boundary, so the boundary darkens, and it
+     * does that identically 400 times across the lane. No amount of smoothing
+     * the input fixes an artefact of the output.
+     *
+     * A canvas gradient interpolates continuously and has no internal edges at
+     * all, so the lit/shaded pattern goes into the STOPS of a single gradient
+     * and the whole lane is filled in one go, clipped to its own silhouette.
+     * The same mistake, in the same file, produced the striped value ramp that
+     * §1.1 records — worth not making a third time. */
+    const sunSide = (map.pal.sun && map.pal.sun.x < CANVAS_W / 2) ? -1 : 1;
+    const warmRGB = this._tint(p.laneBody[lane], 40, 26, 0);
+    const coolRGB = this._tint(p.laneBody[lane], -24, -12, 16);
+
+    // clip to this lane's ground silhouette
+    ctx.beginPath();
+    ctx.moveTo(0, groundY(map, lane, 0));
+    for (let x = 0; x <= WORLD_W; x += 12) ctx.lineTo(x, groundY(map, lane, x));
+    ctx.lineTo(WORLD_W, CANVAS_H);
+    ctx.lineTo(0, CANVAS_H);
+    ctx.closePath();
+    ctx.clip();
+
+    const SP = 40;                                 // one gradient stop per 40px
+    const nS = Math.ceil(WORLD_W / SP);
+    const facing = new Float32Array(nS + 1);
+    for (let i = 0; i <= nS; i++) {
+      const x = i * SP;
+      const slope = (groundY(map, lane, x + 46) - groundY(map, lane, x - 46)) / 92;
+      facing[i] = clamp(-slope * sunSide * 3.0, -1, 1);
+    }
+    let loY = 1e9;
+    for (let x = 0; x <= WORLD_W; x += 32) loY = Math.min(loY, groundY(map, lane, x));
+    const depth = Math.max(60, (lane + 1 < LANE_N ? LANE_BASE[lane + 1] - LANE_BASE[lane] : CANVAS_H - loY));
+    // three horizontal bands: strongest at the ground line, gone by the far edge
+    for (const [t0, t1, k] of [[0, 0.34, 1.0], [0.34, 0.66, 0.5], [0.66, 1.0, 0.18]]) {
+      const g2 = ctx.createLinearGradient(0, 0, WORLD_W, 0);
+      for (let i = 0; i <= nS; i++) {
+        const f = facing[i];
+        const col = f > 0 ? warmRGB : coolRGB;
+        g2.addColorStop(Math.min(1, i / nS), this._fade(col, Math.abs(f) * 0.30 * k));
+      }
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, loY + depth * t0, WORLD_W, depth * (t1 - t0) + 1);
+    }
+    ctx.restore();
+
+    /* CLOUD SHADOW — the missing scale.
+     *
+     * Three passes now work on this ground: grit (1-6px), incident (30-150px)
+     * and slope shading (terrain-wide). None of them touches the scale in
+     * between, and on the open maps that is precisely where the eye rests: Hill
+     * 937 and Ia Drang still measured as large uniform sheets of green after all
+     * three. Real fields are not uniformly lit — broken cloud lays soft shade
+     * across them in patches hundreds of pixels wide, which is the cheapest and
+     * most natural way to put slow value movement into open ground.
+     *
+     * Soft-edged and low-contrast on purpose: this should read as weather, not
+     * as stains. Baked with the lane, so it costs nothing per frame. */
+    ctx.save();
+    const shadeCol = this._tint(p.laneBody[lane], -26, -18, 6);
+    const nSh = Math.round((WORLD_W / 1280) * 6);
+    for (let i = 0; i < nSh; i++) {
+      const cx = rng() * WORLD_W;
+      const gy = groundY(map, lane, cx);
+      const band = Math.max(60, (lane + 1 < LANE_N
+        ? groundY(map, lane + 1, cx) - gy : CANVAS_H - gy));
+      const rx = 220 + rng() * 460;
+      const ry = band * (0.55 + rng() * 0.5);
+      const cy = gy + band * (0.30 + rng() * 0.45);
+      // 0.07-0.14 measured as no change at all against the slope shading below
+      // (large-scale ground variation 16.44 -> 16.35). Weather you cannot see is
+      // not restraint, it is a wasted pass.
+      const a = 0.13 + rng() * 0.11;
+      const g3 = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+      g3.addColorStop(0, this._fade(shadeCol, a));
+      g3.addColorStop(0.55, this._fade(shadeCol, a * 0.72));
+      g3.addColorStop(1, this._fade(shadeCol, 0));
+      ctx.fillStyle = g3;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(1, ry / rx);
+      ctx.translate(-cx, -cy);
+      ctx.beginPath();
+      ctx.arc(cx, cy, rx, 0, 7);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    /* GROUND INCIDENT — features at FIELD scale, not grit scale.
+     *
+     * Everything above works at 1-6px and hugs the ground LINE: speckles at
+     * alpha 0.22, strata at 0.13, turf blades 2-6px tall drawn at y0+1, scour
+     * only where the slope exceeds 0.14. Looked at in a captured frame, the
+     * lower two thirds of every lane band — the part the player actually looks
+     * at — was bare fill. Detail at grit scale cannot fix a problem at field
+     * scale, which is what "the ground is still an empty field" was pointing at.
+     *
+     * Perspective is faked the only way it can be on a side view: a feature
+     * nearer the viewer is drawn wider and flatter than one near the treeline.
+     * All of it bakes into the lane layer, so none of it costs a frame.
+     */
+    ctx.save();
+    // an irregular closed blob — an ellipse reads as a painted spot, and once
+    // you have a dozen of them the repetition is the first thing you see
+    const blob = (cx, cy, rx, ry) => {
+      ctx.beginPath();
+      const n = 7;
+      for (let k = 0; k <= n; k++) {
+        const a = (k / n) * Math.PI * 2;
+        const j = 0.62 + rng() * 0.60;
+        const px = cx + Math.cos(a) * rx * j;
+        const py = cy + Math.sin(a) * ry * j;
+        k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    };
+    // the delta is half water; the highland maps are not
+    const wet = map.trees === 'palm' ? 1.0 : (map.trees === 'jungle' ? 0.5 : 0.22);
+    const churn = this._tint(p.laneBody[lane], -20, -16, -6);
+    // +38 red put these a long way above the field and they read as tan spots
+    // however low the alpha went. Dry ground is a shade lighter, not a highlight.
+    const dry = this._tint(p.laneBody[lane], 20, 15, 3);
+    const water = p.water || '#5c7d86';
+    /* The VISIBLE depth of a lane is not its depth to the bottom of the screen.
+     * Each lane layer blits full-screen in order, so lane 1's slab paints over
+     * everything lane 0 drew below lane 1's ground line. Measured against
+     * CANVAS_H the first cut buried most of lane 0's features under the next
+     * lane and moved the ground's local detail by 0.6 of a grey level. */
+    const visBand = (x) => (lane + 1 < LANE_N
+      ? groundY(map, lane + 1, x) - groundY(map, lane, x)
+      : CANVAS_H - groundY(map, lane, x));
+    const nF = Math.round((WORLD_W / 1280) * 26);
+    for (let i = 0; i < nF; i++) {
+      const x = rng() * WORLD_W;
+      const gy = groundY(map, lane, x);
+      const band = Math.max(46, visBand(x));
+      const depth = 0.14 + rng() * 0.80;              // 0 at the treeline, 1 at the viewer
+      const y = gy + 6 + depth * (band - 14);
+      const w = (30 + rng() * 86) * (0.5 + depth);
+      const h = w * (0.15 + rng() * 0.11);            // flattened by the viewing angle
+      const roll = rng();
+      if (roll < 0.16 + 0.30 * wet) {
+        /* Standing water is the ONE thing on the ground that can be brighter
+         * than the ground, because it returns the sky. That is most of why a
+         * paddy reads as a paddy and not as a green field. */
+        /* The BODY of standing water is dark — it mostly transmits, and only
+         * the rim turns the sky back at you. Filled at -30 off the map's water
+         * colour these came out as pale tan ovals lying on the grass, because
+         * Mekong's water is a warm sunset `#d78a5e` and a light blob with a
+         * defined edge reads as a stain rather than a puddle. */
+        ctx.globalAlpha = 0.30 + rng() * 0.18;
+        ctx.fillStyle = this._shade(water, -86);
+        ctx.beginPath();
+        ctx.ellipse(x, y, w * 0.5, h * 0.46, 0, 0, 7);
+        ctx.fill();
+        ctx.globalAlpha = 0.30 + rng() * 0.22;
+        ctx.strokeStyle = water;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();                               // sky catches the far rim
+        ctx.ellipse(x, y, w * 0.5, h * 0.46, 0, Math.PI * 1.06, Math.PI * 1.94);
+        ctx.stroke();
+      } else if (roll < 0.74) {
+        ctx.globalAlpha = 0.20 + rng() * 0.20;
+        ctx.fillStyle = churn;
+        blob(x, y, w * 0.5, h * 0.62);
+      } else {
+        /* Kept well under the churned patches. A LIGHT blob on a dark field
+         * reads as a stain the moment it has a defined edge, where a dark one
+         * just reads as ground — so the pale ones get about half the strength
+         * and stay soft. */
+        ctx.globalAlpha = 0.08 + rng() * 0.09;
+        ctx.fillStyle = dry;
+        blob(x, y, w * 0.62, h * 0.72);
+      }
+    }
+    // vehicle ruts cutting across the band, not along it — a track that runs
+    // parallel to the lane just reads as another stripe
+    const nR = Math.round((WORLD_W / 1280) * 3);
+    for (let i = 0; i < nR; i++) {
+      const x0 = 80 + rng() * (WORLD_W - 400);
+      const len = 170 + rng() * 300;
+      const band = Math.max(46, visBand(x0));
+      const d0 = 0.18 + rng() * 0.38, d1 = d0 + 0.08 + rng() * 0.26;
+      ctx.globalAlpha = 0.22 + rng() * 0.12;
+      ctx.strokeStyle = churn;
+      ctx.lineWidth = 2.4;
+      for (const off of [-4, 4]) {
+        ctx.beginPath();
+        for (let t = 0; t <= 1.0001; t += 0.1) {
+          const px = x0 + len * t;
+          const py = groundY(map, lane, px) + 6 + (d0 + (d1 - d0) * t) * (band - 14) + off * (0.5 + t);
+          t === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+
     /* Water paddies with dikes and rice rows (delta).
      *
      * The geometry here was always right — 19%/30%/47% of the three Mekong
@@ -1199,7 +1545,10 @@ const Renderer = {
       if (typeof Props !== 'undefined' && Props.ready &&
           (map.trees === 'palm' || map.trees === 'jungle')) {
         // sparse: a palm is ~4x a man's height, so even a few fill the frame
-        const chance = map.trees === 'palm' ? 0.26 : 0.16;
+        // Raised from 0.26/0.16 when the painted palm and banana slices were
+        // deleted below — that share has to go somewhere, and props are the
+        // whole point. What is left over falls through to the vector _tree.
+        const chance = map.trees === 'palm' ? 0.46 : 0.30;
         if (rng() < chance) {
           /* EIGHT silhouettes, not four, and they arrive in CLUMPS.
            *
@@ -1235,11 +1584,9 @@ const Renderer = {
           if (ok) continue;
         }
       }
-      // painted palms/banana groves mix into the procedural treeline
-      if (map.trees === 'palm' && rng() < 0.4 && drawTex(ctx, rng() < 0.6 ? 'palm' : 'banana',
-          Math.floor(rng() * 3), x, groundY(map, lane, x) + 2, (34 + rng() * 22) * LANE_DEPTH[lane])) continue;
-      if (map.trees === 'jungle' && rng() < 0.25 && drawTex(ctx, 'banana',
-          Math.floor(rng() * 3), x, groundY(map, lane, x) + 2, (28 + rng() * 18) * LANE_DEPTH[lane])) continue;
+      // The painted palm and banana slices that used to mix in here are gone:
+      // they were inked line art dropped among flat-shaded props, which is the
+      // clash this pass exists to remove. Their share went to `chance` above.
       this._tree(ctx, map, rng, x, groundY(map, lane, x) + 2, LANE_DEPTH[lane]);
     }
 
@@ -1249,8 +1596,12 @@ const Renderer = {
       const x = 120 + rng() * (WORLD_W - 240);
       if (Math.abs(x - map.flags[lane] * WORLD_W) < 60) continue;
       const kind = ['tuft', 'bush', 'fern', 'tuft'][Math.floor(rng() * 4)];
-      drawTex(ctx, kind, Math.floor(rng() * 4), x, groundY(map, lane, x) + 2,
-        (14 + rng() * 20) * LANE_DEPTH[lane], { alpha: 0.92, flip: rng() < 0.5 });
+      // sized off the prop's authored real height, so a tuft is ankle-high and a
+      // bush is knee-high against a 1.8 m man rather than whatever width the
+      // inked slice happened to be
+      const vh = vegH(kind, LANE_DEPTH[lane]) * (0.74 + rng() * 0.52);
+      drawVeg(ctx, kind, 0, x, groundY(map, lane, x) + 2, vh,
+        { alpha: 0.92, flip: rng() < 0.5 });
     }
 
     // base dressing: watchtower over the US end, village gate at the VC end
@@ -1418,35 +1769,93 @@ const Renderer = {
     return `rgb(${clamp((n >> 16) + dr, 0, 255)},${clamp(((n >> 8) & 255) + dg, 0, 255)},${clamp((n & 255) + db, 0, 255)})`;
   },
 
+  /* Scale a colour's ALPHA, keeping its hue. Aerial perspective needs the map's
+   * haze colour at a dozen strengths down a gradient, and the palettes store it
+   * as an `rgba(...)` string. Accepts rgba(), rgb() and #hex. */
+  _fade(col, k) {
+    const m = /rgba?\(([^)]+)\)/.exec(col);
+    if (m) {
+      const q = m[1].split(',').map((v) => parseFloat(v));
+      const a = q.length > 3 ? q[3] : 1;
+      return `rgba(${q[0] | 0},${q[1] | 0},${q[2] | 0},${(a * k).toFixed(3)})`;
+    }
+    const n = parseInt(col.slice(1), 16);
+    return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${k.toFixed(3)})`;
+  },
+
+  /* Vector trees, for the share of the treeline the prop scatter does not take.
+   *
+   * These were flat single-colour silhouettes: the jungle tree was a stick plus
+   * three filled ellipses, which at lane scale is a lollipop, and the grass-map
+   * tree was a stick plus one wide ellipse — a mushroom. Standing beside props
+   * that carry a full lit-and-shaded canopy they were the weakest art left in
+   * the frame, and most obvious on Cu Chi, the best-looking map.
+   *
+   * A canopy reads because of VALUE, not outline: a shaded underside, a mass,
+   * and a crown catching the light — the same three-part treatment the clouds
+   * and the props use, so all three finally agree about where the sun is. Baked
+   * into the lane layer, so the extra lobes cost nothing per frame.
+   */
   _tree(ctx, map, rng, x, y, depth) {
     const t = map.trees, col = map.pal.tree;
+    const dark = this._shade(col, -16);
+    const lit = this._tint(col, 34, 30, 8);
+    const sunSide = (map.pal.sun && map.pal.sun.x < CANVAS_W / 2) ? -1 : 1;
     const s = depth * (0.7 + rng() * 0.55);
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(s, s);
     ctx.strokeStyle = col; ctx.fillStyle = col;
+
+    // a canopy built from many small lobes, in three value passes
+    const canopy = (cx, cy, rx, ry, n) => {
+      const lobes = [];
+      for (let i = 0; i < n; i++) {
+        const a2 = (i / n) * Math.PI * 2 + rng() * 0.5;
+        const rr = 0.45 + rng() * 0.55;
+        lobes.push({
+          x: cx + Math.cos(a2) * rx * rr * 0.9,
+          y: cy + Math.sin(a2) * ry * rr,
+          r: (rx * 0.34) * (0.6 + rng() * 0.6),
+        });
+      }
+      const pass = (fill, dx, dy, k) => {
+        ctx.fillStyle = fill;
+        ctx.beginPath();
+        for (const l of lobes) ctx.ellipse(l.x + dx, l.y + dy, l.r * k, l.r * k * 0.78, 0, 0, 7);
+        ctx.fill();
+      };
+      pass(dark, 0, ry * 0.22, 1.0);                       // shaded underside
+      pass(col, 0, 0, 0.98);                               // the mass
+      pass(lit, sunSide * rx * 0.13, -ry * 0.20, 0.62);    // crown in the light
+    };
+
     if (t === 'palm') {
       const lean = (rng() - 0.5) * 16;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3.4;
+      ctx.strokeStyle = dark;
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(lean * 0.4, -30, lean, -52); ctx.stroke();
       ctx.lineWidth = 2.4;
-      for (let i = 0; i < 6; i++) {
-        const a = -Math.PI / 2 + (i - 2.5) * 0.42;
+      for (let i = 0; i < 7; i++) {
+        const a2 = -Math.PI / 2 + (i - 3) * 0.38;
+        ctx.strokeStyle = (i % 2) ? col : dark;
         ctx.beginPath();
         ctx.moveTo(lean, -52);
-        ctx.quadraticCurveTo(lean + Math.cos(a) * 14, -52 + Math.sin(a) * 14 - 4, lean + Math.cos(a) * 24, -52 + Math.sin(a) * 24 + 7);
+        ctx.quadraticCurveTo(lean + Math.cos(a2) * 14, -52 + Math.sin(a2) * 14 - 4,
+          lean + Math.cos(a2) * 24, -52 + Math.sin(a2) * 24 + 7);
         ctx.stroke();
       }
+      // a little crown mass so the head is not just six lines
+      ctx.fillStyle = lit;
+      ctx.beginPath(); ctx.ellipse(lean + sunSide * 2, -54, 6, 3.4, 0, 0, 7); ctx.fill();
     } else if (t === 'jungle') {
       ctx.lineWidth = 4;
+      ctx.strokeStyle = dark;
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo((rng() - 0.5) * 6, -34); ctx.stroke();
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.ellipse((rng() - 0.5) * 26, -36 - rng() * 18, 13 + rng() * 12, 9 + rng() * 7, 0, 0, 7);
-        ctx.fill();
-      }
+      canopy(0, -44, 22 + rng() * 10, 14 + rng() * 6, 7);
     } else if (t === 'shattered') {
       ctx.lineWidth = 3.4;
+      ctx.strokeStyle = dark;
       const lean = (rng() - 0.5) * 22;
       const h = 20 + rng() * 26;
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(lean, -h); ctx.stroke();
@@ -1454,10 +1863,14 @@ const Renderer = {
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(lean * 0.6, -h * 0.6); ctx.lineTo(lean * 0.6 + 10, -h * 0.6 - 6); ctx.stroke();
       }
+      // survivors keep a thin ragged crown, which is what a stripped hill looks
+      // like — not every trunk is bare
+      if (rng() < 0.34) canopy(lean, -h - 5, 11 + rng() * 6, 6 + rng() * 4, 5);
     } else {
       ctx.lineWidth = 2.6;
+      ctx.strokeStyle = dark;
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(2, -26); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(2, -30, 18, 6, 0, 0, 7); ctx.fill();
+      canopy(2, -32, 17 + rng() * 7, 7 + rng() * 4, 6);
     }
     ctx.restore();
   },
@@ -1601,7 +2014,7 @@ const Renderer = {
      * exactly as the lane layers already do. */
     ctx.drawImage(this.sky, 0, 0);
     this._blitStrip(ctx, this.farLayer, camX * this.FAR_PARA);
-    this._drawClouds(ctx, time, camX);
+    this._drawClouds(ctx, time, camX, map);
     this._blitStrip(ctx, this.midLayer, camX * this.MID_PARA);
 
     ctx.save();
@@ -1648,8 +2061,28 @@ const Renderer = {
     ctx.restore();
 
     this._drawWeather(ctx, map, time);
-    if (map.pal.haze) {
-      ctx.fillStyle = map.pal.haze;
+    /* AERIAL PERSPECTIVE, not a flat veil.
+     *
+     * This used to be `fillRect(0, 0, CANVAS_W, CANVAS_H)` with the map's haze
+     * colour at its full 0.13-0.20 alpha — one opaque sheet of a single hue over
+     * every pixel in the frame, foreground included. Measured on captured
+     * frames, it was the main reason the palettes never reached the screen:
+     * Ia Drang and Mekong ended up with 0.0% of their saturated pixels more than
+     * 30 degrees off the dominant hue, on palettes deliberately built with 195
+     * and 125 degree spreads.
+     *
+     * Haze is a function of DISTANCE. It belongs on the ridge line and the far
+     * treeline, and it does not belong on the grass at the player's feet. Keyed
+     * to depth it stops flattening the palette and starts doing the job it was
+     * named for — pushing the background back. */
+    if (map.pal.haze && !this._night) {
+      const hz = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+      hz.addColorStop(0, map.pal.haze);            // sky: fully distant
+      hz.addColorStop(0.42, map.pal.haze);         // the ridge line and treeline
+      hz.addColorStop(0.62, this._fade(map.pal.haze, 0.45));
+      hz.addColorStop(0.80, this._fade(map.pal.haze, 0.12));
+      hz.addColorStop(1, this._fade(map.pal.haze, 0));
+      ctx.fillStyle = hz;
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
     }
     /* Colour grade. Warm lift in the highlights, cool weight in the shadows —
@@ -1679,7 +2112,9 @@ const Renderer = {
     // vignette
     const v = ctx.createRadialGradient(CANVAS_W / 2, CANVAS_H * 0.46, CANVAS_H * 0.5, CANVAS_W / 2, CANVAS_H * 0.5, CANVAS_H * 1.0);
     v.addColorStop(0, 'rgba(0,0,0,0)');
-    v.addColorStop(1, 'rgba(0,0,0,0.28)');
+    // lighter at night: the vignette is one more compressive veil on the map
+    // that has the least contrast left to give
+    v.addColorStop(1, this._night ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.28)');
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
@@ -1687,15 +2122,36 @@ const Renderer = {
     if (this.showPerf) this._drawPerf(ctx, game);
   },
 
-  _drawClouds(ctx, time, camX) {
+  _drawClouds(ctx, time, camX, map) {
+    const sun = map && map.pal.sun;
     for (const c of this.clouds) {
       const wx = (c.x + time * c.sp) % (WORLD_W + 400) - 200;
-      const x = wx - camX * 0.2;
-      if (x < -300 || x > CANVAS_W + 300) continue;
-      ctx.fillStyle = `rgba(255,255,250,${c.a})`;
+      const x = wx - camX * c.para;
+      if (x < -420 || x > CANVAS_W + 420) continue;
+      // which way the light comes from, so every cloud is lit consistently
+      const lit = sun ? Math.sign(sun.x - (x + CANVAS_W * 0)) || 1 : 1;
+      // the shadowed underside first, offset away from the light
+      ctx.fillStyle = `rgba(120,118,130,${(c.a * 0.55).toFixed(3)})`;
       ctx.beginPath();
-      ctx.ellipse(x, c.y, c.w, c.w * 0.22, 0, 0, 7);
-      ctx.ellipse(x + c.w * 0.4, c.y - 8, c.w * 0.55, c.w * 0.16, 0, 0, 7);
+      for (const l of c.lobes) {
+        ctx.ellipse(x + l.dx - lit * l.r * 0.10, c.y + l.dy + l.r * 0.30,
+          l.r, l.r * 0.62, 0, 0, 7);
+      }
+      ctx.fill();
+      // the mass
+      ctx.fillStyle = `rgba(246,244,238,${c.a.toFixed(3)})`;
+      ctx.beginPath();
+      for (const l of c.lobes) {
+        ctx.ellipse(x + l.dx, c.y + l.dy, l.r, l.r * 0.66, 0, 0, 7);
+      }
+      ctx.fill();
+      // the crown catching the sun
+      ctx.fillStyle = `rgba(255,252,244,${(c.a * 0.85).toFixed(3)})`;
+      ctx.beginPath();
+      for (const l of c.lobes) {
+        ctx.ellipse(x + l.dx + lit * l.r * 0.14, c.y + l.dy - l.r * 0.24,
+          l.r * 0.72, l.r * 0.40, 0, 0, 7);
+      }
       ctx.fill();
     }
   },
@@ -1739,7 +2195,7 @@ const Renderer = {
         ctx.scale(LANE_DEPTH[lane], LANE_DEPTH[lane]);
         ctx.fillStyle = 'rgba(22,30,16,0.55)';
         ctx.beginPath(); ctx.ellipse(0, -1, c.w / 2, 4, 0, 0, 7); ctx.fill();
-        if (!drawTex(ctx, 'bush', Math.floor(c.x), -4, 2, c.w * 1.15) ) {
+        if (!drawVeg(ctx, 'bush', 0, -4, 2, c.w * 0.62)) {
           ctx.fillStyle = map.pal.brush;
           for (let i = -2; i <= 2; i++) {
             ctx.beginPath();
@@ -1747,7 +2203,7 @@ const Renderer = {
             ctx.fill();
           }
         }
-        drawTex(ctx, 'bush', Math.floor(c.x) + 3, 12, 1, c.w * 0.8, { flip: true, alpha: 0.95 });
+        drawVeg(ctx, 'bush', 0, 12, 1, c.w * 0.44, { flip: true, alpha: 0.95 });
         ctx.restore();
         continue;
       }
@@ -1788,6 +2244,14 @@ const Renderer = {
         ctx.beginPath(); ctx.ellipse(-c.w / 2, -4.3, 2.2, 2.2, 0, 0, 7); ctx.fill();
         ctx.beginPath(); ctx.ellipse(c.w / 2, -4.3, 2.2, 2.2, 0, 0, 7); ctx.fill();
       } else if (c.type === 'dike') {
+        /* Profile-rendered bund, same as the sandbags above: drawn at scale 1
+         * because this context is already scaled by lane depth, and at its
+         * authored real height so it sits correctly against a 1.8 m man. */
+        if (typeof Props !== 'undefined' && Props.ready && Props.has('dike_a') &&
+            Props.draw(ctx, 'dike_a', 0, 0, 1, { flip: (Math.floor(c.x / 47) % 2) === 1 })) {
+          ctx.restore();
+          continue;
+        }
         if (!drawTex(ctx, 'dike', Math.floor(c.x), 0, 1, c.w * 1.7)) {
           ctx.fillStyle = '#6d6034';
           ctx.beginPath();
@@ -1805,6 +2269,11 @@ const Renderer = {
         ctx.fillStyle = 'rgba(72,58,36,0.8)';
         ctx.beginPath(); ctx.ellipse(0, -3.4, c.w / 2 + 3, 2.4, 0, Math.PI, 0); ctx.fill();
       } else if (c.type === 'wall') {
+        if (typeof Props !== 'undefined' && Props.ready && Props.has('stonewall_a') &&
+            Props.draw(ctx, 'stonewall_a', 0, 0, 1, { flip: (Math.floor(c.x / 59) % 2) === 1 })) {
+          ctx.restore();
+          continue;
+        }
         if (!drawTex(ctx, 'stonewall', Math.floor(c.x), 0, 1, c.w * 1.6)) {
           // low mud-brick village wall, chipped
           ctx.fillStyle = '#8a7a5c';
@@ -1913,16 +2382,40 @@ const Renderer = {
      * multiplying by a neutral: a blue-dominant factor suppresses red and green
      * harder than blue, so it cools the frame as it darkens it. A light wash
      * afterwards settles the blacks, since real night is not pure black. */
+    /* EVERY WASH COSTS CONTRAST, AND THEY MULTIPLY TOGETHER.
+     *
+     * Switching to multiply fixed the worst of it (18 -> 34 points of range) but
+     * left the map at 38 against 102-170 on the daylight maps, and the arithmetic
+     * says why: multiply by rgb(58,102,196) scales luminance by 0.39, the navy
+     * source-over on top of it by 0.86, the map's own full-screen haze by 0.80
+     * and the grade by 0.90. Four individually reasonable veils compose to 0.24,
+     * so a scene with 164 points of range arrives with 39. Measured: 38.
+     *
+     * The fix is not a gentler multiply — it is fewer veils and a contrast
+     * restore. The map haze is skipped entirely at night (see above), the navy
+     * source-over is halved, and a `overlay` pass pushes the range back out so
+     * night is DARK rather than FLAT. */
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = 'rgb(58,102,196)';
+    ctx.fillStyle = 'rgb(74,116,205)';
     ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = `rgba(11,16,33,${k * 0.14})`;
+    ctx.fillStyle = `rgba(11,16,33,${k * 0.07})`;
+    ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
+    /* Push the range back out. `overlay` steepens around mid-grey: what was
+     * lighter than half goes lighter, what was darker goes darker, which is
+     * exactly the compression the washes above just caused, inverted. */
+    ctx.globalCompositeOperation = 'overlay';
+    /* NEUTRAL, deliberately. A blue source in overlay mode does not just steepen
+     * contrast — it saturates whatever sits near mid-grey, and the ridge line is
+     * exactly that, so a blue restore turned the grey massif into a row of vivid
+     * blue triangles pasted on the sky. The cooling is the multiply's job; this
+     * pass only has to put the range back. */
+    ctx.fillStyle = 'rgba(168,170,176,0.55)';
     ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
     ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
-    g.addColorStop(0, 'rgba(22,36,80,0.17)');
-    g.addColorStop(1, 'rgba(10,18,40,0.09)');
+    g.addColorStop(0, 'rgba(26,42,92,0.15)');
+    g.addColorStop(1, 'rgba(10,18,40,0.05)');
     ctx.fillStyle = g;
     ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
 
@@ -1961,7 +2454,12 @@ const Renderer = {
    * most on the far lane, none on the near one — separates them the way distance
    * actually does. Costs three fills. */
   _laneHaze(ctx, map, lane) {
-    const a = [0.5, 0.22, 0][lane];
+    /* Depth-derived, not a hardcoded table. `[0.5, 0.22, 0][lane]` was written
+     * for three lanes, where index 2 — the lane nearest the viewer — was the one
+     * that got NO haze. At LANE_N = 2 that entry is never reached, so the
+     * foreground lane has been sitting under a permanent 0.22 veil ever since
+     * the drop to two lanes. The nearest lane always gets zero. */
+    const a = LANE_N > 1 ? 0.5 * (1 - lane / (LANE_N - 1)) : 0;
     if (!a || !map.pal.haze) return;
     const prev = ctx.globalAlpha;
     ctx.globalAlpha = a;

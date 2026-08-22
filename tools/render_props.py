@@ -112,6 +112,126 @@ def _beam(mat, x0, z0, x1, z1, t=0.11, y=0.0, yt=0.11):
     return ob
 
 
+def _curve(x0, z0, x1, z1, bow, segs):
+    """Points along a quadratic bezier bowed perpendicular to the chord.
+
+    Everything organic in here failed the same way first: built from straight
+    beams it reads as a pile of sticks, because a straight line is the one shape
+    plants never make. Every leaf, frond and strand goes through this.
+    """
+    import math as _m
+    dx, dz = x1 - x0, z1 - z0
+    L = _m.hypot(dx, dz) or 1e-6
+    cx = (x0 + x1) / 2 - dz / L * bow
+    cz = (z0 + z1) / 2 + dx / L * bow
+    pts = []
+    for k in range(segs + 1):
+        t = k / float(segs)
+        u = 1 - t
+        pts.append((u * u * x0 + 2 * u * t * cx + t * t * x1,
+                    u * u * z0 + 2 * u * t * cz + t * t * z1))
+    return pts
+
+
+def _poly(mat, pts, y=0.0, yt=0.012):
+    """One flat polygon in the XZ plane, given thickness in Y.
+
+    Chains of rotated boxes cannot draw a leaf. Every box has square ends, so at
+    each bend the corners stand proud and the outline comes out scalloped — the
+    banana plant read as an armadillo shell for exactly this reason. A leaf is
+    one surface with one silhouette, so it is built as one polygon.
+    """
+    import bmesh
+    me = bpy.data.meshes.new('p')
+    bm = bmesh.new()
+    top = [bm.verts.new((x, y + yt, z)) for x, z in pts]
+    bot = [bm.verts.new((x, y - yt, z)) for x, z in pts]
+    bm.faces.new(top)
+    bm.faces.new(list(reversed(bot)))
+    n = len(pts)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((top[i], top[j], bot[j], bot[i]))
+    bm.normal_update()
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new('p', me)
+    bpy.context.collection.objects.link(ob)
+    ob.data.materials.append(mat)
+    return ob
+
+
+def _leafpoly(mat, x0, z0, x1, z1, bow=0.0, wmax=0.09, segs=10, y=0.0, yt=0.012):
+    """A leaf as ONE polygon: the midline bowed, the width swelling and tapering
+    to a point at the tip. Same arguments as _blade, clean silhouette."""
+    import math as _m
+    mid = _curve(x0, z0, x1, z1, bow, segs)
+    left, right = [], []
+    for k, (px, pz) in enumerate(mid):
+        t = k / float(segs)
+        w = wmax * _m.sin(_m.pi * min(1.0, t ** 0.85)) ** 0.6
+        if k == 0:
+            dx, dz = mid[1][0] - px, mid[1][1] - pz
+        elif k == segs:
+            dx, dz = px - mid[k - 1][0], pz - mid[k - 1][1]
+        else:
+            dx, dz = mid[k + 1][0] - mid[k - 1][0], mid[k + 1][1] - mid[k - 1][1]
+        d = _m.hypot(dx, dz) or 1e-6
+        nx, nz = -dz / d, dx / d
+        left.append((px + nx * w, pz + nz * w))
+        right.append((px - nx * w, pz - nz * w))
+    return _poly(mat, left + list(reversed(right)), y=y, yt=yt)
+
+
+def _blade(mat, x0, z0, x1, z1, bow=0.0, wmax=0.09, segs=6, y=0.0, yt=0.02):
+    """A leaf with actual blade area: half-width swells to `wmax` near the middle
+    and comes to a point at the tip.
+
+    The first banana plant was six narrow ribbons tracing an outline with nothing
+    between them, which at 60 px read as a croquet hoop. A leaf is a surface.
+    """
+    import math as _m
+    pts = _curve(x0, z0, x1, z1, bow, segs)
+    for k in range(segs):
+        tm = (k + 0.5) / segs
+        w = wmax * _m.sin(_m.pi * tm) ** 0.55
+        _beam(mat, pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1],
+              t=max(w, 0.008), y=y, yt=yt)
+
+
+def _frond(rachis, leaf, x0, z0, x1, z1, bow=0.0, pairs=9, leafL=0.20,
+           y=0.0, yt=0.016):
+    """A pinnate frond: one stem plus leaflets down both sides.
+
+    This is the whole difference between a fern and a bent stick — the leaflets
+    are the read, and there have to be enough of them to make a comb.
+    """
+    import math as _m
+    pts = _curve(x0, z0, x1, z1, bow, pairs + 1)
+    for k in range(pairs + 1):
+        if k:
+            _beam(rachis, pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1],
+                  t=0.016, y=y, yt=yt)
+        if k == pairs:
+            break
+        t = k / float(pairs)
+        # longest a third of the way out, tapering to nothing at the tip
+        L = leafL * _m.sin(_m.pi * (0.25 + 0.75 * t)) * (1.0 - 0.45 * t)
+        if L < 0.02:
+            continue
+        ax, az = pts[k]
+        dx, dz = pts[k + 1][0] - ax, pts[k + 1][1] - az
+        d = _m.hypot(dx, dz) or 1e-6
+        dx, dz = dx / d, dz / d
+        for sgn in (-1, 1):
+            # swept back toward the tip, the way a frond actually sits
+            ang = sgn * 1.02
+            lx = ax + (dx * _m.cos(ang) - dz * _m.sin(ang)) * L
+            lz = az + (dx * _m.sin(ang) + dz * _m.cos(ang)) * L
+            _blade(leaf, ax, az, lx, lz, bow=sgn * L * 0.22, wmax=L * 0.20,
+                   segs=2, y=y + sgn * 0.006, yt=yt * 0.7)
+
+
 def build_watchtower():
     """Legs, X-bracing, a railed platform and a thatch roof.
 
@@ -231,79 +351,139 @@ def build_m113():
 # repeated stamp, and a repeated stamp is the problem being solved.
 
 def build_bamboo():
-    """A clump of culms. Vietnam's most characteristic screen of cover."""
+    """A clump of culms. Vietnam's most characteristic screen of cover.
+
+    First version read as electricity pylons: six dead-straight culms at even
+    spacing with square nodes bridging them, which is a lattice, not a plant.
+    Real bamboo leans out from a common base, every cane at its own angle, and
+    the nodes are thin rings rather than blocks. The leaf mass matters as much —
+    a bare cane is a pole, and it is the spray at the top that says bamboo.
+    """
     cane = _pmat('bm_cane', (0.150, 0.170, 0.062))
     dark = _pmat('bm_dark', (0.086, 0.104, 0.040))
     leaf = _pmat('bm_leaf', (0.110, 0.155, 0.055))
-    culms = [(-0.62, 3.5, -0.10), (-0.30, 4.4, 0.05), (0.02, 3.9, -0.04),
-             (0.30, 4.8, 0.12), (0.60, 3.2, 0.18), (0.14, 2.6, -0.16)]
+    pale = _pmat('bm_pale', (0.168, 0.182, 0.076))
+    import math as _m
+    import random as _r
+    _r.seed(19)
+    # (base x, height, lean at the tip) — fanning out from a tight clump, which
+    # is how it grows, rather than standing in a row
+    culms = [(-0.22, 3.6, -0.95), (-0.10, 4.5, -0.52), (-0.02, 3.9, -0.18),
+             (0.06, 4.8, 0.34), (0.16, 3.2, 0.86), (0.02, 2.6, 0.14),
+             (-0.16, 4.1, -0.72), (0.12, 3.4, 0.60)]
     for i, (x, h, lean) in enumerate(culms):
         m = cane if i % 3 else dark
-        _beam(m, x, 0.0, x + lean, h, t=0.055, y=(i % 3 - 1) * 0.07, yt=0.05)
-        # nodes — the joints are what say bamboo rather than reed
-        n = 3
-        for k in range(1, n + 1):
-            z = h * k / (n + 1.0)
-            _box(dark, x - 0.075, -0.055, z, x + 0.075, 0.055, z + 0.045)
-        # leaf sprays, upper third only
-        for k in range(3):
-            lz = h * (0.62 + 0.12 * k)
+        y = (i % 4 - 1.5) * 0.09
+        # the cane itself curves — it is not a ruled line
+        pts = _curve(x, 0.0, x + lean, h, bow=-lean * 0.16, segs=4)
+        for k in range(4):
+            _beam(m, pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1],
+                  t=0.052 - 0.006 * k, y=y, yt=0.046 - 0.005 * k)
+        # nodes: thin rings on the cane, not blocks bridging between canes
+        for k in range(1, 5):
+            t = k / 5.0
+            nx = x + lean * t * t
+            nz = h * t
+            _box(dark, nx - 0.058, y - 0.050, nz, nx + 0.058, y + 0.050, nz + 0.022)
+        # leaf sprays over the top half — the actual read of the plant
+        for k in range(5):
+            t = 0.52 + 0.11 * k
+            lx = x + lean * t * t
+            lz = h * t
             sx = 1 if (i + k) % 2 else -1
-            _beam(leaf, x + lean * 0.7, lz, x + lean * 0.7 + sx * (0.42 + 0.1 * k),
-                  lz + 0.30 - 0.1 * k, t=0.035, y=(k - 1) * 0.06, yt=0.03)
+            for j in range(3):
+                L = 0.30 + _r.random() * 0.26
+                ang = sx * (0.35 + 0.42 * j) + (_r.random() - 0.5) * 0.3
+                _blade(leaf if (i + j) % 3 else pale, lx, lz,
+                       lx + _m.sin(ang) * L, lz + _m.cos(ang) * L * 0.72,
+                       bow=sx * 0.05, wmax=0.030, segs=2,
+                       y=y + (j - 1) * 0.05, yt=0.013)
 
 
 def build_deadtree():
-    """A shell-stripped trunk. Reads instantly as a fought-over place."""
-    bark = _pmat('dt_bark', (0.088, 0.070, 0.048))
+    """A shell-stripped trunk. Reads instantly as a fought-over place.
+
+    The stacked-box version read as a totem pole: four rectangles of decreasing
+    width with three stubs poking out at tidy angles. A shattered trunk is not
+    tidy — it leans, it narrows continuously, and the top is a splintered crown
+    of spikes rather than a flat cap. The stubs vary in length, angle and droop.
+    """
     char = _pmat('dt_char', (0.040, 0.034, 0.028))
-    # tapered trunk, stacked so it narrows toward the break
-    # One trunk, not a stack. Switching material halfway up put a hard grey/brown
-    # seam across the middle and the whole thing read as blocks balanced on each
-    # other. The bark darkens gradually toward the burnt top instead.
-    seg = [(0.34, 0.0, 1.1), (0.27, 1.1, 2.3), (0.20, 2.3, 3.4), (0.14, 3.4, 4.2)]
-    for i, (r, z0, z1) in enumerate(seg):
-        lean = 0.05 * i
-        t = i / (len(seg) - 1.0)
-        m = _pmat('dt_seg%d' % i, (0.088 - 0.040 * t, 0.070 - 0.032 * t, 0.048 - 0.018 * t))
-        _box(m, -r + lean, -r * 0.7, z0, r + lean, r * 0.7, z1)
-    # broken stubs, none matching another
-    _beam(char, 0.10, 2.05, 0.95, 2.62, t=0.075, y=0.05, yt=0.06)
-    _beam(char, -0.05, 2.85, -0.78, 3.15, t=0.062, y=-0.04, yt=0.05)
-    _beam(char, 0.16, 3.55, 0.58, 3.98, t=0.048, y=0.02, yt=0.04)
-    _box(char, -0.16, -0.26, 4.20, 0.22, 0.26, 4.46)          # splintered top
+    import math as _m
+    import random as _r
+    _r.seed(13)
+    segs = 14
+    pts = _curve(0.0, 0.0, 0.46, 4.2, bow=-0.20, segs=segs)
+    for i in range(segs):
+        t = i / float(segs)
+        r = 0.34 - 0.24 * t
+        m = _pmat('dt_s%d' % i, (0.088 - 0.046 * t, 0.070 - 0.037 * t, 0.048 - 0.021 * t))
+        _beam(m, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1],
+              t=r, y=0.0, yt=r * 0.72)
+    limbs = [(0.16, 1.85, 1.05, 0.42, 0.085), (0.02, 2.60, -0.88, 0.20, 0.070),
+             (0.26, 3.15, 0.66, -0.18, 0.056), (0.10, 2.20, -0.52, -0.26, 0.048),
+             (0.34, 3.62, 0.44, 0.16, 0.042)]
+    for i, (bx, bz, reach, rise, th) in enumerate(limbs):
+        _beam(char, bx, bz, bx + reach, bz + rise, t=th,
+              y=(i - 2) * 0.06, yt=th * 0.8)
+        _beam(char, bx + reach, bz + rise, bx + reach * 1.22, bz + rise * 1.5 + 0.10,
+              t=th * 0.55, y=(i - 2) * 0.06, yt=th * 0.45)
+    tx, tz = pts[-1]
+    for k in range(6):
+        L = 0.16 + _r.random() * 0.40
+        ang = (k - 2.5) * 0.20 + (_r.random() - 0.5) * 0.18
+        _beam(char, tx, tz - 0.12, tx + _m.sin(ang) * L * 0.5, tz - 0.12 + L,
+              t=0.030 + _r.random() * 0.020, y=(k - 2.5) * 0.045, yt=0.028)
 
 
 def build_banana():
-    """Broad drooping leaves — the shape nothing else on the map has.
+    """Broad drooping paddles — the shape nothing else on the map has.
 
-    First attempt paired two straight beams per leaf and produced a flat zigzag
-    lying on its side: 5.3 m wide and 1.9 m tall, when the plant is taller than
-    it is wide. A leaf needs to be a CURVE, so each one is walked out in short
-    segments that rise, flatten and then fall away at the tip.
+    Two earlier failures worth not repeating. Straight paired beams gave a flat
+    zigzag lying on its side, 5.3 m wide on a plant that is taller than it is
+    wide. Curving them fixed the posture but left six narrow ribbons tracing an
+    outline with nothing inside, which at 60 px read as a croquet hoop. Banana
+    leaves are big flat surfaces, so they are built as blades with real width,
+    and split lengthwise the way wind actually leaves them.
     """
     stem = _pmat('bn_stem', (0.120, 0.140, 0.058))
     leaf = _pmat('bn_leaf', (0.135, 0.190, 0.062))
     dark = _pmat('bn_dark', (0.088, 0.125, 0.045))
+    rib = _pmat('bn_rib', (0.070, 0.100, 0.034))
     import math as _m
-    _box(stem, -0.19, -0.17, 0.0, 0.19, 0.17, 1.25)           # pseudostem
-    _box(stem, -0.15, -0.14, 1.25, 0.15, 0.14, 1.70)
-    # (side, reach, base height, how far the tip falls)
-    fronds = [(-1, 1.05, 1.62, 0.95), (1, 0.92, 1.70, 0.80),
-              (-1, 0.74, 1.86, 0.55), (1, 0.66, 1.92, 0.45),
-              (-1, 1.15, 1.38, 1.15), (1, 1.02, 1.30, 1.02)]
-    for i, (sx, reach, z0, fall) in enumerate(fronds):
+    # pseudostem: tapered and sheathed. A plain rectangle read as a fence post.
+    for k in range(6):
+        t0, t1 = k / 6.0, (k + 1) / 6.0
+        r0, r1 = 0.21 - 0.07 * t0, 0.21 - 0.07 * t1
+        m = stem if k % 2 else dark
+        _box(m, -r0, -r0 * 0.85, t0 * 1.70, r1, r1 * 0.85, t1 * 1.70)
+    # (side, reach, base z, tip z, bow, half-width)
+    #
+    # Eight leaves all sweeping to the same two sides at similar angles stacked
+    # into two solid lobes and the plant read as a moth. What says banana is
+    # SEPARATE leaves with daylight between them, spread from young ones still
+    # standing upright at the crown to old ones drooping to the ground.
+    fronds = [(-1, 0.28, 1.66, 2.54, 0.09, 0.095),
+              (1,  0.24, 1.70, 2.62, 0.07, 0.085),
+              (-1, 0.92, 1.60, 1.74, 0.40, 0.150),
+              (1,  1.02, 1.54, 1.48, 0.44, 0.155),
+              (-1, 1.26, 1.36, 0.58, 0.50, 0.165),
+              (1,  1.16, 1.30, 0.46, 0.46, 0.150)]
+    for i, (sx, reach, z0, z1, bow, wm) in enumerate(fronds):
         m = leaf if i % 2 else dark
-        y = (i - 2.5) * 0.055
-        segs = 5
-        px, pz = 0.0, z0
-        for k in range(1, segs + 1):
-            t = k / segs
-            # rises early, falls late — a quarter-sine arc tipped over
-            x = sx * reach * t
-            z = z0 + _m.sin(t * _m.pi * 0.9) * 0.34 - fall * (t ** 2.2)
-            _beam(m, px, pz, x, z, t=0.155 - 0.02 * k, y=y, yt=0.022)
-            px, pz = x, z
+        y = (i - 2.5) * 0.06
+        # ONE polygon per leaf. Built as a chain of boxes it scalloped at every
+        # bend and read as an armadillo shell; before that, three narrow strips
+        # merged into a solid dark arch.
+        _leafpoly(m, 0.0, z0, sx * reach, z1, bow=sx * bow, wmax=wm, segs=12,
+                  y=y, yt=0.013)
+        # midrib over the blade — the split that says banana, not palm
+        _leafpoly(rib, 0.0, z0, sx * reach, z1, bow=sx * bow, wmax=wm * 0.13,
+                  segs=12, y=y + 0.016, yt=0.009)
+        # one wind tear per leaf, angled back off the rib
+        tx, tz = _curve(0.0, z0, sx * reach, z1, sx * bow, 8)[5]
+        _leafpoly(rib, tx, tz, tx + sx * 0.15, tz - 0.12 * (1 if z1 < z0 else -1),
+                  bow=0.0, wmax=0.012, segs=3, y=y + 0.016, yt=0.009)
 
 
 def build_grass():
@@ -320,6 +500,171 @@ def build_grass():
               t=0.034, y=(_r.random() - 0.5) * 0.34, yt=0.026)
 
 
+# ---- small ground cover -------------------------------------------------
+# These exist to RETIRE the inked line-art vegetation (TEX tuft/fern/bush/plant
+# in render.js). That art is hand-drawn with black outlines and cross-hatching,
+# and the game's props are flat-shaded off one orthographic camera — two drawing
+# languages that cannot be reconciled by tuning. A hand-inked fern standing next
+# to a flat-shaded palm is what "some of it looks ass" was pointing at.
+#
+# Deliberately SMALL. grass_a is 1.8 m, which is right for a stand of elephant
+# grass and far too big for the ankle-height clutter that fills ground between
+# the trees. These run 0.3-1.2 m.
+
+def build_tuft():
+    """Ankle-height grass. The most-used prop on any map, so it stays cheap."""
+    pale = _pmat('tf_pale', (0.165, 0.175, 0.072))
+    deep = _pmat('tf_deep', (0.100, 0.122, 0.046))
+    import random as _r
+    _r.seed(11)
+    # 14 blades vanished at the ~26 px this draws at. Ground clutter has to be a
+    # clump to read at all; a handful of separate strokes just disappears.
+    for i in range(30):
+        x = (_r.random() - 0.5) * 0.66
+        h = 0.20 + _r.random() * 0.36
+        _beam(deep if i % 3 else pale, x, 0.0, x + (_r.random() - 0.5) * 0.34, h,
+              t=0.026, y=(_r.random() - 0.5) * 0.24, yt=0.020)
+
+
+def build_bushlow():
+    """A low leafy mass. Replaces the inked `bush`.
+
+    Built first as a heap of boxes, which is precisely what it looked like. A
+    bush has no large faces at all — it is a few hundred small leaves catching
+    light at different angles, so that is what it is made of.
+    """
+    mid = _pmat('bl_mid', (0.118, 0.150, 0.052))
+    pale = _pmat('bl_pale', (0.156, 0.178, 0.070))
+    deep = _pmat('bl_deep', (0.074, 0.100, 0.036))
+    import math as _m
+    import random as _r
+    _r.seed(23)
+    for i in range(4):                                    # a hint of stem
+        x = -0.18 + i * 0.12
+        _beam(deep, x, 0.0, x + (_r.random() - 0.5) * 0.2, 0.30 + _r.random() * 0.18,
+              t=0.018, y=(i - 1.5) * 0.07, yt=0.016)
+    for i in range(96):
+        # sample a squashed dome, denser toward the middle
+        ang = _r.random() * _m.pi
+        rad = 0.72 * (0.35 + 0.65 * _r.random() ** 0.6)
+        bx = _m.cos(ang) * rad
+        bz = 0.10 + _m.sin(ang) * rad * 0.62
+        out = 0.10 + _r.random() * 0.11
+        oa = ang + (_r.random() - 0.5) * 1.5
+        # pale on top where light lands, deep underneath — the only way a mass
+        # of one colour ever reads as round
+        m = pale if bz > 0.34 and _r.random() < 0.6 else (deep if bz < 0.22 else mid)
+        _blade(m, bx, bz, bx + _m.cos(oa) * out, bz + _m.sin(oa) * out * 0.8,
+               bow=(_r.random() - 0.5) * 0.06, wmax=0.030 + _r.random() * 0.018,
+               segs=2, y=(_r.random() - 0.5) * 0.30, yt=0.012)
+
+
+def build_fern():
+    """Ground fern. Replaces the inked `fern`.
+
+    The first one was two bare arcs meeting at a point and read as a croquet
+    hoop. A fern is leaflets; without them the stem is just a bent stick.
+    """
+    frond = _pmat('fn_stem', (0.090, 0.118, 0.040))
+    leaf = _pmat('fn_leaf', (0.128, 0.162, 0.056))
+    pale = _pmat('fn_pale', (0.160, 0.182, 0.072))
+    import random as _r
+    _r.seed(7)
+    spread = [(-1, 0.70, 0.30), (1, 0.62, 0.40), (-1, 0.48, 0.52),
+              (1, 0.42, 0.58), (-1, 0.26, 0.66), (1, 0.20, 0.70), (0, 0.05, 0.74)]
+    for i, (sx, reach, top) in enumerate(spread):
+        _frond(frond, pale if i % 3 == 0 else leaf,
+               0.0, 0.06, sx * reach, top,
+               bow=sx * 0.16 if sx else 0.04, pairs=9,
+               leafL=0.15 + 0.03 * _r.random(), y=(i - 3) * 0.055)
+
+
+def build_vine():
+    """Hanging growth. The inked `plant` slice the owner singled out was a vine;
+    this is the same idea drawn in the game's own language.
+
+    Bare strands read as parallel dashes — it is the leaves hanging off them that
+    make it a vine rather than a set of dropped wires.
+    """
+    stem = _pmat('vn_stem', (0.078, 0.098, 0.036))
+    leaf = _pmat('vn_leaf', (0.112, 0.148, 0.050))
+    deep = _pmat('vn_deep', (0.066, 0.092, 0.032))
+    import math as _m
+    import random as _r
+    _r.seed(31)
+    for i in range(6):
+        x0 = -0.58 + i * 0.232
+        drop = 0.72 + (i % 3) * 0.24
+        segs = 6
+        px, pz = x0, 1.24
+        for k in range(1, segs + 1):
+            t = k / float(segs)
+            x = x0 + 0.17 * _m.sin(t * 2.4)
+            z = 1.24 - drop * t
+            _beam(stem, px, pz, x, z, t=0.020, y=(i - 2.5) * 0.055, yt=0.017)
+            # leaves down both sides of the strand, alternating the way they grow
+            for sgn in (-1, 1):
+                if _r.random() < 0.32:
+                    continue
+                L = 0.10 + _r.random() * 0.07
+                ang = sgn * (0.7 + _r.random() * 0.5) - _m.pi / 2
+                _blade(leaf if (k + i) % 2 else deep, x, z,
+                       x + _m.cos(ang) * L, z + _m.sin(ang) * L * 0.7,
+                       bow=sgn * 0.03, wmax=0.026 + _r.random() * 0.012, segs=2,
+                       y=(i - 2.5) * 0.055 + sgn * 0.02, yt=0.011)
+            px, pz = x, z
+
+
+
+def build_dike():
+    """A paddy bund. The Mekong's own cover, and among the last inked kit left."""
+    earth = _pmat('dk_earth', (0.108, 0.086, 0.052))
+    dry = _pmat('dk_dry', (0.140, 0.112, 0.066))
+    grass = _pmat('dk_grass', (0.120, 0.140, 0.056))
+    pale = _pmat('dk_pale', (0.160, 0.172, 0.070))
+    import random as _r
+    _r.seed(41)
+    segs = 12
+    pts = _curve(-1.55, 0.0, 1.55, 0.0, bow=0.46, segs=segs)
+    for i in range(segs):
+        m = dry if i % 3 == 0 else earth
+        _beam(m, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1],
+              t=0.13, y=0.0, yt=0.30)
+    # grass along the crown — a bare bund reads as a speed bump
+    for i in range(26):
+        t = _r.random()
+        cx = -1.5 + 3.0 * t
+        cz = 0.10 + 0.40 * _r.random() + 0.30 * (1 - abs(t - 0.5) * 2)
+        h = 0.10 + _r.random() * 0.18
+        _beam(grass if i % 3 else pale, cx, cz, cx + (_r.random() - 0.5) * 0.16,
+              cz + h, t=0.020, y=(_r.random() - 0.5) * 0.30, yt=0.016)
+
+
+def build_stonewall():
+    """A low village wall of mud brick, chipped and gapped."""
+    brick = _pmat('sw_brick', (0.150, 0.126, 0.086))
+    dark = _pmat('sw_dark', (0.104, 0.086, 0.058))
+    cap = _pmat('sw_cap', (0.170, 0.146, 0.100))
+    import random as _r
+    _r.seed(53)
+    W, rows = 1.55, 5
+    for r in range(rows):
+        z0 = r * 0.17
+        z1 = z0 + 0.155
+        off = 0.10 if r % 2 else 0.0          # staggered courses
+        x = -W
+        while x < W:
+            bw = 0.20 + _r.random() * 0.10
+            if r == rows - 1 and _r.random() < 0.34:
+                x += bw + 0.02                # the top course is broken
+                continue
+            m = dark if _r.random() < 0.3 else brick
+            _box(m, x + off, -0.17, z0, min(W, x + off + bw), 0.17, z1)
+            x += bw + 0.018
+    _box(cap, -W, -0.19, rows * 0.17, W * 0.55, 0.19, rows * 0.17 + 0.055)
+
+
+
 BUILT = {
     'm113':       (build_m113, 2.6),
     'watchtower': (build_watchtower, 5.2),
@@ -330,6 +675,14 @@ BUILT = {
     'deadtree_a': (build_deadtree, 4.5),
     'banana_a':   (build_banana, 2.7),
     'grass_a':    (build_grass, 1.8),
+    # small ground cover, sized to retire the inked TEX vegetation
+    'tuft_a':     (build_tuft, 0.55),
+    'bush_low':   (build_bushlow, 0.85),
+    'fern_a':     (build_fern, 0.75),
+    'vine_a':     (build_vine, 1.30),
+    # cover — the last of the inked kit to be replaced
+    'dike_a':      (build_dike, 0.62),
+    'stonewall_a': (build_stonewall, 1.05),
 }
 
 

@@ -50,10 +50,12 @@ const Props = {
    * frame cost several megapixels for nothing, so each size is pre-scaled once
    * into a small canvas and reused. Bucketed to 8px so a hundred slightly
    * different palm heights do not each mint their own texture. */
-  _scaled(it, dw) {
+  _scaled(it, dw, shade) {
+    const sh = shade > 0 ? Math.round(shade * 10) : 0;
     const b = Math.max(8, Math.round(dw / 8) * 8);
+    const key = sh ? b + 's' + sh : b;
     const cache = it.cache || (it.cache = {});
-    let c = cache[b];
+    let c = cache[key];
     if (!c) {
       c = document.createElement('canvas');
       c.width = b;
@@ -62,17 +64,29 @@ const Props = {
       x.imageSmoothingEnabled = true;
       x.imageSmoothingQuality = 'high';
       x.drawImage(it.img, 0, 0, b, b);
-      cache[b] = c;
+      if (sh) {
+        /* Shade baked in ONCE per size rather than per draw. Darkening at draw
+         * time needs either a canvas filter or a scratch buffer every frame;
+         * this pays for it on first use and the cache serves it thereafter.
+         * source-atop confines the wash to the prop's own pixels, which is the
+         * whole trick — a plain fillRect would flood the frame. */
+        x.globalCompositeOperation = 'source-atop';
+        x.fillStyle = 'rgba(14,20,12,' + (sh / 10) + ')';
+        x.fillRect(0, 0, b, b);
+        x.globalCompositeOperation = 'source-over';
+      }
+      cache[key] = c;
       // a runaway cache would be its own leak; props only ever need a few sizes
       const keys = Object.keys(cache);
-      if (keys.length > 14) delete cache[keys[0]];
+      if (keys.length > 20) delete cache[keys[0]];
     }
     return c;
   },
 
   /* Draw with its base planted on (x, groundY). `fit` overrides the authored
    * height when a map wants a specific size — the aspect ratio is kept either
-   * way, so nothing ever stretches. */
+   * way, so nothing ever stretches. `shade` (0-1) darkens the prop, for growth
+   * that sits between the camera and the light. */
   draw(ctx, name, x, groundY, scale, opts = {}) {
     const it = this.items[name];
     if (!it) return false;
@@ -82,7 +96,7 @@ const Props = {
     const k = h / (m.hM * m.ppm);
     const dw = m.res * k;
     if (dw < 1) return true;
-    const src = this._scaled(it, dw);
+    const src = this._scaled(it, dw, opts.shade);
     ctx.save();
     if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
     ctx.translate(x, groundY);

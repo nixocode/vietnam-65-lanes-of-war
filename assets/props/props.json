@@ -2,23 +2,33 @@
  "props": [
   {
    "name": "bamboo_a",
-   "hM": 4.805,
-   "wM": 2.574,
+   "hM": 4.892,
+   "wM": 2.726,
    "groundY": 480.6,
-   "ppm": 93.47,
+   "ppm": 91.8,
    "res": 512,
    "realH": 4.8,
-   "aspect": 0.5357
+   "aspect": 0.5572
   },
   {
    "name": "banana_a",
-   "hM": 2.267,
-   "wM": 2.273,
-   "groundY": 479.9,
-   "ppm": 197.59,
+   "hM": 2.62,
+   "wM": 2.42,
+   "groundY": 480.6,
+   "ppm": 171.42,
    "res": 512,
    "realH": 2.7,
-   "aspect": 1.0026
+   "aspect": 0.9237
+  },
+  {
+   "name": "bush_low",
+   "hM": 0.678,
+   "wM": 1.633,
+   "groundY": 349.3,
+   "ppm": 275.1,
+   "res": 512,
+   "realH": 0.85,
+   "aspect": 2.4086
   },
   {
    "name": "cart_a",
@@ -32,13 +42,33 @@
   },
   {
    "name": "deadtree_a",
-   "hM": 4.46,
-   "wM": 1.795,
+   "hM": 4.652,
+   "wM": 2.56,
    "groundY": 480.6,
-   "ppm": 100.7,
+   "ppm": 96.54,
    "res": 512,
    "realH": 4.5,
-   "aspect": 0.4025
+   "aspect": 0.5503
+  },
+  {
+   "name": "dike_a",
+   "hM": 1.005,
+   "wM": 3.168,
+   "groundY": 327.2,
+   "ppm": 141.76,
+   "res": 512,
+   "realH": 0.62,
+   "aspect": 3.1522
+  },
+  {
+   "name": "fern_a",
+   "hM": 0.667,
+   "wM": 1.168,
+   "groundY": 384.2,
+   "ppm": 384.36,
+   "res": 512,
+   "realH": 0.75,
+   "aspect": 1.7511
   },
   {
    "name": "frame_a",
@@ -221,6 +251,26 @@
    "aspect": 1.131
   },
   {
+   "name": "stonewall_a",
+   "hM": 0.905,
+   "wM": 3.1,
+   "groundY": 321.6,
+   "ppm": 144.88,
+   "res": 512,
+   "realH": 1.05,
+   "aspect": 3.4254
+  },
+  {
+   "name": "tuft_a",
+   "hM": 0.576,
+   "wM": 0.881,
+   "groundY": 402.9,
+   "ppm": 509.85,
+   "res": 512,
+   "realH": 0.55,
+   "aspect": 1.5295
+  },
+  {
    "name": "village_row",
    "hM": 0.502,
    "wM": 1.723,
@@ -229,6 +279,16 @@
    "res": 512,
    "realH": 3.2,
    "aspect": 3.4323
+  },
+  {
+   "name": "vine_a",
+   "hM": 1.305,
+   "wM": 1.492,
+   "groundY": 452.5,
+   "ppm": 301.11,
+   "res": 512,
+   "realH": 1.3,
+   "aspect": 1.1433
   },
   {
    "name": "watchtower",

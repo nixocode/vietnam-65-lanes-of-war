@@ -15,7 +15,13 @@ assets/v3_sources/
 assets/sprites3d/*/*_[0-9][0-9].png
 assets/sprites3d/*/index.json
 assets/sprites3d/*/.outlined.json
-assets/props/.toned.json
+
+# NOT assets/props/.toned.json — it used to be ignored here as a build artifact,
+# which it is not. The prop PNGs ARE committed and they are committed ALREADY
+# GRADED, so the ledger is the only thing standing between a fresh clone and
+# tools/tone_props.py grading them a second time: 0.80 twice is 0.64, and a
+# second 4px rim on top of the first is an 8px black border. The sprite ledgers
+# above are genuinely disposable because the frames they guard are not committed.
 
 # Debug captures and contact sheets written during development.
 assets/debug/
@@ -27,3 +33,10 @@ assets/debug/
 __pycache__/
 .vercel
 node_modules/
+
+# Seeded design-canvas output. 2.2 MB of editor payload, regenerated from the
+# .dc.html sources beside it; the canvas itself lives as a published Artifact.
+# The sources ARE tracked — they are the design; this file is a build product,
+# and it would otherwise be served from the live site for no reason.
+design/hud/*.html
+!design/hud/*.dc.html
