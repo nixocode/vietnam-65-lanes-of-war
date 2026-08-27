@@ -491,6 +491,9 @@ class Game {
       s.emergeT = Math.max(0, s.emergeT - dt);
       s.nadeCd = Math.max(0, (s.nadeCd || 0) - dt);
       s.suppCd = Math.max(0, (s.suppCd || 0) - dt);
+      // a focus order must never outlive its target, or the squad keeps its
+      // concentration bonus pointed at a squad that no longer exists
+      if (s.focus && !this.squadAlive(s.focus).length) s.focus = null;
       s.smokeCd = Math.max(0, (s.smokeCd || 0) - dt);
       s.suppFireT = Math.max(0, (s.suppFireT || 0) - dt);
       // pin: builds from incoming fire (added in _fire/_areaDamage), decays in lulls
@@ -848,12 +851,47 @@ class Game {
       else { s.moveToX = clamp(arg, 30, WORLD_W - 30); s.order = 'moveto'; }
     } else if (order === 'grenade') {
       return this._squadGrenade(s);
+    } else if (order === 'focus') {
+      return this._squadFocus(s);
     }
     if (order === 'smoke') {
       return this._squadSmoke(s);
     } else if (order === 'suppress') {
       return this._squadSuppress(s);
     }
+    return true;
+  }
+
+  /* FOCUS FIRE — the squad concentrates on one enemy squad instead of each man
+   * choosing for himself.
+   *
+   * Riflemen deliberately spread fire (`_acquire` adds rand(0,150) so bursts
+   * walk a bunched line rather than queueing on the point man), which is right
+   * by default and wrong when one enemy squad is the problem. Concentrating
+   * kills a squad outright instead of wounding three, and a dead squad stops
+   * shooting back — that is the whole trade the player now gets to make, and it
+   * is the decision the middle of a firefight was missing.
+   *
+   * Picks the nearest enemy squad this one can actually see and engage. Cleared
+   * automatically when that squad is gone, so focus can never strand a squad
+   * shooting at nothing.
+   */
+  _squadFocus(s) {
+    const alive = this.squadAlive(s);
+    if (!alive.length) return false;
+    const ax = this.squadAnchor(s);
+    let best = null, bd = 1e9;
+    for (const o of this.squads) {
+      if (o.side === s.side || o.lane !== s.lane) continue;
+      const men = this.squadAlive(o);
+      if (!men.length) continue;
+      if (!men.some(m => this.canSee(s.side, m))) continue;
+      const d = Math.abs(this.squadAnchor(o) - ax);
+      if (d < bd) { bd = d; best = o; }
+    }
+    if (!best) return false;
+    // picking the same squad twice releases it, so one key toggles
+    s.focus = (s.focus === best) ? null : best;
     return true;
   }
 
@@ -1247,6 +1285,11 @@ class Game {
       // riflemen distribute fire across a bunched group instead of queueing
       // on the point man — every acquire re-rolls, so bursts walk the line
       if (!d.sniper) score += rand(0, 150);
+      /* ...unless the player has called for concentrated fire. Big enough to
+       * beat the spread roll and any distance term inside a unit's range, but
+       * NOT absolute: a man still will not shoot through a wall or past his
+       * reach, because the range and line-of-sight tests above already ran. */
+      if (u.squad && u.squad.focus && f.squad === u.squad.focus) score += 900;
       if (d.sniper) {
         if (f.sniperUnit) score += 600;
         else if (!f.isHole && UNITS[f.key] && UNITS[f.key].mg) score += 300;
@@ -2128,6 +2171,47 @@ class Game {
         const close = this.squads.filter(o => o.side !== side && o.lane === s.lane &&
           this.squadAlive(o).length && Math.abs(this.squadAnchor(o) - s.x) < 270);
         if (close.length >= 2) this._squadSuppress(s);
+      }
+
+      /* CONCENTRATE ON WHAT IS ALREADY HURT.
+       *
+       * The AI had every tactical tool the player has and used two of them. It
+       * fired the way an untrained squad does — every man for himself — so its
+       * damage spread across a line and wounded three squads instead of
+       * removing one. Finishing a squad is worth far more than hurting several,
+       * because a dead squad stops shooting back. */
+      if (!s.focus || !this.squadAlive(s.focus).length) {
+        let pick = null, bestScore = -1e9;
+        for (const o of this.squads) {
+          if (o.side === side || o.lane !== s.lane) continue;
+          const men = this.squadAlive(o);
+          if (!men.length) continue;
+          const dist = Math.abs(this.squadAnchor(o) - s.x);
+          if (dist > 340) continue;
+          if (!men.some(m => this.canSee(side, m))) continue;
+          const full = (SQUADS[o.key] && SQUADS[o.key].comp.length) || men.length;
+          const hurt = 1 - men.length / full;
+          const score = hurt * 420 - dist;
+          if (score > bestScore) { bestScore = score; pick = o; }
+        }
+        if (pick) s.focus = pick;
+      }
+
+      /* A MAULED SQUAD PULLS BACK instead of feeding itself in.
+       *
+       * Squads advanced until they were dead, which reads as stupid rather than
+       * aggressive and hands the player free kills. Below a third strength and
+       * under fire, they go to ground behind the nearest cover.
+       *
+       * `playerHeld` is cleared afterwards: orderSquad sets it to mean "a human
+       * chose this", and leaving it set on an AI squad would freeze it out of
+       * its own advance logic for the rest of the match. */
+      const full = (sd.comp && sd.comp.length) || 1;
+      const left = this.squadAlive(s).length;
+      if (left && left / full <= 0.34 && !s.ceding &&
+          (s.underFireT || 0) > 0 && Math.random() < 0.4) {
+        this.orderSquad(s, 'fallback');
+        s.playerHeld = false;
       }
     }
   }

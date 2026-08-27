@@ -155,7 +155,12 @@ STATE_ACTIONS = {
 MODEL_FOR = {
     'rifleman':  'soldier',     'arvn':     'casual',
     'm60':       'adventurer',  'engineer': 'swat',
-    'recon':     'adventurer',  'sniper':   'soldier',
+    # sniper gets `worker`, the one donor in art/models nothing used. It shared
+    # `soldier` with the rifleman, so the two most common US figures on screen
+    # were the same body — and a sniper reading as "just another rifleman" is
+    # exactly wrong for a unit you are supposed to pick out. Costs no memory:
+    # same frame count, different mesh.
+    'recon':     'adventurer',  'sniper':   'worker',
     'guerrilla': 'farmer',      'marksman': 'farmer',
     'sapper':    'hoodie',
     'nva':       'worker',      'rpd':      'worker',

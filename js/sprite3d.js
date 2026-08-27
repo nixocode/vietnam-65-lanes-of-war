@@ -35,6 +35,9 @@ const S3_FOOT = 39 / 84;
  * geometrically honest one at this scale, which is the trade the block above
  * already describes. Walk is untouched; it only ever runs at genuinely slow
  * speeds where the honest stride still reads correctly. */
+// The speed the stride length is normalised against — the rifleman, the unit
+// every other one is balanced around. See the stride note in _sel.
+const S3_REF_SPD = 42;
 const S3_WALK_CYCLE = 0.72;
 const S3_RUN_CYCLE = 0.387;
 const S3_WALK_SPD = 22;        // world px/s below which a soldier is picking his way
@@ -191,7 +194,31 @@ const Sprite3D = {
       const h = S3_TARGET_H * (o.scale || 1);
       // each man carries his own stride length and where in the cycle he starts,
       // so a squad moving together never lands its feet on the same beat
-      const cycle = h * (running ? S3_RUN_CYCLE : S3_WALK_CYCLE) * (o.gaitK || 1);
+      /* STRIDE SCALES WITH THE UNIT'S SPEED, so cadence stays even.
+       *
+       * The frame index comes off distance travelled, so with a FIXED cycle
+       * length animation fps is directly proportional to how fast a unit moves:
+       * a sapper at 56 px/s played 25.9 walk fps and a sniper at 30 played 13.9.
+       * The sniper animated 1.87x choppier than the sapper, and the slowest
+       * units — the ones you watch creeping into position — were the worst.
+       *
+       * That is also backwards from how walking works. People change speed
+       * mostly by changing STRIDE LENGTH; cadence stays in a narrow band. A slow
+       * man takes short steps, he does not take the same long stride in slow
+       * motion. Scaling the cycle with speed is therefore both the fix and the
+       * more honest gait: fps = spd*n / (h*C*spd/REF) cancels to n*REF/(h*C),
+       * the same for every unit.
+       *
+       * Off the unit's BASE speed from UNITS, never the instantaneous `spd` —
+       * `dist/cycle` would jump the moment the cycle changed, popping the frame
+       * index every time a man accelerated out of cover.
+       *
+       * Result: 19.3-20.7 fps across all twelve, against 13.9-25.9 before. */
+      const ud = typeof UNITS !== 'undefined' && UNITS[key];
+      const strideK = ud && ud.speed
+        ? clamp(ud.speed / S3_REF_SPD, 0.72, 1.25) : 1;
+      const cycle = h * (running ? S3_RUN_CYCLE : S3_WALK_CYCLE)
+        * (o.gaitK || 1) * strideK;
       const f = ((o.dist || 0) / cycle + (o.gaitOff || 0)) % 1;
       return [c, Math.floor((f < 0 ? f + 1 : f) * n) % n];
     }

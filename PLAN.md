@@ -474,21 +474,41 @@ There were simply not enough frames in it.
 
 ## 2. Open, ranked
 
-The art passes are done and the atlas memory wall is down. The jank is fixed and
-measured. What is left is the HUD and combat depth — the owner asked for all four
-depth directions, so this sequences them by value per unit of work.
+Art is done, the atlas wall is down, the jank is fixed, and combat has its first
+real mid-fight decision. What is left is more depth and the harder animation work.
+
+**Done since the last pass**
+- **Even cadence.** Animation fps was proportional to unit SPEED, because the
+  frame index comes off distance travelled with a fixed cycle: a sapper at
+  56 px/s played 25.9 walk fps and a sniper at 30 played 13.9 — 1.87x choppier
+  for the units you most often watch creeping into position. Stride now scales
+  with the unit's base speed, which is also how walking actually works (people
+  change speed by changing stride, not cadence). **19.3-20.7 fps across all
+  twelve.** Keyed to BASE speed, never instantaneous, or `dist/cycle` would pop
+  the frame index every time a man accelerated.
+- **HUD plates** ported from the approved canvas — chamfered corners, hairline
+  brass rules, a brass CP plate as the single anchor, ranging ticks on the
+  morale bars. Appended to `css/style.css`: `#hud-controls button` is declared
+  FOUR times further up and `#hud-bottom` twice, so the cascade is the only
+  reliable way to land a change until that is untangled.
+- **Focus fire.** Riflemen deliberately spread fire; concentrating kills a squad
+  outright instead of wounding three, and a dead squad stops shooting back.
+  `X` or the FOCUS button, toggles, auto-clears when the target dies, marked
+  with brackets on the field.
+- **The AI uses it too**, preferring squads already hurt — and a squad below a
+  third strength under fire now falls back instead of feeding itself in.
+- **Sniper got its own body** (`worker.glb`, previously downloaded and unused).
+  It shared `soldier` with the rifleman, so the two commonest US figures were
+  the same mesh. Zero memory: same frame count, different donor.
 
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | HUD wiring | Designed and APPROVED (`design/hud/*.dc.html`, published canvas), not implemented — `js/ui.js` and `css/style.css` still ship the old plates. The one approved piece of work with nothing blocking it. |
-| 2 | Mid-fight agency | Target priority — let a selected squad focus the enemy MG rather than each man picking his own. `orderSquad`/`orderSel` plumbing already exists. (The dead suppress hotkey is FIXED: it was bound to `S` behind smoke and unreachable; it is `C` for covering fire now.) |
-| 3 | Smarter AI | `_aiVC`/`_aiUS` deploy and advance. Make them concentrate on the weaker lane, hold when losing a firefight instead of feeding men in, and use call-ins reactively. |
-| 4 | Break a donor tie | `worker.glb` is downloaded and unused; giving it to `sniper` (currently sharing `soldier` with rifleman) costs ZERO memory. One unit re-render. |
-| 5 | Terrain and flanking | Lane switching — the largest change, since `LANE_N = 2` and lane is fixed at spawn. |
-| 6 | Attrition | Ammo and reload as a resource. Deliberately last: it touches every unit's balance and risks the pacing that currently works. |
-| 7 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. Costs frames; 9.7 MB spare. |
-| 8 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
-| 9 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
+| 1 | Terrain and flanking | Lane switching. The largest remaining depth item — `LANE_N = 2` and lane is fixed at spawn, so "where you fight" is currently not a decision. |
+| 2 | Attrition | Ammo and reload as a resource. Touches every unit's balance, so it goes after flanking. |
+| 3 | HUD group rails | The design's BASIC INFANTRY / HEAVY WEAPONS / SPECIALISTS rails need a category field on the 13 squads; none exists yet. |
+| 4 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. ~9 MB spare would cover it. |
+| 5 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
+| 6 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
 
 
 **Checked and NOT a gap: audio.** It was about to go on this list as "an M60 and

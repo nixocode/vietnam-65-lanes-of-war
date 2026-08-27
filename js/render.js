@@ -2672,6 +2672,32 @@ const Renderer = {
       if (!alive.length) continue;
       const vis = alive.some(m => game.visibleToPlayer(m));
       if (!vis) continue;
+      /* Mark the squad the player has called concentrated fire on.
+       *
+       * An order with no visible consequence is an order nobody uses. Brackets
+       * rather than a box: the focused squad is being SHOT AT, and a solid
+       * frame around it competes with the health bars and hit sparks already
+       * living in that space. */
+      for (const o of game.squads) {
+        if (o.focus !== s || o.side === s.side) continue;
+        const fx = game.squadAnchor(s);
+        const fy = groundY(game.map, lane, fx) - 74 * LANE_DEPTH[lane];
+        const w = 22 * LANE_DEPTH[lane];
+        ctx.save();
+        ctx.globalAlpha = 0.62 + 0.22 * Math.sin(time * 5);
+        ctx.strokeStyle = '#e0c48c';
+        ctx.lineWidth = 1.4;
+        for (const sx of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(fx + sx * w, fy - 7);
+          ctx.lineTo(fx + sx * (w + 5), fy - 7);
+          ctx.lineTo(fx + sx * (w + 5), fy + 7);
+          ctx.lineTo(fx + sx * w, fy + 7);
+          ctx.stroke();
+        }
+        ctx.restore();
+        break;
+      }
       if (s.pinned) {
         const ax = game.squadAnchor(s);
         const ay = groundY(game.map, lane, ax) - 84 * LANE_DEPTH[lane];
