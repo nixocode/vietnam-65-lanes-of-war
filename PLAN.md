@@ -42,9 +42,29 @@ before touching it), `docs/ASSET_PROMPT.md` (brief for generating new props).
    accumulated state from earlier stagings add full-screen blits. This is the
    second time a `Capture` figure has misled this project, after the bake-frame
    problem below.
-7. **Frame rate cannot be measured here.** The automation pane never
-   rasterises. Everything measured is work-per-frame; the `` ` ``/F3 overlay is
-   the only source of truth and needs the owner to read it.
+7. **Frame rate CAN be measured here** — `tools/perf.js`. This said the opposite
+   for the project's whole life, and the reason was specific rather than
+   fundamental: the automation pane runs hidden, so Chrome throttles
+   requestAnimationFrame and the callback never fires. RAF is not the only clock.
+   A canvas draw returns once the command is QUEUED, but a pixel readback cannot
+   return until every queued command has COMPLETED, so `render() ->
+   getImageData(1x1)` bounds real frame cost. Validated against ground truth:
+   holding the scene fixed and changing only canvas size gives 1.8 / 3.0 / 5.9 ms
+   at 0.36 / 1.44 / 3.24 Mpx — flat submission cost, rasterisation scaling with
+   area, which is the signature of the real thing.
+
+   Two traps, both hit and both now guarded in the tool: flushing every frame
+   makes Chrome DE-ACCELERATE the canvas (3.1ms on a fresh page, 41.7ms after a
+   few dozen benches — it looked exactly like a load cliff at 60s of match time
+   and was purely the instrument), and flushing once per batch is unsound because
+   intermediate frames are never observable and the driver need not produce them
+   (it reported 0.06ms/frame, 16,000 FPS). Answer: flush per frame, keep `iters`
+   modest, few benches per page load, and watch `degraded` — `jsMs` jumps two
+   orders of magnitude when the canvas falls back to software.
+
+   Still worth an owner reading off `` ` ``/F3 for the real composited number;
+   this is a hidden tab on one machine. But it is a repeatable millisecond figure
+   for comparing two builds, which is what it is for.
 8. Do not revisit AI-generated frame sheets or auto-cut cutout rigs. Both are
    proven dead ends (`SPRITE_PIPELINE.md` §1).
 
@@ -129,9 +149,28 @@ on captured frames rather than guessed:
 - Buildings measure Lmean 108-120 against 57-91 for everything else. Sunlit
   thatch SHOULD be the light accent, but `hut_a` at saturation 0.49 is louder
   than the palette wants.
-- The far parallax band (`mtn`, `treeline`, `villageSil`, `paddy`) is still inked
-  line art. It recedes properly now, which buys time, but it is still the odd
-  system out.
+- The far parallax band is **done**. `treeline`, `villageSil` and `paddy` are now
+  drawn procedurally — `_treeBand`, `_villageBand`, `_paddyStrip` — and their
+  slices are gone from `assets/manifest.js` (108 terrain slices -> 99).
+
+  The paddies were the real find: **isometric 3/4-view tiles**, drawn looking
+  DOWN at the field from an angle, in a game whose every other element is a
+  strict side view. That is precisely the collage the prop pipeline was built to
+  end, and it survived only because it was squashed to 55% and drawn at half
+  alpha — which hides a wrong projection without fixing it. Edge on, a paddy is
+  a bright sliver of reflected sky between two low bunds.
+
+  `mtn` STAYS. It is the one piece of the old set that earns its place: a
+  distant ridge silhouette, now pushed back into the sky colour, at a size where
+  the line work does not read.
+
+  Two things worth keeping: built from `brush` alone the new treeline came out
+  uniformly mid-green and read as a row of shrubs where the inked slices read as
+  a wall of jungle — it needs `tree` for the mass and `brush` for the lit
+  surface, which is the relationship those palette entries already describe. And
+  `ctx.ellipse()` CONTINUES the current subpath, so opening the band with a
+  `moveTo` to the far corner ran a visible spike from the bottom-left of the
+  frame into the first lobe. One `moveTo` per lobe.
 
 ### 1.2 One art language *(done — the inked art is gone)*
 All small vegetation now draws from the 3D prop set through `drawVeg()` in
@@ -194,6 +233,15 @@ nodes bridging them read as electricity pylons.
 - `grass_a` pulled down from Lmean 83 to 68; it was the palest thing on the
   ground and scattered bright straw across the field at random.
 
+**Buildings brought into the palette.** They measured Lmean 108-120 and
+saturation up to 0.49 against 57-91 / 0.20-0.37 for everything else — sunlit
+thatch and timber SHOULD be the light accent in a frame of olive foliage, and
+that part is kept, but at those values they had stopped being an accent and
+become the brightest, most saturated thing on screen. The stone in `hut_c` and
+`village_row` read as poured concrete. Re-rendered from source with their own
+FIXUP entries: now Lmean 53-80, sat 0.28-0.39, still lighter than the foliage
+they stand against. **The prop set now has zero palette outliers.**
+
 **Still open here**
 - `sandbags_row` (0.27 x 0.11 m) and `sandbag_one` (0.15 x 0.06 m) have authored
   real heights that cannot be right for sandbags.
@@ -247,64 +295,220 @@ Still worth doing: the banana renders paler than everything around it, and a
 palm from a real model still reads better than anything built from boxes — if
 a properly licensed nature pack turns up, the pipeline takes it unchanged.
 
-### 1.4 Gunfights *(partly fixed — keep going)*
-Measured before the fix: 31 men in a battle produced **0.56 muzzle flashes per
-frame** and **51% of frames showed nothing firing at all**. Gunsmoke now spawns
-on every shot and lives ~1.4s, so 100% of frames show combat is happening.
+### 1.4 Gunfights *(impact + suppression done; heavy weapons partly)*
+Measured before the first fix: 31 men produced **0.56 muzzle flashes per frame**
+and **51% of frames showed nothing firing**. Gunsmoke now spawns on every shot,
+so 100% of frames show combat.
+
+**Suppression is now drawn.** It was the mechanic the whole sim turns on —
+accuracy halved, advances stopped, the stance machine driven to prone — and the
+only thing on screen saying so was the word PINNED in 8px type. Two sources now:
+a round cracking within 46px of a man throws dust off the ground on the side the
+fire came from, and a pinned squad keeps a low trickle going between rounds
+(impact dust alone made it flicker — suppressed on frames something landed, idle
+on frames nothing did, when the STATE is continuous).
+
+**Impact had emitters and no weight.** `dirtKick` was four dots of 1.5-3px and
+`splinters` five of 1-2.4px, which at lane scale is invisible: the calls were
+all wired and a round striking earth still read as nothing happening. Both now
+lead with a DUST PUFF — the part the eye actually catches — and throw clods
+after it, scaled by lane depth, with belt-fed weapons throwing visibly more than
+a rifle.
+
+**Dust is not smoke.** Drawn in gunsmoke's neutral grey it vanished into the
+ground it was rising from; kicked earth is warmer and lighter than the field,
+which is what makes it read against grass. `color: 'dust'` in the particle draw.
+
+**Particles now cull by PRIORITY, not by age.** `add()` was unbounded with one
+backstop at 900 that spliced away the OLDEST — exactly the wrong end, since the
+oldest are the smoke and dust giving a fight its body and the newest are the
+flashes and tracers telling the player who is shooting at whom. Ground dust and
+debris carry `prio: 0` and stop being added above 260; flashes, tracers, blood
+and explosions always get through.
+
+Cost of all of it, measured with `tools/perf.js`: **+0.2 to +0.8 ms/frame**,
+worst map 5.0 → 5.8ms. Everything still holds 60 with 3-5x headroom.
+
+**Heavy weapons now read as heavy.** `muzzle()`'s `heavy` flag changed exactly
+one number — flash height, 26px against 19 — so an M60 burst and a single rifle
+shot were the same event at the muzzle, on weapons costing 5 CP and 3 CP that
+are supposed to feel different. Belt-fed now gets a longer, wider flash, seven
+sparks instead of three, brass in a stream rather than one shell at a time, and
+half again as much smoke: a gun position firing bursts fogs itself in, and that
+fog is most of how you find one on real footage.
+
+**Shell and rocket impact got the cue that says weight.** Everything the
+explosion did threw material UP — flash, column, ejecta, smoke — which is what a
+firework does. What separates a shell from a firework is the low sheet of dust
+running OUTWARD along the ground, because the blast has nowhere else to go once
+it meets earth. Measured spreading 250px+ from the burst.
+
+**Recoil.** The vector rig has swapped recoil frames off `muzzleT` since it was
+written; the 3D sprite path never got anything, so men fired without moving at
+all — most of why a firefight read stiff even with the muzzle and smoke work
+done. There is no recoil clip and the donor has none to borrow, so it is
+positional: the man rides back along his own facing and settles over the 0.11s
+the shot already lasts. 3px at 84px tall; 6px reads as a man being shoved.
 
 Still missing:
-- **Impact.** Rounds hitting cover should throw splinters, dust and chips with
-  real weight; hits on men need more than a small spark.
-- **Suppression made visible** — dust kicking off the ground in front of a
-  pinned squad is the clearest read there is.
-- **Weight on the heavy weapons.** An M60 burst and a rifle shot look nearly
-  identical.
-- **Shell and rocket impact** — currently underplayed for what it does.
+- **Weapon report** still does not distinguish an M60 from a rifle by ear.
+- A first cut gated the pinned-squad trickle on `particles.length < 150`, which
+  switched the dust OFF in exactly the heavy firefights it exists to describe.
+  Saturation belongs in `add()` and nowhere else.
 
-### 1.5 Animation *(prone and transparency fixed; recoil still open)*
+### 1.5 Animation and soldier variety
 
-**The prone CLIP is broken at source and is no longer used.** It was synthesised
-by pitching the body 84 degrees about the pelvis, but the arms hang off the
-chest and the rifle rides the right wrist, so the tip-over drove the weapon into
-the ground behind the man and folded his legs back through his torso. At game
-size: a tangle of limbs, barrel in the dirt, no visible head.
+**Per-man appearance.** `gaitK` has varied each man's animation SPEED and
+`gaitOff` his clip PHASE for a long time, so a squad never marched in lockstep —
+but every man was the same pixels in the same colours, and at squad size that
+reads as one soldier stamped five times. Each man now carries a small brightness
+and hue shift keyed off `gaitOff` (a `Math.random()` fixed at spawn, so a man's
+colour never changes frame to frame). Kept narrow on purpose: it has to break up
+a rank without breaking the side's identity, which the player reads by colour
+before anything else.
 
-Three Blender attempts each made it worse, and they are worth not repeating:
-counter-rotating the shoulders slid the rifle off the hands entirely (the weapon
-is bound to the wrist by a Child-Of whose inverse was captured at the original
-pose); a shallower 58-degree pitch gave a diagonal version of the same tangle;
-and the donor has no prone or crouch action to borrow — all 24 of its clips are
-upright.
+**Cost matters here and was measured, not assumed.** `ctx.filter` with THREE
+functions chained (brightness + hue-rotate + saturate) roughly DOUBLED frame
+cost — iadrang 3.2 -> 7.2ms, cuchi 3.3 -> 8.6ms. One function costs +1.0ms and
+two cost about the same as one, so `saturate` was carrying nearly all of it.
+Shipping brightness + hue-rotate: +1.0 to +1.9 ms, every map still holds 60.
 
-The game now draws prone men with the **aim** pose dropped 26px toward the
-ground. Clean art, and the height difference is what reads as "down" at 84px
-anyway. A proper prone clip needs either a real mocap source or hand-posed
-arms in Blender; until then this is the honest option.
+**Idle drift.** The two at-rest poses were split on a fixed `gaitOff < 0.45`, so
+a man played the same idle from spawn to death and a squad holding a position
+showed two poses frozen in whatever proportion the spawn rolls gave. A slow
+per-man oscillator now drifts men between them. Measured over 30s: both variants
+in use (41 / 66 samples) with 8 switches — movement, not thrash.
 
-Still open:
-- Recoil: a per-shot kick on the upper body, not just a flash.
-- A real crouch, between standing and prone.
-- Death variety — one death clip per unit.
+**Recoil** is done (see §1.4).
 
----
+**The prone CLIP is broken at source and is not used.** It was synthesised by
+pitching the body 84 degrees about the pelvis, but the arms hang off the chest
+and the rifle rides the right wrist, so the tip-over drove the weapon into the
+ground behind the man and folded his legs back through his torso. Three Blender
+attempts each made it worse and are worth not repeating: counter-rotating the
+shoulders slid the rifle off the hands entirely (the weapon is bound to the
+wrist by a Child-Of whose inverse was captured at the original pose); a shallower
+58-degree pitch gave a diagonal version of the same tangle; and the donor has no
+prone or crouch action to borrow — all 24 of its clips are upright. The game
+draws prone men with the **aim** pose dropped 26px instead, and the height
+difference is what reads as "down" at 84px anyway.
+
+### 1.5b Atlas memory *(reclaimed — the wall is down)*
+
+Adding soldier art used to be impossible: atlases 96 MB + props 31 = **127 of a
+130 MB cap**, and one more body costs about eight. That gate is now open, and
+the first half needed **no Blender at all** — every per-frame PNG was still on
+disk under `assets/sprites3d/*/`, so it was a repack, minutes not an hour.
+
+| step | atlas MB |
+|---|---|
+| was | 96 |
+| cells 128x112 instead of 128x128 | 84 |
+| drop `melee` + `prone` | 79 |
+| spend it: walk 14->28, run 18->24, runfire 18->20 | **89** |
+
+**Total now 120.3 of 130, 9.7 MB spare** — and the jank is fixed with it.
+
+**Two clips were rendered for every unit and never drawn.** `melee` appeared
+only as a key in the `URGENT` table in `js/sprite3d.js`; nothing selected it.
+`prone` was rendered and then explicitly routed around because its source clip
+is broken. 12 frames per unit of 125.
+
+**A quarter of every cell was empty air.** Measured across ALL TWELVE units with
+those two excluded, content spans y 18-122 of 128. The crop is a FIXED band
+applied identically to every frame of every unit, so the shared anchor survives —
+per-frame tight-bboxing is what makes sprites flicker and stays banned. Measure
+across the whole set before touching `CROP_Y`: rifleman is the tightest unit at
+92 rows and using it alone would have decapitated `rpgman` and `marksman`, which
+need 105.
+
+**Three traps hit on the way, all now guarded in the tools:**
+
+1. **The repack silently destroyed the muzzle data.** `index.json` is gitignored
+   and a partial re-render had left it holding muzzle points for `prone` alone,
+   while the COMPLETE set survived only inside the tracked `atlas.json`. Packing
+   from that stale index emitted empty muzzle lists — every flash would have
+   detached from its barrel. Recovered from the atlases, and
+   `tools/pack_sprites3d.py` now REFUSES to write when any frame lacks a muzzle
+   point rather than overwriting good art with bad.
+2. **The frame-count raise blew the budget before a single frame rendered.**
+   `runfire` is a SEPARATE clip from `run` and scales with it; forgetting that
+   turned a planned +20 frames/unit into +30 and 130.7 MB. Recompute with
+   `MB = 0.0581 * frames_per_unit * 12` before changing `CLIP_FRAMES`.
+3. **`tools/render_all_sprites.sh` was missing `rpgman`**, so "rebuild
+   everything" silently left one unit on stale frame counts.
+
+### 1.5c The jank, measured and fixed
+
+"Very janky, animations aren't smooth" was exactly reproducible from the
+constants. Frame index comes off DISTANCE TRAVELLED — `frame = (dist/cycle)*n` —
+so animation fps is set by speed, stride and frame count, never by the game's
+frame rate.
+
+| | before | after |
+|---|---|---|
+| rifleman walk | 9.7 fps | **19.4** |
+| sniper walk | 7.2 fps | **14.4** |
+| rifleman run | 23.3 fps | **31** |
+
+The stride was never the bug: 60 world-px per cycle for an 84px man is a real
+1.4m stride, and shortening it to win frames would make men mince and skate.
+There were simply not enough frames in it.
+
+### 1.5d Soldier variety
+
+- **Per-man colour.** `gaitK` varied each man's animation speed and `gaitOff`
+  his phase, but every man was the same pixels in the same colours. Each now
+  carries a brightness and hue shift keyed off `gaitOff`. Measured: three chained
+  `ctx.filter` functions DOUBLED frame cost (3.2 -> 7.2ms); one costs +1.0ms and
+  two cost about the same as one, so `saturate` carried nearly all of it.
+  Shipping brightness + hue-rotate.
+- **Idle drift.** Men drift between the two at-rest poses instead of being
+  assigned one for life. Measured over 30s: both in use, 8 switches, no thrash.
+- **Still open — donors are doubled up.** `soldier` serves rifleman AND sniper,
+  `adventurer` m60 AND recon, `farmer` guerrilla AND marksman. `worker.glb` is
+  already downloaded (Quaternius CC0, same pack) and unused, so breaking one tie
+  costs ZERO memory — the same 135 frames off a different body. Cheapest
+  remaining variety win.
+
 
 ## 2. Open, ranked
 
+The art passes are done and the atlas memory wall is down. The jank is fixed and
+measured. What is left is the HUD and combat depth — the owner asked for all four
+depth directions, so this sequences them by value per unit of work.
+
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | Value structure (§1.1) | Biggest single cause of "mid" |
-| 2 | Ground detail (§1.2) | Second biggest; the eye spends most time here |
-| 3 | Impact + suppression FX (§1.4) | Makes fights *feel* like fights |
-| 4 | Recoil + crouch (§1.5) | Fights still read stiff |
-| 5 | HUD rebuild | Frame/plate art now DESIGNED (`design/hud/`, published canvas) but NOT implemented — the CSS still ships the old plates. Awaiting the owner's read on the design before wiring it. |
-| 6 | Real weapon meshes | Proportions fixed; still donor stand-ins |
-| 7 | A real prone clip | Needs mocap or hand-posed arms; see §1.5 |
+| 1 | HUD wiring | Designed and APPROVED (`design/hud/*.dc.html`, published canvas), not implemented — `js/ui.js` and `css/style.css` still ship the old plates. The one approved piece of work with nothing blocking it. |
+| 2 | Mid-fight agency | Target priority — let a selected squad focus the enemy MG rather than each man picking his own. `orderSquad`/`orderSel` plumbing already exists. (The dead suppress hotkey is FIXED: it was bound to `S` behind smoke and unreachable; it is `C` for covering fire now.) |
+| 3 | Smarter AI | `_aiVC`/`_aiUS` deploy and advance. Make them concentrate on the weaker lane, hold when losing a firefight instead of feeding men in, and use call-ins reactively. |
+| 4 | Break a donor tie | `worker.glb` is downloaded and unused; giving it to `sniper` (currently sharing `soldier` with rifleman) costs ZERO memory. One unit re-render. |
+| 5 | Terrain and flanking | Lane switching — the largest change, since `LANE_N = 2` and lane is fixed at spawn. |
+| 6 | Attrition | Ammo and reload as a resource. Deliberately last: it touches every unit's balance and risks the pacing that currently works. |
+| 7 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. Costs frames; 9.7 MB spare. |
+| 8 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
+| 9 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
+
+
+**Checked and NOT a gap: audio.** It was about to go on this list as "an M60 and
+an M16 are indistinguishable by ear, no distance falloff, no crack-thump" — all
+three false. `js/audio.js` already gives m16/ak/mg their own spectra, pans off
+camera-relative world x, attenuates with distance, rolls sharpness into a
+muffled thump as `far` rises, DELAYS the report so a shot across the map arrives
+late, and slaps an echo back off the treeline past 0.25 far. Verify before
+ranking.
 
 ## 3. Blocked on the owner
 
-- **An FPS reading** off `` ` ``/F3. Everything else is work-per-frame.
+- **An FPS reading** off `` ` ``/F3 — now a nice-to-have rather than a blocker.
+  `tools/perf.js` gives a real millisecond cost (see rule 7); the owner's number
+  would confirm it against a composited display.
 - **Does it feel right?** Mechanics are verified; feel is not something I can
   measure.
+- **The HUD design** (`design/hud/`, published as a canvas). Item 3 above does
+  not start until the owner has looked at it — wiring the wrong plates into
+  `ui.js` and `style.css` is a day spent on something they may not want.
 - **Nothing, for art.** Corrected: §1.3 needs CC0 models run through the
   existing Blender pipeline, not generated images. `docs/ASSET_PROMPT.md` §A has
   the steps. Claude Design is the right tool only for the HUD (§B there), which
@@ -327,6 +531,28 @@ The vegetation swap costs a consistent **+0.8 to +1.0 src Mpx**, against a cap o
 13. The foreground band is 1.27 of the frame's total.
 
 Memory 121 MB decoded against a 130 MB cap. Roughly 5 Mpx spare per frame.
+
+**FRAME COST**, measured with `tools/perf.js` at 1600x900, ~35 men, 70s in,
+60 samples:
+
+| map | frameMs | p95 | ceiling |
+|---|---|---|---|
+| iadrang | 2.9 | 3.7 | 345 fps |
+| cuchi | 3.1 | 3.7 | 323 fps |
+| mekong | **5.6** | 6.6 | 179 fps |
+| khesanh | 4.4 | 6.4 | 227 fps |
+| hill937 | 4.2 | 6.1 | 238 fps |
+
+Nowhere near frame-limited — 3-5x headroom against the 16.7ms that 60fps allows,
+and the whole TAIL is inside budget too.
+
+**Quote no p95 taken from fewer than 50 samples.** At `iters: 18` the same
+scenes reported medians of 6.1 and p95s of 17.7-18.5, which read as the FX work
+pushing the tail over the 60fps line. It had not: a p95 over 18 samples is
+"second worst frame", and the worst frames are warm-up and GC. At 70 samples the
+same scene gives 3.1 and 3.7. This was one edit away from being recorded here as
+a regression that did not exist. The tool now warms up ten frames and defaults
+to 60.
 
 **These are STEADY-STATE figures.** `Capture.budget()` used to measure the
 first render after staging, which bakes every lane layer — a one-time map-load

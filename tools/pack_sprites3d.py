@@ -1,8 +1,12 @@
 """Pack rendered 3D sprite frames into one atlas per unit.
 
 Every frame comes off the same locked orthographic camera, so all frames share
-one anchor by construction — the atlas keeps that property by never cropping
-per frame. Cells are a straight downscale of the render, nothing else.
+one anchor by construction, and the atlas keeps that property by never cropping
+PER FRAME. The fixed band trimmed below is a different thing: the same rows are
+removed from every frame of every unit, so the shared anchor survives intact —
+it is only the constant `CROP_Y` offset applied to `groundY` and the muzzle
+points. Per-frame tight-bboxing is what makes sprites flicker, and it stays
+banned (see SPRITE_PIPELINE.md).
 
 The game needs two numbers to place a sprite: where the ground plane sits in a
 cell, and how many pixels tall the figure's reference height is. Both fall out
@@ -24,6 +28,27 @@ SRC = os.path.join(ROOT, 'assets', 'sprites3d')
 # texture a browser has to hold — the new sheets are SMALLER than the old ones.
 CELL = 128
 
+# The figure never fills a square cell. Measured across ALL TWELVE units with
+# `melee` and `prone` excluded, content spans y 18-122 of 128 — a quarter of
+# every cell is empty air above the head and below the boots, and the browser
+# holds all of it. Cropping to a 112-row band takes the atlas set from 96 MB to
+# 84, which is what pays for the extra walk frames that fix the animation jank.
+#
+# Measure before changing this: rifleman is the TIGHTEST unit at 92 rows and
+# using it alone would have clipped `rpgman` and `marksman`, which need 105.
+# Horizontally there is nothing to win — `death` reaches x=0 and `dive` x=127.
+CELL_H = 112
+CROP_Y = 14                    # covers rows 14-125: 4 spare above, 3 below
+
+# Rendered for every unit and never drawn.
+#   melee — appears only as a key in the URGENT table in js/sprite3d.js; no code
+#           path ever selects it.
+#   prone — the source clip is broken (arms hang off the chest and the rifle
+#           rides the wrist, so pitching the body drives the barrel into the
+#           ground); js/sprite3d.js routes prone men to the `aim` pose instead.
+# 12 frames of 125 per unit, about 8 MB across the set.
+SKIP = {'melee', 'prone'}
+
 # Fallback only. The render writes its actual camera into index.json, and that
 # is what gets used — the two must never be able to drift apart.
 FIG_H, ORTHO, CAM_Z = 1.8, 1.8 * 1.5, 1.8 * 0.52
@@ -44,6 +69,8 @@ def pack(unit):
     names = []
     clips = {}
     for c in CLIP_ORDER + [k for k in idx['clips'] if k not in CLIP_ORDER]:
+        if c in SKIP:
+            continue
         frames = idx['clips'].get(c)
         if not frames:
             continue
@@ -53,7 +80,8 @@ def pack(unit):
     n = len(names)
     cols = 8
     rows = (n + cols - 1) // cols
-    atlas = Image.new('RGBA', (cols * CELL, rows * CELL), (0, 0, 0, 0))
+    atlas = Image.new('RGBA', (cols * CELL, rows * CELL_H), (0, 0, 0, 0))
+    clipped = 0
     for i, nm in enumerate(names):
         f = os.path.join(d, nm + '.png')
         if not os.path.isfile(f):
@@ -61,7 +89,17 @@ def pack(unit):
         im = Image.open(f).convert('RGBA')
         if im.size != (CELL, CELL):
             im = im.resize((CELL, CELL), Image.LANCZOS)
-        atlas.paste(im, ((i % cols) * CELL, (i // cols) * CELL))
+        # guard the band rather than trusting it: a frame whose silhouette runs
+        # outside the crop would be silently decapitated, and a sprite missing a
+        # head is exactly the kind of fault that reads as "fine" in a thumbnail
+        bb = im.getbbox()
+        if bb and (bb[1] < CROP_Y or bb[3] > CROP_Y + CELL_H):
+            clipped += 1
+        im = im.crop((0, CROP_Y, CELL, CROP_Y + CELL_H))
+        atlas.paste(im, ((i % cols) * CELL, (i // cols) * CELL_H))
+    if clipped:
+        raise SystemExit('%s: %d frames fall outside the %d-row crop band at y=%d'
+                         % (unit, clipped, CELL_H, CROP_Y))
 
     cam = idx.get('cam') or {}
     fig_h = cam.get('figH', FIG_H)
@@ -70,20 +108,41 @@ def pack(unit):
     k = CELL / res
     meta = {
         'unit': unit,
+        # cells are no longer square; `cell` stays as the WIDTH so an older
+        # reader degrades to a stretched sprite rather than a crash
         'cell': CELL,
+        'cellW': CELL,
+        'cellH': CELL_H,
         'cols': cols,
         'rows': rows,
         'count': n,
         # y within a cell where world z=0 (the ground) lands
-        'groundY': round((res / 2 + (cam_z / ortho) * res) * k, 2),
+        'groundY': round((res / 2 + (cam_z / ortho) * res) * k - CROP_Y, 2),
         # pixels spanned by the figure's reference height
         'figH': round((fig_h / ortho) * res * k, 2),
         'clips': clips,
         # barrel tip per frame, in cell pixels — muzzle flashes start at the gun
-        'muzzle': {c: [[round(p[0] * k, 1), round(p[1] * k, 1)] if p else None
+        # barrel tip per frame, in cell pixels. The y MUST take the same CROP_Y
+        # shift as groundY or every muzzle flash detaches from its barrel.
+        'muzzle': {c: [[round(p[0] * k, 1), round(p[1] * k - CROP_Y, 1)] if p else None
                        for p in (idx.get('muzzle', {}).get(c) or [])]
                    for c in clips},
     }
+    # A REPACK MUST NOT SILENTLY DROP THE MUZZLE DATA.
+    #
+    # `index.json` is gitignored and a partial re-render (`--only prone`) can
+    # leave it holding muzzle points for that clip alone, while the COMPLETE set
+    # survives only inside the tracked atlas.json. Repacking from that stale
+    # index then emitted empty muzzle lists and every flash would have detached
+    # from its barrel — caught by SelfTest, but only after the atlases had been
+    # overwritten. Fail before writing anything.
+    holes = sum(1 for c in clips for i in range(len(clips[c]))
+                if not (meta['muzzle'].get(c) or [None] * (i + 1))[i:i + 1][0])
+    if holes:
+        raise SystemExit(
+            '%s: %d frames have no muzzle point. index.json is probably stale — '
+            'it is gitignored, so a partial render can wipe it while the good '
+            'data survives in atlas.json. Recover it before packing.' % (unit, holes))
     atlas.save(os.path.join(d, 'atlas.png'), optimize=True)
     json.dump(meta, open(os.path.join(d, 'atlas.json'), 'w'), indent=1)
     kb = os.path.getsize(os.path.join(d, 'atlas.png')) / 1024

@@ -501,6 +501,26 @@ class Game {
       if (s.pinned) {
         // whole squad hugs the ground — reuses the prone/speed/accuracy penalties
         for (const m of alive) m.suppressT = Math.max(m.suppressT, 0.45);
+        /* Keep the dust up between incoming rounds.
+         *
+         * Impact dust alone makes suppression flicker: a pinned squad reads as
+         * suppressed on the frames something lands near it and as idle on the
+         * frames nothing does, when the STATE is continuous — they are held down
+         * the whole time. A low trickle in front of the squad, aimed back down
+         * the line of fire, keeps the read on without adding a second mechanic.
+         * Rate-limited rather than per-frame; the particle cap is shared with
+         * every muzzle flash on the field. */
+        s.dustCd = (s.dustCd || 0) - dt;
+        // No count gate here: FXManager.add drops `prio: 0` decoration once the
+        // field is busy, which is the same job done in one place and by the
+        // right rule. A hard 150 here just meant the dust switched OFF in
+        // exactly the heavy firefights it exists to describe.
+        if (s.dustCd <= 0) {
+          s.dustCd = rand(0.10, 0.22);
+          const ax = this.squadAnchor(s);
+          this.fx.suppressDust(ax + s.dir * rand(10, 44), groundY(this.map, s.lane, ax),
+            -s.dir, LANE_DEPTH[s.lane]);
+        }
       }
 
       if (s.emergeT > 0) continue;
@@ -1347,17 +1367,25 @@ class Game {
             this.fx.sparks(ex, ey);
             if (Math.random() < 0.5) Sound.ricochet(ex);
           } else {
-            this.fx.splinters(ex, ey);
+            this.fx.splinters(ex, ey, scale);
             if (Math.random() < 0.2) Sound.ricochet(ex);
           }
         } else if (this.map.trees === 'palm' && Math.random() < 0.35) {
           this.fx.waterPlume(ex, gy);
         } else {
-          this.fx.dirtKick(ex, gy);
+          // a belt-fed gun throws visibly more earth than a rifle — an M60 burst
+          // and a single rifle shot used to land identically
+          this.fx.dirtKick(ex, gy, scale, !!d.mg || !!suppressive);
         }
       }
       // cracking rounds keep heads down even when they miss
       if (!t.isHole && Math.abs(ex - t.x) < 46 && Math.random() < 0.6) {
+        /* Draw the suppression the sim is already applying. Everything below
+         * this line has always happened — accuracy halved, advances stopped,
+         * stance driven to prone — and the only thing on screen saying so was
+         * the word PINNED in 8px type. The dust walks in from the firing side. */
+        this.fx.suppressDust(ex, groundY(this.map, t.lane, ex),
+          Math.sign(u.x - t.x) || 1, LANE_DEPTH[t.lane]);
         t.suppressT = Math.max(t.suppressT || 0, rand(0.4, 0.9));
         if (t.squad) {
           t.squad.pin += (d.suppress ? 0.1 : 0.045) * (suppressive ? 2 : 1) *

@@ -388,7 +388,7 @@ const UI = {
       html += `<button data-o="fallback">FALL BACK <i>B</i></button>`;
       if (sd.grenades) html += `<button data-o="grenade"><span class="sp-cd"></span> <i>G</i></button>`;
       html += `<button data-o="smoke" title="Pop smoke (S)"><i>S</i></button>`;
-      if (sd.suppressive) html += `<button data-o="suppress"><span class="sp-cd"></span> <i>S</i></button>`;
+      if (sd.suppressive) html += `<button data-o="suppress" title="Covering fire (C)"><span class="sp-cd"></span> <i>C</i></button>`;
       el.innerHTML = html;
       el.querySelectorAll('button').forEach(b => {
         b.addEventListener('pointerdown', ev => ev.stopPropagation());
@@ -431,7 +431,18 @@ const UI = {
       if (up === 'B') { this.orderSel('fallback'); return true; }
       if (up === 'G') { this.orderSel('grenade'); return true; }
       if (up === 'S') { this.orderSel('smoke'); return true; }
-      if (up === 'S') { this.orderSel('suppress'); return true; }
+      /* SUPPRESS WAS UNREACHABLE FROM THE KEYBOARD.
+       *
+       * Both smoke and suppress were bound to `S`, so the second line could
+       * never run — and the suppress button advertised `S` in its own label, so
+       * anyone playing on hotkeys had a dead key on the most tactical order in
+       * the game. It halves the target's accuracy, doubles pin accumulation
+       * (js/game.js:1246) and is the only way to pin a dug-in squad, and it
+       * could only ever be reached by clicking.
+       *
+       * `C` for covering fire. Free: Q/W/E/R/T are call-ins, A/B/G/H/S the other
+       * orders, P/F/M and `/F3 global, 1-9 the cards. */
+      if (up === 'C') { this.orderSel('suppress'); return true; }
     }
     const n = parseInt(key, 10);
     if (n >= 1 && n <= this.unitKeys.length) { this.armUnit(this.unitKeys[n - 1]); return true; }

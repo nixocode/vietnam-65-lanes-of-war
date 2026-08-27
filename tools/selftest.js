@@ -201,8 +201,17 @@ window.SelfTest = {
     ok(typeof Sprite3D !== 'undefined' && Sprite3D.enabled, 'Sprite3D not enabled');
     for (const k of wantUnits) ok(Sprite3D.has(k), 'missing sprite atlas: ' + k);
 
-    const wantClips = ['idle', 'idle2', 'walk', 'run', 'aim', 'fire', 'hit',
-      'death', 'prone', 'throw', 'dive', 'melee'];
+    /* Clips the game actually SELECTS. `prone` and `melee` are deliberately not
+     * here: both were rendered for every unit and never drawn — `melee` appears
+     * only as a key in the URGENT table in js/sprite3d.js, and prone men are
+     * routed to the `aim` pose because the source prone clip is broken. They
+     * were dropped from the atlas in tools/pack_sprites3d.py to buy the frames
+     * that fixed the walk-cycle jank, so asserting their presence now asserts a
+     * requirement the game does not have.
+     *
+     * Add a clip here only once something selects it. */
+    const wantClips = ['idle', 'idle2', 'walk', 'run', 'runfire', 'aim', 'fire',
+      'hit', 'hit2', 'death', 'throw', 'dive'];
     for (const k of wantUnits) {
       if (!Sprite3D.has(k)) continue;
       const C = Sprite3D.units[k].meta.clips;

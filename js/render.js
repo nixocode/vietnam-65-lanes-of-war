@@ -49,11 +49,20 @@ const POSE_FADE = 0.09;  // seconds to crossfade between pose changes
 /* curated cells from the texture sheets (corrupted/header cells never referenced) */
 const TEX = {
   mtn: ['t1_57', 't1_58', 't1_59'],
-  treeline: ['t1_53', 't1_54', 't1_55'],
-  villageSil: ['t2_54', 't2_56', 't2_57'],
-  paddy: ['t1_12', 't1_14', 't1_16'],
-  // tuft / fern / bush / plant / palm / banana are GONE — all vegetation now
-  // comes from the prop set via drawVeg(). See the comment there.
+  /* GONE, with their slices dropped from assets/manifest.js too:
+   *   tuft / fern / bush / plant / palm / banana -> the prop set, via drawVeg()
+   *   treeline / villageSil                      -> _treeBand / _villageBand
+   *   paddy                                      -> _paddyStrip
+   *
+   * The paddy slices are worth a note: they were ISOMETRIC tiles, drawn looking
+   * down at the field from an angle, in a game whose every other element is a
+   * strict side view. They survived this long only because they were squashed
+   * to 55% and drawn at half alpha, which hid the projection without fixing it.
+   *
+   * `mtn` stays. It is the one piece of the old set that still earns its place:
+   * a distant ridge silhouette, now pushed back into the sky colour, where the
+   * line work does not read at all.
+   */
   dike: ['t1_02', 't1_04', 't1_05'],
   stonewall: ['t1_07', 't1_08', 't1_09'],
   sandbags: ['t2_08'],
@@ -942,26 +951,19 @@ const Renderer = {
     ctx.closePath(); ctx.fill();
     ctx.globalAlpha = 1;
     // textured jungle line riding the canopy crest + distant settlements/paddies
-    let tx = -60 + rng() * 80;
-    while (tx < w + 180) {
-      const tw = 220 + rng() * 160;
-      drawTex(ctx, 'treeline', Math.floor(rng() * 4), tx, 354 + rng() * 10, tw, { alpha: 0.85 });
-      tx += tw * 0.86;
-    }
+    const sunSide = (map.pal.sun && map.pal.sun.x < CANVAS_W / 2) ? -1 : 1;
+    this._treeBand(ctx, rng, w, 352, 46, map.pal.brush, sunSide, map.pal.tree);
     if (map.id !== 'khesanh' && map.id !== 'hill937') {
       for (let k = 0; k < 3; k++) {
-        drawTex(ctx, 'villageSil', k, (0.16 + 0.3 * k + rng() * 0.1) * w, 358, 150 + rng() * 60, { alpha: 0.8 });
+        this._villageBand(ctx, rng, (0.16 + 0.3 * k + rng() * 0.1) * w, 360,
+          130 + rng() * 60, map.pal.tree);
       }
     }
     if (map.id === 'mekong') {
       // far paddies gleaming below the treeline
-      for (let k = 0; k < 5; k++) {
-        const px = (0.08 + 0.19 * k + rng() * 0.06) * w;
-        ctx.save();
-        ctx.translate(px, 398 + (k % 2) * 9);
-        ctx.scale(1, 0.55);
-        drawTex(ctx, 'paddy', k, 0, 0, 130 + rng() * 50, { alpha: 0.5 });
-        ctx.restore();
+      for (let k = 0; k < 7; k++) {
+        const px = (0.06 + 0.14 * k + rng() * 0.05) * w;
+        this._paddyStrip(ctx, rng, px, 396 + (k % 3) * 7, 120 + rng() * 90, map);
       }
     }
     // unify with the palette
@@ -971,6 +973,132 @@ const Renderer = {
     ctx.fillRect(0, 0, w, CANVAS_H);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
+  },
+
+  /* A distant treeline, drawn rather than sliced.
+   *
+   * The `treeline` slices are hand-inked canopy — black outlines and dense
+   * cross-hatching — which is the last of the drawing system the whole prop
+   * pipeline exists to replace. At this distance a canopy is not detail anyway:
+   * it is a ragged edge and two values, the mass and the crowns catching light.
+   * Built the same way as the clouds and the vector trees so all of them agree
+   * about where the sun is. */
+  _treeBand(ctx, rng, w, baseY, height, color, sunSide, deep) {
+    /* Three values off the map's OWN two greens, not one colour shaded twice.
+     *
+     * Built from `brush` alone the band came out uniformly mid-green and read as
+     * a row of shrubs where the inked slices it replaced read as a wall of
+     * jungle — softer AND lighter, which lost the one thing the far treeline is
+     * for: a dark mass for the lit field in front of it to sit against. The
+     * canopy takes `tree` (the map's darkest green) with `brush` as the lit
+     * surface, which is the relationship those two palette entries already
+     * describe. Lobes are packed tighter too; gaps read as shrubs. */
+    const dark = this._shade(deep || color, -10);
+    const mid = deep ? this._shade(deep, 12) : color;
+    const lit = this._tint(color, 22, 22, 4);
+    const lobes = [];
+    for (let x = -40; x < w + 60; x += 9 + rng() * 11) {
+      lobes.push({ x, y: baseY - rng() * height * 0.72, r: height * (0.34 + rng() * 0.46) });
+    }
+    /* One subpath per lobe, plus a rect for the solid base.
+     *
+     * `ctx.ellipse()` CONTINUES the current subpath — it draws a line from the
+     * current point to the start of the arc. Opening with a moveTo to the far
+     * corner therefore ran a spike from the bottom-left of the band into the
+     * first lobe, which is exactly what appeared at the left edge of the frame.
+     * A moveTo before each ellipse starts a fresh subpath, and fill() unions
+     * them under the nonzero rule. */
+    const pass = (fill, dy, k) => {
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.rect(-60, baseY, w + 120, height);
+      for (const l of lobes) {
+        const rx = l.r * k * 1.25, ry = l.r * k;
+        ctx.moveTo(l.x + rx, l.y + dy);
+        ctx.ellipse(l.x, l.y + dy, rx, ry, 0, 0, 7);
+      }
+      ctx.fill();
+    };
+    pass(dark, height * 0.16, 1.0);
+    pass(mid, 0, 0.97);
+    pass(lit, -height * 0.18, 0.44);
+    // a few emergent crowns breaking the line — a flat top reads as a hedge
+    ctx.fillStyle = dark;
+    for (let i = 0; i < w / 190; i++) {
+      const ex = rng() * w, eh = height * (0.5 + rng() * 0.7);
+      ctx.beginPath();
+      ctx.ellipse(ex, baseY - eh, height * 0.20, height * 0.26, 0, 0, 7);
+      ctx.fill();
+      ctx.fillRect(ex - 1.2, baseY - eh, 2.4, eh * 0.7);
+    }
+  },
+
+  /* Rooflines on the horizon. The `villageSil` slices were three unrelated
+   * things — a second treeline, a black pagoda, and a bare hill — so a village
+   * looked different every time one was picked. These are roofs, which is all
+   * that reads of a hamlet at this range. */
+  _villageBand(ctx, rng, cx, baseY, w, color) {
+    const dark = this._shade(color, -18);
+    ctx.save();
+    ctx.fillStyle = dark;
+    let x = cx - w / 2;
+    while (x < cx + w / 2) {
+      const bw = 16 + rng() * 30, bh = 8 + rng() * 12;
+      const eave = bw * 0.16;
+      if (rng() < 0.18) {
+        // a tiered roof — the one shape that says village rather than shed
+        for (let t = 0; t < 3; t++) {
+          const tw = bw * (1 - t * 0.22), ty = baseY - bh * 0.5 - t * bh * 0.42;
+          ctx.beginPath();
+          ctx.moveTo(x + bw / 2 - tw / 2 - eave, ty);
+          ctx.lineTo(x + bw / 2, ty - bh * 0.5);
+          ctx.lineTo(x + bw / 2 + tw / 2 + eave, ty);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.fillRect(x + bw / 2 - 1.5, baseY - bh * 0.5, 3, bh * 0.5);
+      } else {
+        ctx.beginPath();                       // a pitched roof over a low wall
+        ctx.moveTo(x - eave, baseY - bh * 0.55);
+        ctx.lineTo(x + bw * 0.5, baseY - bh);
+        ctx.lineTo(x + bw + eave, baseY - bh * 0.55);
+        ctx.closePath(); ctx.fill();
+        ctx.fillRect(x + bw * 0.12, baseY - bh * 0.55, bw * 0.76, bh * 0.55);
+      }
+      x += bw + rng() * 26;
+    }
+    ctx.restore();
+  },
+
+  /* Flooded paddy, seen EDGE ON.
+   *
+   * The `paddy` slices are isometric 3/4-view tiles — drawn looking down at the
+   * field from an angle — in a game whose every other element is a strict side
+   * view. That is precisely the collage the prop pipeline was built to end, and
+   * it survived this long only because it was squashed to 55% and drawn at 0.5
+   * alpha, which hides the projection without fixing it. Edge on, a paddy is a
+   * bright horizontal sliver of sky lying between two low bunds. */
+  _paddyStrip(ctx, rng, x, y, w, map) {
+    const water = map.pal.water || '#8fa9b4';
+    const bund = this._tint(map.pal.laneBody[0], 10, 2, -8);
+    const h = 3 + rng() * 3;
+    ctx.save();
+    ctx.fillStyle = bund;
+    ctx.fillRect(x - w / 2, y + h * 0.6, w, h * 0.8);       // near bund
+    ctx.fillStyle = this._shade(water, -18);
+    ctx.fillRect(x - w / 2, y, w, h);                       // the sheet of water
+    ctx.globalAlpha = 0.75;                                  // sky on the surface
+    ctx.fillStyle = water;
+    ctx.fillRect(x - w / 2, y, w, Math.max(1, h * 0.42));
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = bund;
+    ctx.fillRect(x - w / 2, y - h * 0.5, w, h * 0.5);        // far bund
+    // rice standing in it, as ticks rather than blades at this size
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = this._tint(map.pal.brush, -10, 6, -10);
+    for (let i = 0; i < w / 7; i++) {
+      ctx.fillRect(x - w / 2 + rng() * w, y - rng() * h * 0.5, 1, 1 + rng() * 2);
+    }
+    ctx.restore();
   },
 
   _ridge(ctx, rng, w, baseY, amp, color, alpha) {
@@ -3021,8 +3149,22 @@ const Renderer = {
        * instead — the height difference is what sells "down" at 84px, not the
        * limb arrangement. */
       const proneDrop = u.pose === 'prone' ? 26 * scale : 0;
+      /* RECOIL — a per-shot kick on the whole man.
+       *
+       * The vector rig has swapped recoil FRAMES off `muzzleT` since it was
+       * written, but the 3D sprite path never got anything: men fired without
+       * moving at all, which is most of why a firefight reads stiff even with
+       * the muzzle and smoke work done. There is no recoil clip to play and the
+       * donor has none to borrow, so this is positional — the man rides back
+       * along his own facing and settles, over the 0.11s the shot already lasts.
+       *
+       * Deliberately small. At 84px a 3px kick is the difference between a man
+       * firing and a man holding a rifle; 6px is a man being shoved. */
+      const rk = (u.muzzleT || 0) > 0
+        ? Math.min(1, (u.muzzleT || 0) / 0.11) * 3.0 * scale : 0;
       drawSoldier(ctx, u.key, {
-        x: u.x, y: u.y + (u.yj || 0) - towerLift + proneDrop, dir: u.dir, scale,
+        x: u.x - u.dir * rk, y: u.y + (u.yj || 0) - towerLift + proneDrop - rk * 0.35,
+        dir: u.dir, scale,
         // debounced (see MOVE_HOLD) — the raw flag flickers sub-100ms and that
         // reached the screen as clip thrash
         moving: u.movingVis != null ? u.movingVis : u.moving,
@@ -3216,8 +3358,13 @@ const Renderer = {
         ctx.lineWidth = 2.5 * (1 - k);
         ctx.beginPath(); ctx.arc(p.x, p.y, p.size * k, 0, 7); ctx.stroke();
       } else if (p.type === 'smoke') {
+        /* `dust` is not smoke. Kicked-up earth is WARMER and LIGHTER than the
+         * field it comes off, which is what makes it read against grass; drawn
+         * in the neutral grey of gunsmoke it disappeared into the ground it was
+         * supposed to be rising from. */
         ctx.fillStyle = p.color === 'dark' ? `rgba(30,28,24,${0.4 * (1 - k)})`
           : p.color === 'blood' ? `rgba(110,26,16,${0.3 * (1 - k)})`
+          : p.color === 'dust' ? `rgba(196,174,132,${0.6 * (1 - k)})`
           : `rgba(126,120,104,${0.42 * (1 - k)})`;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.6 + k), 0, 7); ctx.fill();
       } else if (p.type === 'flame') {

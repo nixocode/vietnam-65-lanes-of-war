@@ -211,9 +211,21 @@ const Sprite3D = {
       const t = (o.time || 0) * 1.4 + (o.gaitOff || 0);
       return [c, Math.floor(((t % 1) + 1) % 1 * n) % n];
     }
-    // two at-rest poses, assigned per man — a line of troops standing about is
-    // where identical animation is most obvious
-    const c = ((o.gaitOff || 0) < 0.45 ? pick('idle', 'idle2') : pick('idle2', 'idle'));
+    /* Two at-rest poses, and men DRIFT between them rather than being assigned
+     * one for life.
+     *
+     * The split was a fixed `gaitOff < 0.45`, so a given man played the same
+     * idle from spawn to death: a squad holding a position showed two poses,
+     * frozen in whatever proportion the spawn rolls happened to give. Men
+     * standing about shift their weight, and a line of troops is exactly where
+     * identical animation is most obvious.
+     *
+     * The oscillator is slow (a ~19s period, prime-ish against the clip lengths)
+     * and offset per man, so switches are rare, unsynchronised, and land inside
+     * the existing `holdT` guard rather than thrashing the clip machine. */
+    const drift = Math.sin((o.time || 0) * 0.33 + (o.gaitOff || 0) * 6.283) * 0.5 + 0.5;
+    const c = (((o.gaitOff || 0) * 0.65 + drift * 0.35) < 0.45
+      ? pick('idle', 'idle2') : pick('idle2', 'idle'));
     const n = C[c].length;
     // a per-soldier offset so a squad never breathes in lockstep
     const t = (o.time || 0) * 0.9 + (o.gaitOff || 0);
@@ -281,19 +293,46 @@ const Sprite3D = {
     const frames = M.clips[clip];
     if (!frames || !frames.length) return;
     const idx = frames[Math.min(frames.length - 1, Math.max(0, fi))];
-    const sx = (idx % M.cols) * M.cell;
-    const sy = ((idx / M.cols) | 0) * M.cell;
+    /* Cells are no longer square. The figure occupied about three quarters of a
+     * 128x128 cell — a quarter of every one was empty air above the head and
+     * below the boots, and the browser held all of it across twelve atlases.
+     * The packer now trims a fixed band (see tools/pack_sprites3d.py) and the
+     * same band came off `groundY` and the muzzle points, so nothing here needs
+     * to know the offset; it only needs to stop assuming width == height.
+     * `cell` is still written as the WIDTH, so an atlas packed before this
+     * change degrades to a stretched sprite rather than throwing. */
+    const cw = M.cellW || M.cell;
+    const ch = M.cellH || M.cell;
+    const sx = (idx % M.cols) * cw;
+    const sy = ((idx / M.cols) | 0) * ch;
     // scale so the model's reference height lands on S3_TARGET_H
     const s = ((o.scale || 1) * S3_TARGET_H) / M.figH;
     ctx.save();
     ctx.globalAlpha = alpha;
+    /* PER-MAN COLOUR. Five men in a squad were five identical blits.
+     *
+     * `gaitK` already varies each man's animation SPEED and `gaitOff` his clip
+     * PHASE, so a squad has never marched in lockstep — but every man was the
+     * same pixels in the same colours, and at squad size that reads as one
+     * soldier stamped five times. Uniforms fade differently, men tan
+     * differently, and kit is issued at different times.
+     *
+     * Keyed off `gaitOff`, which is a per-man `Math.random()` fixed at spawn, so
+     * a man's colour never changes frame to frame. Kept narrow deliberately:
+     * this has to break up a rank without breaking the side's identity, and the
+     * player reads US from VC by colour before anything else. */
+    const v = o.gaitOff;
+    if (v != null) {
+      ctx.filter = 'brightness(' + (0.94 + v * 0.12).toFixed(3) + ') ' +
+        'hue-rotate(' + ((v - 0.5) * 10).toFixed(1) + 'deg)';
+    }
     // o.y is the hip line the rig drew from; the ground sits S3_FOOT below it
     ctx.translate(o.x, o.y + (swayY || 0) + S3_TARGET_H * (o.scale || 1) * S3_FOOT);
     const dv = dirV == null ? (o.dir || 1) : dirV;
     ctx.scale(Math.abs(dv) < S3_TURN_MIN ? (dv < 0 ? -S3_TURN_MIN : S3_TURN_MIN) : dv, 1);
     // the cell's x centre is the model's centreline; groundY is its ground plane
-    ctx.drawImage(U.img, sx, sy, M.cell, M.cell,
-      -M.cell * s / 2, -M.groundY * s, M.cell * s, M.cell * s);
+    ctx.drawImage(U.img, sx, sy, cw, ch,
+      -cw * s / 2, -M.groundY * s, cw * s, ch * s);
     ctx.restore();
   },
 
@@ -344,7 +383,7 @@ const Sprite3D = {
     if (!p) return { x: o.x + (o.dir || 1) * 24 * sc, y: o.y - 27 * sc };
     const s = (sc * S3_TARGET_H) / M.figH;
     return {
-      x: o.x + (o.dir || 1) * (p[0] - M.cell / 2) * s,
+      x: o.x + (o.dir || 1) * (p[0] - (M.cellW || M.cell) / 2) * s,
       y: o.y + S3_TARGET_H * sc * S3_FOOT + (p[1] - M.groundY) * s,
     };
   },

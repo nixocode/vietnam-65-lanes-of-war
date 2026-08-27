@@ -66,7 +66,22 @@ class FXManager {
     if (ps.length > 900) ps.splice(0, ps.length - 900);
   }
 
-  add(p) { this.particles.push(p); }
+  /* Above a soft cap, DECORATION is dropped and SIGNAL is kept.
+   *
+   * `add` was unbounded, with one crude backstop at 900 that spliced the OLDEST
+   * particles away — which is exactly the wrong end. The oldest live particles
+   * are the smoke and dust that give a firefight its body, and the newest are
+   * the muzzle flashes and tracers that tell the player who is shooting at whom.
+   * Culling by age throws away the readable ones under exactly the load where
+   * reading the fight matters most.
+   *
+   * Ground dust and debris carry `prio: 0` and stop being added once the field
+   * is busy; flashes, tracers, blood and explosions have no prio and always get
+   * through. The 900 backstop stays as a last resort. */
+  add(p) {
+    if (p.prio === 0 && this.particles.length >= 260) return;
+    this.particles.push(p);
+  }
 
   floater(x, y, text, color, big = false) {
     this.floaters.push({ x, y, text, color, big, t: 0, life: big ? 1.6 : 1.2 });
@@ -104,16 +119,32 @@ class FXManager {
   }
 
   /* ---------- weapon FX ---------- */
+  /* `heavy` is belt-fed: the M60 and the RPD.
+   *
+   * It used to change ONE number — flash height, 26px against 19 — so an M60
+   * burst and a single rifle shot were the same event at the muzzle, on weapons
+   * that cost 5 CP and 3 CP and are supposed to feel different in the hand. A
+   * machine gun reads heavy because of what it leaves in the air: a longer,
+   * wider flash, a spray of sparks rather than three, brass coming out in a
+   * stream, and a great deal more smoke — a gun position firing bursts fogs
+   * itself in, and that fog is most of how you find one on real footage. */
   muzzle(x, y, dir, scale, heavy = false) {
-    const h = (heavy ? 26 : 19) * scale;
-    if (!this.anim('muzzle', x + dir * 4, y, { h, fps: 55, flip: dir < 0, life: 0.09 })) {
-      for (let i = 0; i < 3; i++) {
+    const h = (heavy ? 30 : 19) * scale;
+    if (!this.anim('muzzle', x + dir * 4, y, {
+      h, fps: 55, flip: dir < 0, life: heavy ? 0.13 : 0.09,
+    })) {
+      for (let i = 0; i < (heavy ? 7 : 3); i++) {
         this.add({
-          x, y, vx: dir * rand(60, 160), vy: rand(-40, 40), g: 0,
-          t: 0, life: rand(0.04, 0.09), size: rand(2, 4) * scale,
+          x, y, vx: dir * rand(60, heavy ? 240 : 160), vy: rand(-40, 40) * (heavy ? 1.5 : 1),
+          g: 0, t: 0, life: rand(0.04, heavy ? 0.13 : 0.09),
+          size: rand(2, heavy ? 5.5 : 4) * scale,
           color: i === 0 ? '#fff6c0' : '#ffb545', type: 'spark', drag: 4,
         });
       }
+    }
+    if (heavy) {
+      // the belt throws brass in a stream, not a shell at a time
+      for (let i = 0; i < 2; i++) this.casing(x - dir * 4 * scale, y + 3, dir, scale);
     }
     /* GUNSMOKE — on every shot, and it outlives the shot by a long way.
      *
@@ -127,17 +158,18 @@ class FXManager {
      * been firing carries a haze and the firing LINE becomes visible even
      * between bursts. That is what gun camera footage actually looks like.
      */
+    const hk = heavy ? 1.5 : 1;
     this.add({
       x: x + dir * 6, y: y - 2, vx: dir * rand(10, 26), vy: rand(-16, -7), g: -7,
-      t: 0, life: rand(0.9, 1.5), size: rand(3.5, 7) * scale,
+      t: 0, life: rand(0.9, 1.5) * hk, size: rand(3.5, 7) * scale * hk,
       color: 'smoke', type: 'smoke', drag: 1.1,
     });
     // a second, slower puff on some shots so the haze has depth rather than
     // being one uniform ring per round
-    if (Math.random() < 0.55) {
+    if (Math.random() < (heavy ? 0.9 : 0.55)) {
       this.add({
         x: x + dir * 10, y: y - 4, vx: dir * rand(3, 12), vy: rand(-9, -3), g: -4,
-        t: 0, life: rand(1.3, 2.1), size: rand(5, 10) * scale,
+        t: 0, life: rand(1.3, 2.1) * hk, size: rand(5, 10) * scale * hk,
         color: 'smoke', type: 'smoke', drag: 0.7,
       });
     }
@@ -225,23 +257,75 @@ class FXManager {
     });
   }
 
-  dirtKick(x, y) {
-    for (let i = 0; i < 4; i++) {
+  /* A round striking earth. `scale` is lane depth, `heavy` for belt-fed and
+   * rocket work.
+   *
+   * This was four dots of 1.5-3px with no dust at all, which at lane scale is
+   * invisible — the emitter existed and the impact still read as nothing
+   * happening. A strike throws a DUST PUFF first (that is the part the eye
+   * catches) and clods after it, and the puff has to outlive the clods or there
+   * is nothing left a fifth of a second later. */
+  dirtKick(x, y, scale = 1, heavy = false) {
+    const k = (heavy ? 1.7 : 1) * scale;
+    for (let i = 0; i < (heavy ? 4 : 2); i++) {
       this.add({
-        x: x + rand(-6, 6), y, vx: rand(-30, 30), vy: rand(-90, -30), g: 320,
-        t: 0, life: rand(0.3, 0.5), size: rand(1.5, 3), color: '#8a7350', type: 'dot',
+        x: x + rand(-4, 4) * k, y: y - rand(0, 3), vx: rand(-16, 16) * k,
+        vy: rand(-34, -14) * k, g: -10, t: 0, life: rand(0.42, 0.85),
+        size: rand(4, 8) * k, color: 'dust', type: 'smoke', drag: 1.5, prio: 0,
+      });
+    }
+    for (let i = 0; i < (heavy ? 9 : 6); i++) {
+      this.add({
+        x: x + rand(-6, 6) * k, y, vx: rand(-52, 52) * k, vy: rand(-150, -45) * k,
+        g: 340, t: 0, life: rand(0.32, 0.62), size: rand(1.6, 3.6) * k,
+        color: i % 3 ? '#8a7350' : '#5d4c31', type: 'dot', prio: 0,
+      });
+    }
+  }
+
+  /* Ground spray in front of a squad under fire.
+   *
+   * Suppression is the mechanic the whole sim turns on — it halves accuracy,
+   * stops advances and drives the stance machine — and the only thing on screen
+   * saying so was the word PINNED in 8px type. Dust walking along the ground in
+   * front of men who have their heads down is the clearest read there is, and it
+   * is diegetic: it is the incoming rounds that are being drawn, not a label.
+   * `dir` is the direction the fire is coming FROM. */
+  suppressDust(x, y, dir, scale = 1) {
+    const k = scale;
+    for (let i = 0; i < 2; i++) {
+      const px = x + dir * rand(4, 30) * k;
+      this.add({
+        x: px, y: y - rand(0, 2), vx: dir * rand(6, 26) * k, vy: rand(-26, -10) * k,
+        g: -8, t: 0, life: rand(0.5, 0.95), size: rand(3, 6.5) * k,
+        color: 'dust', type: 'smoke', drag: 1.6, prio: 0,
+      });
+      this.add({
+        x: px, y, vx: dir * rand(20, 70) * k, vy: rand(-110, -40) * k, g: 330,
+        t: 0, life: rand(0.26, 0.5), size: rand(1.4, 2.8) * k,
+        color: '#8a7350', type: 'dot', prio: 0,
       });
     }
   }
 
   /* Rounds should not all kick up the same puff of dirt. What a bullet throws up
    * tells you what it just hit, and that reads at a glance. */
-  splinters(x, y) {
-    for (let i = 0; i < 5; i++) {
+  /* Timber taking a round. Five 1-2.4px dots read as nothing; a hit on a hooch
+   * wall throws chips and a puff of pulverised wood, and it is the puff that
+   * makes it register at lane scale. */
+  splinters(x, y, scale = 1) {
+    const k = scale;
+    this.add({
+      x, y: y - 2, vx: rand(-10, 10), vy: rand(-26, -10), g: -6, t: 0,
+      life: rand(0.35, 0.6), size: rand(3, 5.5) * k, color: 'dust',
+      type: 'smoke', drag: 1.5, prio: 0,
+    });
+    for (let i = 0; i < 9; i++) {
       this.add({
-        x: x + rand(-5, 5), y: y + rand(-6, 6), vx: rand(-70, 70), vy: rand(-120, -20),
-        g: 420, t: 0, life: rand(0.28, 0.5), size: rand(1, 2.4),
-        color: i % 3 ? '#7a5a33' : '#3d2c18', type: 'dot',
+        x: x + rand(-5, 5) * k, y: y + rand(-6, 6) * k,
+        vx: rand(-110, 110) * k, vy: rand(-165, -25) * k,
+        g: 430, t: 0, life: rand(0.3, 0.58), size: rand(1.2, 3.2) * k,
+        color: i % 3 ? '#7a5a33' : '#3d2c18', type: 'dot', prio: 0,
       });
     }
   }
@@ -315,6 +399,28 @@ class FXManager {
       this.add({
         x: x + rand(-r * 0.3, r * 0.3), y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: -30,
         t: 0, life: rand(0.9, 2.0), size: rand(8, 18), color: 'smoke', type: 'smoke', drag: 1.2,
+      });
+    }
+    /* THE GROUND RING — the cue that says weight.
+     *
+     * Everything above this throws material UP: flash, column, ejecta, smoke.
+     * That is what a firework does. What separates a shell from a firework is
+     * the low, fast sheet of dust that runs OUTWARD along the ground, because
+     * the blast has nowhere else to go once it hits earth — and it is the part
+     * a viewer reads as force rather than as light. It also lasts, so the
+     * impact leaves the ground disturbed after the flash is gone.
+     *
+     * Not `prio: 0`: a shell landing is signal, not decoration, and there are
+     * never many of them at once. */
+    const ringN = big ? 14 : 8;
+    for (let i = 0; i < ringN; i++) {
+      const side = i % 2 ? 1 : -1;
+      const sp = rand(70, big ? 260 : 160);
+      this.add({
+        x: x + side * rand(2, r * 0.3), y: y - rand(0, 5),
+        vx: side * sp, vy: rand(-16, -2), g: -4,
+        t: 0, life: rand(0.6, 1.25), size: rand(6, big ? 18 : 12),
+        color: 'dust', type: 'smoke', drag: 2.1,
       });
     }
     if (big) {

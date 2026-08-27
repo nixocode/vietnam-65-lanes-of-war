@@ -86,8 +86,34 @@ os.makedirs(OUTDIR, exist_ok=True)
 # stepping off distance travelled plays at roughly 10 animation-fps, which is
 # visibly choppy next to a 60fps game — that choppiness is a large part of what
 # reads as "arcade". The still-ish poses stay cheap.
-CLIP_FRAMES = {'idle': 6, 'aim': 6, 'fire': 7, 'run': 18,
-               'runfire': 18, 'walk': 14, 'death': 12, 'hit': 4, 'prone': 4,
+# WALK AND RUN ARE THE JANK, and the arithmetic says so.
+#
+# The frame index comes off DISTANCE TRAVELLED — `frame = (dist / cycle) * n` in
+# js/sprite3d.js — so animation fps is set by speed, stride and frame count, not
+# by the game's frame rate. With `S3_WALK_CYCLE = 0.72` a walk cycle is 60.5
+# world-px, and 14 frames across it gave a 42 px/s rifleman 9.7 animation fps.
+# The slow units were worse: sniper and marksman ran at 7.2. That is the
+# "very janky, animations aren't smooth" the owner reported, and it is the one
+# complaint that was exactly reproducible from the constants.
+#
+# The stride is NOT the bug — 60px for an 84px man is a real 1.4m stride, and
+# shortening it to win frames would make men mince and skate. The fix is frames.
+#   walk    14 -> 28 :  9.7 -> 19.4 fps (sniper 7.2 -> 14.4)
+#   run     18 -> 24 : 23   -> 31   fps
+#   runfire 18 -> 20 : 23   -> 26   fps
+#
+# SIZED TO THE MEMORY BUDGET, and it is tight. The crop and the two dead clips
+# freed 17 MB, and these counts spend it: 135 frames/unit lands the atlas set at
+# ~94 MB, +31 for props = 125 of a 130 cap. A first cut at walk 28 / run 26 /
+# runfire 26 came to 143 frames and 130.7 MB — over the cap before a single
+# frame was rendered. `runfire` is a SEPARATE clip from `run` and scales with
+# it; forgetting that is what blew the estimate. It gets the smallest raise
+# because a man moving and firing at once is the rarest of the three.
+#
+# Recompute this before touching the counts:
+#   MB = 0.0581 * frames_per_unit * 12
+CLIP_FRAMES = {'idle': 6, 'aim': 6, 'fire': 7, 'run': 24,
+               'runfire': 20, 'walk': 28, 'death': 12, 'hit': 4, 'prone': 4,
                'idle2': 6, 'throw': 9, 'dive': 9, 'melee': 8, 'hit2': 4}
 LOOPING = {'idle', 'idle2', 'run', 'runfire', 'walk', 'prone'}
 

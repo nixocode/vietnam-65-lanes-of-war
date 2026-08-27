@@ -10,7 +10,10 @@
 set -u
 cd "$(dirname "$0")/.."
 BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
-UNITS=${@:-"rifleman arvn m60 engineer recon sniper guerrilla nva rpd sapper marksman"}
+# rpgman was missing from this list, so a "rebuild everything" run silently left
+# it on whatever frame counts it was last rendered with while the other eleven
+# moved on. Twelve units have atlases; twelve belong here.
+UNITS=${@:-"rifleman arvn m60 engineer recon sniper guerrilla nva rpd sapper marksman rpgman"}
 
 for u in $UNITS; do
   echo "--- $u"

@@ -52,6 +52,22 @@ FIXUP = {
     # At Lmean 83 this was the palest thing on the ground and scattered bright
     # straw across the field at random — noise where the frame needs structure.
     'grass_a':       (0.78, (0.014, 0.010, 0.002)),
+    # Measured at Lmean 108-120 and saturation up to 0.49, against 57-91 / 0.20-0.37
+    # for every other prop. Sunlit thatch and timber SHOULD be the light accent in
+    # a frame of olive foliage — that part is right and is kept — but at these
+    # values they stopped being an accent and became the brightest, most
+    # saturated thing on screen, reading as pale blocks pasted into the shot. The
+    # stone in `hut_c` and `village_row` went further and read as poured concrete.
+    # Pulled down and desaturated toward the field without losing the contrast
+    # that makes a building legible against the treeline.
+    'hut_a':         (0.80, (0.026, 0.016, 0.002), 0.42),
+    'hut_b':         (0.80, (0.026, 0.016, 0.002), 0.42),
+    'hut_c':         (0.76, (0.022, 0.014, 0.002), 0.40),
+    'village_row':   (0.76, (0.022, 0.014, 0.002), 0.44),
+    'frame_a':       (0.82, (0.024, 0.015, 0.002), 0.46),
+    'frame_b':       (0.82, (0.024, 0.015, 0.002), 0.46),
+    'frame_c':       (0.82, (0.024, 0.015, 0.002), 0.46),
+    'stall':         (0.84, (0.024, 0.015, 0.002), 0.48),
     'rock':          (0.86, (0.020, 0.014, 0.004)),
     # the APC came out a pale grey slab next to olive infantry; armour should sit
     # DARKER than the men it carries, not lighter
