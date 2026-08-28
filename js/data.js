@@ -380,6 +380,12 @@ const MAPS = {
     id: 'mekong', name: 'MEKONG DELTA', year: 'JUNE 1967', mode: 'standard',
     desc: 'Rice paddies, canals and raised dikes at sunset. Close terrain where farmland and battlefield blur.',
     trees: 'palm', treeDensity: 0.55, seed: 31967,
+    /* No mountains. The Mekong Delta is a floodplain — the highest thing in it
+     * is a dike — and the horizon range drawn on every other map put a sierra
+     * behind the rice fields. Ia Drang and Khe Sanh and Hill 937 are all
+     * genuinely mountain country; this one is not, and the flat horizon is a
+     * large part of what makes the delta look like the delta. */
+    flatHorizon: true,
     weather: {},
     pal: {
       skyTop: '#f2a65e', skyBot: '#e4695a', sun: { x: 340, y: 170, r: 58, color: '#ffd9a8' },

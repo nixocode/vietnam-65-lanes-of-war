@@ -948,22 +948,37 @@ const Renderer = {
 
   _drawFar(ctx, map, w) {
     const rng = seeded(map.seed + 7);
-    // painted mountain silhouettes on the horizon, then the procedural ridges
-    let mx = -80 + rng() * 100;
-    while (mx < w + 220) {
-      const mw = 340 + rng() * 260;
-      /* 0.9 made these read as cut-outs pasted on the sky: they are inked line
-       * art, they sit FARTHER away than the procedural ridges drawn over them,
-       * and they were arriving brighter and more saturated than those ridges.
-       * The farthest thing in the frame has to be the faintest. */
-      drawTex(ctx, 'mtn', Math.floor(rng() * 3), mx, 288 + rng() * 18, mw, { alpha: 0.52 });
-      mx += mw * (0.55 + rng() * 0.3);
-    }
+    /* The horizon range, built rather than sliced.
+     *
+     * This was the last inked line art left in the frame, and it occupied the
+     * widest band of it: `drawTex('mtn', ...)` pasted hand-drawn mountain
+     * silhouettes across the whole sky on all five maps. Everything in front of
+     * them — massif, ridges, treeline, props, soldiers — is now built from
+     * value, so the one thing spanning the top third of the screen was speaking
+     * a different language than the rest of the picture. That is exactly the
+     * "assets look like they are from different worlds" complaint, and it was
+     * loudest here because these are the largest shapes on screen.
+     *
+     * Two tiers, because a RANGE is not a row of triangles: a far tier washed
+     * most of the way to the sky and a nearer tier carrying the lit/shadow
+     * split, overlapping so the near peaks cut into the far ones. Peaks use the
+     * same off-centre shoulder profile as _massif so the built landforms all
+     * agree about what a mountain looks like.
+     *
+     * Maps with `flatHorizon` get none of it — see MEKONG, where a mountain
+     * range was simply wrong: the delta is a floodplain. */
+    if (!map.flatHorizon) this._farRange(ctx, rng, w, map);
     // a named landform is drawn BEFORE the ridges, so they overlap its foot and
     // it reads as standing behind the country rather than in front of it
     if (map.pal.massif) this._massif(ctx, rng, w, map, map.pal.massif);
-    this._ridge(ctx, rng, w, 260, 70, map.pal.hillFar, 0.85);
-    this._ridge(ctx, rng, w, 300, 55, map.pal.hillNear, 1);
+    /* The ridges are the other half of the horizon, and on a flat map they were
+     * still throwing peaks: amp 70 stepped every 64px is a sawtooth, which is
+     * where the sierra behind the rice fields was actually coming from once the
+     * painted range was gone. Flattened to a low far shore, which is what you
+     * see across a floodplain — land, but no relief. */
+    const fh = map.flatHorizon;
+    this._ridge(ctx, rng, w, fh ? 322 : 260, fh ? 9 : 70, map.pal.hillFar, 0.85);
+    this._ridge(ctx, rng, w, fh ? 336 : 300, fh ? 7 : 55, map.pal.hillNear, 1);
     /* Blend the far band toward the SKY, not toward its own hill colour.
      *
      * This used to wash 42% of flat `hillFar` over the whole layer, which is why
@@ -1271,6 +1286,64 @@ const Renderer = {
    * line, because at this size a flat fill reads as a cut-out no matter how big
    * it is. The split follows the map's own sun.
    */
+  /* One peak of the horizon range. Shares _massif's profile deliberately: a
+   * long shoulder into an off-centre summit and a shorter fall, with a little
+   * jag on the line so it is not a smooth curve. Returns the ridge points so
+   * the caller can split the faces at the summit. */
+  _peak(rng, cx, halfW, baseY, h) {
+    const pts = [];
+    const off = -0.2 + rng() * 0.4;
+    const N = 18;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const d = Math.abs((t - 0.5) - off * 0.5) * 2;
+      const prof = Math.pow(Math.max(0, 1 - d), 1.6);
+      pts.push([cx - halfW + halfW * 2 * t, baseY - h * prof + (rng() - 0.5) * h * 0.09]);
+    }
+    return pts;
+  },
+
+  _farRange(ctx, rng, w, map) {
+    const sunSide = (map.pal.sun && map.pal.sun.x < CANVAS_W / 2) ? -1 : 1;
+    const tier = (baseY, hLo, hHi, wLo, wHi, col, alpha, faces) => {
+      let x = -140 - rng() * 120;
+      while (x < w + 200) {
+        const pw = wLo + rng() * (wHi - wLo);
+        const h = hLo + rng() * (hHi - hLo);
+        const pts = this._peak(rng, x + pw / 2, pw / 2, baseY, h);
+        let pk = 0;
+        for (let i = 1; i < pts.length; i++) if (pts[i][1] < pts[pk][1]) pk = i;
+        const fill = (c, from, to) => {
+          ctx.beginPath();
+          ctx.moveTo(pts[from][0], baseY + 90);
+          for (let i = from; i <= to; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+          ctx.lineTo(pts[to][0], baseY + 90);
+          ctx.closePath();
+          ctx.fillStyle = c;
+          ctx.fill();
+        };
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        fill(col, 0, pts.length - 1);
+        if (faces) {
+          // only the near tier carries a light: on the far one the haze has
+          // already eaten the form, and shading it there just made it noisy
+          if (sunSide > 0) { fill(faces[0], pk, pts.length - 1); fill(faces[1], 0, pk); }
+          else { fill(faces[0], 0, pk); fill(faces[1], pk, pts.length - 1); }
+        }
+        ctx.restore();
+        x += pw * (0.42 + rng() * 0.26);   // overlap, so peaks stand behind peaks
+      }
+    };
+    const far = map.pal.hillFar;
+    // the farthest tier is mostly air: mixed 60% toward the sky before it is
+    // drawn, so the aerial-perspective wash on top has something to work with
+    const airy = this._mix(far, map.pal.skyBot, 0.6);
+    tier(300, 74, 138, 300, 520, airy, 0.75, null);
+    tier(316, 52, 104, 240, 420, far, 0.9,
+         [this._tint(far, 26, 26, 22), this._shade(far, -26)]);
+  },
+
   _massif(ctx, rng, w, map, spec) {
     const cx = spec.x * w;
     const halfW = spec.w / 2;
@@ -1846,97 +1919,258 @@ const Renderer = {
     }
     ctx.restore();
 
-    /* Water paddies with dikes and rice rows (delta).
+    /* RICE PADDIES, on the ground plane.
      *
-     * The geometry here was always right — 19%/30%/47% of the three Mekong
-     * lanes sit below the waterline — but it drew as a SIX PIXEL strip, which
-     * at lane scale is a hairline. A captured frame of a rice-paddy map at
-     * sunset contained no water a player would notice. The map is named for the
-     * delta and had no visible delta in it.
+     * The previous version flooded wherever the terrain dipped below a fixed
+     * waterline. The maths was right and it measured well — 63% and 65% of the
+     * two lanes under water at 10 and 15 px — and then I measured what actually
+     * REACHED THE SCREEN by rendering the map twice, once with `pal.water`
+     * deleted, and diffing: 1909 pixels, 0.13% of the frame, on five rows. The
+     * whole delta was a scratch. Trees and ground vegetation bake over the top
+     * of this block, and there was nothing left of a 10 px band after that.
      *
-     * So: depth now scales with how far the ground drops below the waterline
-     * rather than being a constant sliver, the surface carries a sky reflection
-     * (which is what actually reads as "water" rather than "a coloured band"),
-     * and the dikes stand proud between the fields. */
+     * But the deeper fault was the shape, not the paint order. A waterline
+     * against an elevation curve gives long sinuous pools — a creek. The map's
+     * own description says "rice paddies, canals and raised dikes", and a delta
+     * is a CHECKERBOARD: level fields held by earth banks, stepping away from
+     * you, each one a mirror. That is a property of the ground plane, and the
+     * ground plane is the whole slab from the lane line down, not a band at it.
+     *
+     * So the fields are bands across the slab, each following the terrain so
+     * the dikes run on the contour the way real bunds do, getting taller toward
+     * the viewer for perspective. And the water is the SKY, darkened — not the
+     * cool grey-blue this used to use. That colour was picked in isolation; laid
+     * at 0.72 over green earth it resolves to rgb(58,69,61), a grey-green with
+     * G above B, which is why nothing on screen was even blue-ish. A flooded
+     * paddy at sunset is a mirror, so it carries the sunset, which also puts it
+     * in a completely different hue family from the green field it sits in —
+     * and that separation is the entire read at this scale.
+     *
+     * The nearest band is left as bank rather than water: the player's own
+     * foreground stays legible, and men are never wading at the screen edge. */
     if (p.water) {
-      /* WATER LIES FLAT. That is the whole trick, and getting it wrong is why
-       * two earlier attempts failed: a band drawn at a fixed offset BELOW the
-       * ground curve follows every undulation, so it reads as a painted stripe
-       * or an orange fence — never as a pool. Standing water has one level
-       * across a basin and the ground rises out of it.
+      const bottom = (lane < LANE_N - 1)
+        ? LANE_BASE[lane + 1] + 26
+        : CANVAS_H;
+      const gY = (x) => groundY(map, lane, x);
+      const STEP = 24;
+      const cols = [];
+      for (let x = 0; x <= WORLD_W; x += STEP) cols.push(x);
+
+      /* Reflected sky, and it has to stay BRIGHT. First attempt mixed 52% toward
+       * mud and landed on rgb(120,76,66) — a maroon, which beside green earth
+       * reads as a ploughed field, and the delta came out as terracotta
+       * terraces. A flooded paddy is a mirror: near enough as bright as the sky
+       * it reflects, and BRIGHTER than the land around it. That value inversion
+       * is the tell. Only a quarter of the way to mud, and the water now sits
+       * above the field in value instead of below it. */
+      const wetFar = this._mix(p.skyBot, '#3b3a30', 0.26);
+      const wetNear = this._mix(p.skyTop, '#46402f', 0.22);
+      /* The bunds were near-black olive and the fields all mirror, so the frame
+       * came out as pink corduroy with no green left in it. An earth bank at
+       * sunset is a WARM light catching a dry crest, not a dark rule. */
+      const bankTop = this._mix(this._tint(p.laneTop[lane], 26, 16, 0), p.skyTop, 0.2);
+      const bankFace = this._tint(p.laneBody[lane], 44, 22, 2);
+      // standing rice: the crop is what most of a delta actually is
+      const cropFar = this._tint(p.brush, -22, -4, -14);
+      const cropNear = this._tint(p.brush, 16, 34, -12);
+
+      // band heights grow toward the viewer; the first is a sliver at the
+      // vegetation line and the last is the bank under the player's feet
+      const h0 = lane === LANE_N - 1 ? 17 : 11;
+      const growth = 1.36;
+      const bands = [];
+      let off = 4, h = h0;
+      while (off < bottom - LANE_BASE[lane] && bands.length < 9) {
+        bands.push({ o0: off, o1: off + h });
+        off += h; h *= growth;
+      }
+      if (bands.length) bands.pop();          // nearest strip stays dry bank
+
+      /* FIELDS ARE LEVEL. This is the correction that mattered most.
        *
-       * groundY = LANE_BASE - elev * ELEV_PX, so the waterline is simply a
-       * constant y for the lane. Fill from that flat surface down to the
-       * ground, and the basins appear on their own wherever the terrain dips
-       * under it — no extra geometry, and it tracks the elevation profile
-       * exactly because it IS the elevation profile. */
-      /* The waterline was 0.085, chosen before anything measured what that
-       * produced. Against this elevation profile it floods 15/29/45% of the
-       * three lanes at mean depths of 2.8 / 13 / 9.8 px — and 2.8 px on the
-       * back lane is nothing, which is why the delta had no visible water even
-       * once the drawing was fixed. 0.14 floods 63/65/74% at 10.1 / 15.2 /
-       * 16.8 px: ankle-to-shin against an 84 px soldier, which is what a rice
-       * paddy actually is, with dikes standing between the fields.
-       * Purely presentational — this layer is static art, so nothing in the sim
-       * moves with it. */
-      const WL = 0.14;
-      const waterY = LANE_BASE[lane] - WL * ELEV_PX;
-      /* The body must not be a darkened version of the sunset tone. Tried that:
-       * it lands on muddy brown, and brown beside green earth reads as MORE
-       * EARTH — the pools rendered correctly and looked like dirt tracks. Water
-       * reads from two things, a cool dark body and a bright sheen on top, so
-       * the depths go cool grey-blue and the reflected sunset is carried only
-       * by the surface line. */
-      const body = 'rgb(54,66,72)';
-      const step = 8;
-      for (let x = 0; x <= WORLD_W - step; x += step) {
-        const gy = groundY(map, lane, x);
-        if (gy <= waterY + 1) continue;          // ground stands above the water
-        const depth = gy - waterY;
+       * Every dike first ran at a fixed offset below groundY, so all of them
+       * carried the same undulation and stacked as parallel contour arcs — the
+       * frame came out as terraces on a hillside, which is Luzon or Bali, not
+       * the Mekong. A paddy is levelled by hand precisely so that it holds an
+       * even sheet of water; its bund is near horizontal and the terrain gets
+       * absorbed by the field edges, not repeated by every one of them.
+       *
+       * So each band blends from the ground line toward its own mean, harder
+       * the closer it is to the viewer. The top band still hugs the vegetation
+       * line, and by the near bands the fields are flat. */
+      let gSum = 0;
+      for (const x of cols) gSum += gY(x);
+      const gMean = gSum / cols.length;
+      const ribAt = [];
+      bands.forEach((b, k) => {
+        b.flat = bands.length < 2 ? 0.5 : 0.18 + 0.74 * (k / (bands.length - 1));
+        // field character. Most are planted; one is a bare mirror, which is what
+        // sells the water; the last-but-one is the canal named in the briefing.
+        /* MOST FIELDS ARE PLANTED. First cut made every band a sky mirror and
+         * the entire ground plane went sunset-pink — the green field the map is
+         * fought over simply disappeared, which is a worse frame than the one I
+         * started from. In the delta the crop is the ground and the water shows
+         * BETWEEN the fields: a few flooded and unplanted, one canal, the rest
+         * green. That ordering is also what gives the picture three values
+         * instead of one — green crop, bright water, warm bund. */
+        const r = rng();
+        b.kind = (k === bands.length - 2 && lane === LANE_N - 1) ? 'canal'
+               : r < 0.26 ? 'mirror' : r < 0.36 ? 'fallow' : 'rice';
+      });
 
-        // the body: cool and dark, so it separates from the earth around it
-        ctx.globalAlpha = 0.72;
-        ctx.fillStyle = body;
-        ctx.fillRect(x, waterY, step + 1, depth);
+      const lineY = (b, x, o) => gY(x) * (1 - b.flat) + gMean * b.flat + o;
+      const bandPath = (b, pad) => {
+        ctx.beginPath();
+        ctx.moveTo(0, lineY(b, 0, b.o0 - pad));
+        for (const x of cols) ctx.lineTo(x, lineY(b, x, b.o0 - pad));
+        for (let i = cols.length - 1; i >= 0; i--) ctx.lineTo(cols[i], lineY(b, cols[i], b.o1));
+        ctx.closePath();
+      };
 
-        // sunset caught on a flat surface. Bright, and on one straight line —
-        // the value jump from dark body to hot sheen is what actually says
-        // "water" at this scale, more than any hue does.
-        ctx.globalAlpha = 0.9;
-        ctx.fillStyle = p.water;
-        ctx.fillRect(x, waterY, step + 1, 2.2);
-        if (rng() < 0.5) {
-          ctx.globalAlpha = 0.34;
-          ctx.fillRect(x + rng() * 4, waterY + 3 + rng() * Math.min(12, depth * 0.6),
-                       4 + rng() * 6, 1.2);
-        }
+      for (const b of bands) {
+        const yTop = LANE_BASE[lane] + b.o0 - 40, yBot = LANE_BASE[lane] + b.o1 + 40;
+        ctx.save();
+        bandPath(b, 0);
+        ctx.clip();
 
-        // rice standing out of the flood, rooted at the bottom not the surface
-        if (depth > 4) {
-          ctx.globalAlpha = 0.7;
-          ctx.strokeStyle = '#5f7a2e';
+        if (b.kind === 'fallow') {
+          // a drained field between flooded ones. Without this the slab is
+          // stripes of water and nothing else, and stripes are not a checkerboard
+          ctx.fillStyle = this._tint(p.laneBody[lane], 30, 16, -4);
+          ctx.fillRect(0, yTop, WORLD_W, yBot - yTop);
+          ctx.globalAlpha = 0.3;
+          ctx.strokeStyle = this._shade(p.laneBody[lane], -18);
           ctx.lineWidth = 1;
-          for (let sx = x + 1; sx < x + step; sx += 4) {
-            const h = 4 + rng() * 5;
-            ctx.beginPath();
-            ctx.moveTo(sx, waterY + 1);
-            ctx.lineTo(sx + (rng() - 0.5) * 1.8, waterY + 1 - h);
-            ctx.stroke();
+          for (let x = 0; x < WORLD_W; x += 7) {
+            const y = lineY(b, x, b.o0 + (b.o1 - b.o0) * (0.3 + rng() * 0.5));
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 5, y + 0.6); ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        } else {
+          const deep = b.kind === 'canal', planted = b.kind === 'rice';
+          const g = ctx.createLinearGradient(0, yTop, 0, yBot);
+          if (planted) {
+            g.addColorStop(0, cropFar); g.addColorStop(1, cropNear);
+          } else {
+            g.addColorStop(0, deep ? this._mix(wetFar, '#161b1e', 0.42) : wetFar);
+            g.addColorStop(1, deep ? this._mix(wetNear, '#1b1d1c', 0.34) : wetNear);
+          }
+          ctx.fillStyle = g;
+          ctx.fillRect(0, yTop, WORLD_W, yBot - yTop);
+          if (planted) {
+            // water showing through the crop along the far edge, where the
+            // stand thins out against the bund
+            ctx.globalAlpha = 0.5;
+            const wg = ctx.createLinearGradient(0, yTop, 0, yTop + (b.o1 - b.o0) * 0.7);
+            wg.addColorStop(0, wetFar); wg.addColorStop(1, this._fade(wetFar, 0));
+            ctx.fillStyle = wg;
+            ctx.fillRect(0, yTop, WORLD_W, (b.o1 - b.o0) * 0.7);
+            ctx.globalAlpha = 1;
+          }
+
+          /* The sheen along the FAR edge, hard against the dike above it.
+           * The jump from a dark bank to a hot surface line is what reads as
+           * water at this size — more than the hue does. */
+          ctx.globalAlpha = deep ? 0.95 : planted ? 0.4 : 0.85;
+          ctx.strokeStyle = p.water;
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.moveTo(0, lineY(b, 0, b.o0 + 1.4));
+          for (const x of cols) ctx.lineTo(x, lineY(b, x, b.o0 + 1.4));
+          ctx.stroke();
+
+          // and the dike's own shadow lying on the water under it
+          ctx.globalAlpha = 0.34;
+          ctx.strokeStyle = 'rgb(20,24,26)';
+          ctx.lineWidth = Math.max(2, (b.o1 - b.o0) * 0.22);
+          ctx.beginPath();
+          ctx.moveTo(0, lineY(b, 0, b.o0 + 4));
+          for (const x of cols) ctx.lineTo(x, lineY(b, x, b.o0 + 4));
+          ctx.stroke();
+
+          // broken highlights: a paddy surface is never one flat sheet
+          ctx.globalAlpha = planted ? 0.1 : 0.24;
+          ctx.fillStyle = p.water;
+          for (let x = 0; x < WORLD_W; x += 26) {
+            const fy = lineY(b, x, b.o0 + (b.o1 - b.o0) * (0.3 + rng() * 0.55));
+            ctx.fillRect(x + rng() * 14, fy, 5 + rng() * 13, 1);
+          }
+
+          if (b.kind === 'rice') {
+            // rice rooted in the flood, in rows, leaning together
+            ctx.globalAlpha = 0.5;
+            ctx.strokeStyle = this._shade(cropFar, -22);
+            ctx.lineWidth = 1;
+            const bh = b.o1 - b.o0;
+            for (let x = 0; x < WORLD_W; x += 3.4) {
+              const base = lineY(b, x, b.o0 + bh * (0.25 + rng() * 0.7));
+              const hh = bh * (0.3 + rng() * 0.4);
+              ctx.beginPath();
+              ctx.moveTo(x, base);
+              ctx.lineTo(x + (rng() - 0.5) * 2.4, base - hh);
+              ctx.stroke();
+            }
           }
         }
         ctx.globalAlpha = 1;
+        ctx.restore();
+
+        /* THE DIKE along the field's far edge — raised earth, a lit top and a
+         * shadowed face, which is what turns a band of water into a held field.*/
+        const dh = Math.max(2.4, (b.o1 - b.o0) * 0.2);
+        ctx.beginPath();
+        ctx.moveTo(0, lineY(b, 0, b.o0 - dh));
+        for (const x of cols) ctx.lineTo(x, lineY(b, x, b.o0 - dh));
+        for (let i = cols.length - 1; i >= 0; i--) ctx.lineTo(cols[i], lineY(b, cols[i], b.o0 + dh * 0.5));
+        ctx.closePath();
+        ctx.fillStyle = bankFace;
+        ctx.fill();
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = bankTop;
+        ctx.lineWidth = Math.max(1, dh * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(0, lineY(b, 0, b.o0 - dh));
+        for (const x of cols) ctx.lineTo(x, lineY(b, x, b.o0 - dh));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        /* Where the cross-bunds run. One per band was invisible; a delta is
+         * divided every thirty or forty metres, so this is a spacing, not a
+         * coin flip — jittered so the grid is hand-made rather than ruled. */
+        const gap = 150 + (b.o1 - b.o0) * 3.4;
+        for (let x = 90 + rng() * gap; x < WORLD_W - 90; x += gap * (0.7 + rng() * 0.6))
+          ribAt.push({ b, x });
       }
 
-      /* Dikes: the raised earth walls that make a delta read as FIELDS rather
-       * than as flooding. One wherever the ground crosses the waterline. */
-      for (let x = step; x <= WORLD_W - step; x += step) {
-        const a = groundY(map, lane, x - step) > waterY;
-        const b = groundY(map, lane, x) > waterY;
-        if (a === b) continue;
-        ctx.fillStyle = this._tint(p.laneBody[lane], 26, 12, -8);
-        ctx.fillRect(x - 2, waterY - 4, 5, 10);
-        ctx.fillStyle = this._tint(p.laneTop[lane], 8, 20, -4);
-        ctx.fillRect(x - 2, waterY - 5, 5, 2);
+      /* CROSS-BUNDS. Without these the slab is horizontal stripes, and stripes
+       * read as a striped hillside. The short walls running AWAY from the viewer
+       * are what make it a checkerboard of separate fields, and they are the
+       * single most identifying thing about delta country. */
+      for (const rib of ribAt) {
+        const b = rib.b, x = rib.x;
+        const y0 = lineY(b, x, b.o0), y1 = lineY(b, x, b.o1);
+        // leaning slightly, because a bund seen off-axis is not a vertical line
+        const lean = (x - WORLD_W / 2) * 0.006;
+        const wTop = Math.max(2.2, (b.o1 - b.o0) * 0.17);
+        const wBot = wTop * 2.1;
+        ctx.beginPath();
+        ctx.moveTo(x - wTop, y0); ctx.lineTo(x + wTop, y0);
+        ctx.lineTo(x + wBot + lean, y1); ctx.lineTo(x - wBot + lean, y1);
+        ctx.closePath();
+        ctx.fillStyle = bankFace; ctx.fill();
+        // a bund throws a shadow down-sun across the field it divides; without
+        // it these sat flush in the water and could not be seen at all
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = 'rgb(24,26,22)';
+        ctx.fillRect(x + wTop, y0, wTop * 1.5, y1 - y0);
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = bankTop;
+        ctx.beginPath();
+        ctx.moveTo(x - wTop * 0.5, y0); ctx.lineTo(x + wTop * 0.5, y0);
+        ctx.lineTo(x + wBot * 0.4 + lean, y1); ctx.lineTo(x - wBot * 0.2 + lean, y1);
+        ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 1;
       }
     }
 
@@ -2256,6 +2490,20 @@ const Renderer = {
   _tint(hex, dr, dg, db) {
     const n = parseInt(hex.slice(1), 16);
     return `rgb(${clamp((n >> 16) + dr, 0, 255)},${clamp(((n >> 8) & 255) + dg, 0, 255)},${clamp((n & 255) + db, 0, 255)})`;
+  },
+
+  /* Blend two colours. Aerial perspective, reflected sky and wet earth all want
+   * "this colour, most of the way toward that one", which neither _shade (value
+   * only) nor _tint (fixed offsets) can express. Accepts #hex or rgb()/rgba().*/
+  _mix(a, b, k) {
+    const rd = (c) => {
+      const m = /rgba?\(([^)]+)\)/.exec(c);
+      if (m) { const q = m[1].split(',').map(parseFloat); return [q[0], q[1], q[2]]; }
+      const n = parseInt(c.slice(1), 16);
+      return [n >> 16, (n >> 8) & 255, n & 255];
+    };
+    const A = rd(a), B = rd(b);
+    return `rgb(${(A[0] + (B[0] - A[0]) * k) | 0},${(A[1] + (B[1] - A[1]) * k) | 0},${(A[2] + (B[2] - A[2]) * k) | 0})`;
   },
 
   /* Scale a colour's ALPHA, keeping its hue. Aerial perspective needs the map's
