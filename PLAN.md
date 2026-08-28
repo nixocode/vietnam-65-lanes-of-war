@@ -474,41 +474,35 @@ There were simply not enough frames in it.
 
 ## 2. Open, ranked
 
-Art is done, the atlas wall is down, the jank is fixed, and combat has its first
-real mid-fight decision. What is left is more depth and the harder animation work.
-
 **Done since the last pass**
-- **Even cadence.** Animation fps was proportional to unit SPEED, because the
-  frame index comes off distance travelled with a fixed cycle: a sapper at
-  56 px/s played 25.9 walk fps and a sniper at 30 played 13.9 — 1.87x choppier
-  for the units you most often watch creeping into position. Stride now scales
-  with the unit's base speed, which is also how walking actually works (people
-  change speed by changing stride, not cadence). **19.3-20.7 fps across all
-  twelve.** Keyed to BASE speed, never instantaneous, or `dist/cycle` would pop
-  the frame index every time a man accelerated.
-- **HUD plates** ported from the approved canvas — chamfered corners, hairline
-  brass rules, a brass CP plate as the single anchor, ranging ticks on the
-  morale bars. Appended to `css/style.css`: `#hud-controls button` is declared
-  FOUR times further up and `#hud-bottom` twice, so the cascade is the only
-  reliable way to land a change until that is untangled.
-- **Focus fire.** Riflemen deliberately spread fire; concentrating kills a squad
-  outright instead of wounding three, and a dead squad stops shooting back.
-  `X` or the FOCUS button, toggles, auto-clears when the target dies, marked
-  with brackets on the field.
-- **The AI uses it too**, preferring squads already hurt — and a squad below a
-  third strength under fire now falls back instead of feeding itself in.
-- **Sniper got its own body** (`worker.glb`, previously downloaded and unused).
-  It shared `soldier` with the rifleman, so the two commonest US figures were
-  the same mesh. Zero memory: same frame count, different donor.
+- **Terrain blending.** Soldiers had contact shadows since the sprite rig
+  landed; props never did, so every hut, palm and sandbag wall ended on a hard
+  cut curve and read as a sticker on grass. Props now ground from one place in
+  `Props.draw`, gather litter at the base, and the LANE EDGE — a ruled line
+  across the whole battlefield where one slab met the next — is broken by growth
+  straddling the join.
+- **Ground colour.** Every terrain pass worked in VALUE, so the field came out
+  beautifully lit and monochrome. Nine soft hue-shifted patches per 1280px
+  (dry / lush / scuffed / damp) drawn EARLY so the lighting lands on top and
+  unifies them. Ground pixels >12 degrees off the dominant hue: 20.7% -> 38.8%.
+- **Lane switching.** `V` or the CROSS button. Lane was fixed at spawn, so the
+  largest positional choice on the board did not exist. The cost is what makes
+  it a decision: out of cover, holding fire, unrecallable for ~1.9s. `lane`
+  flips immediately (targeting, covers and the render pass all key off it) while
+  the drawn y and the depth SCALE ease across — without the scale easing a man
+  jumped 17% in size on the first frame.
+- **The AI flanks with it**, moving surplus out of a lane it has already won
+  into one it is losing — without which it can win a lane decisively, lose the
+  other, and lose the match with no way to move the difference.
 
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | Terrain and flanking | Lane switching. The largest remaining depth item — `LANE_N = 2` and lane is fixed at spawn, so "where you fight" is currently not a decision. |
-| 2 | Attrition | Ammo and reload as a resource. Touches every unit's balance, so it goes after flanking. |
-| 3 | HUD group rails | The design's BASIC INFANTRY / HEAVY WEAPONS / SPECIALISTS rails need a category field on the 13 squads; none exists yet. |
-| 4 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. ~9 MB spare would cover it. |
-| 5 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
-| 6 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
+| 1 | Attrition | Ammo and reload as a resource. The last of the four depth directions asked for. Touches every unit's balance, so it wants care. |
+| 2 | HUD group rails | The design's BASIC INFANTRY / HEAVY WEAPONS / SPECIALISTS rails need a category field on the 13 squads; none exists. |
+| 3 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. ~9 MB spare would cover it. |
+| 4 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
+| 5 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
+| 6 | CSS duplicate cleanup | `#hud-controls button` is declared four times in `css/style.css` and `#hud-bottom` twice, so the cascade is currently the only reliable way to land a HUD change. |
 
 
 **Checked and NOT a gap: audio.** It was about to go on this list as "an M60 and

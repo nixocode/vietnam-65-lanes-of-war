@@ -3302,7 +3302,7 @@ const Renderer = {
       // never skip a living man entirely — see CONCEAL_FLOOR. Skipping was what
       // made concealed enemies blink out of existence rather than fade into cover.
       if (vis <= 0.001 && u.deadT == null) continue;
-      const scale = LANE_DEPTH[lane] * (u.sj || 1);
+      let scale = LANE_DEPTH[lane] * (u.sj || 1);
       const concealed = u.side === 'vc' && game.isConcealed(u);
       const alpha = (concealed && u.side === game.player ? 0.55 : 1) * Math.min(1, vis);
       // stance is decided by the squad-level state machine, nowhere else
@@ -3318,6 +3318,14 @@ const Renderer = {
        * unusable (see Sprite3D._sel), so the aim pose is used and dropped
        * instead — the height difference is what sells "down" at 84px, not the
        * limb arrangement. */
+      /* A crossing man's SCALE eases with him. The lanes sit at different depths
+       * (LANE_DEPTH 0.92 / 1.08), and `lane` flips at the start of the crossing,
+       * so without this he would jump 17% in size on the first frame and then
+       * walk across at the wrong depth. */
+      if (u.crossK != null && u.crossFrom != null) {
+        const a = LANE_DEPTH[u.crossFrom], b = LANE_DEPTH[u.lane];
+        scale = (a + (b - a) * u.crossK) * (u.sj || 1);
+      }
       const proneDrop = u.pose === 'prone' ? 26 * scale : 0;
       /* RECOIL — a per-shot kick on the whole man.
        *

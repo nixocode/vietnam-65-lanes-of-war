@@ -389,6 +389,7 @@ const UI = {
       if (sd.grenades) html += `<button data-o="grenade"><span class="sp-cd"></span> <i>G</i></button>`;
       html += `<button data-o="smoke" title="Pop smoke (S)"><i>S</i></button>`;
       html += `<button data-o="focus" title="Concentrate fire on the nearest enemy squad (X)">FOCUS <i>X</i></button>`;
+      if (LANE_N > 1) html += `<button data-o="crosslane" title="Cross to the other lane — out of cover and holding fire while they move (V)">CROSS <i>V</i></button>`;
       if (sd.suppressive) html += `<button data-o="suppress" title="Covering fire (C)"><span class="sp-cd"></span> <i>C</i></button>`;
       el.innerHTML = html;
       el.querySelectorAll('button').forEach(b => {
@@ -445,6 +446,7 @@ const UI = {
        * orders, P/F/M and `/F3 global, 1-9 the cards. */
       if (up === 'C') { this.orderSel('suppress'); return true; }
       if (up === 'X') { this.orderSel('focus'); return true; }
+      if (up === 'V') { this.orderSel('crosslane'); return true; }
     }
     const n = parseInt(key, 10);
     if (n >= 1 && n <= this.unitKeys.length) { this.armUnit(this.unitKeys[n - 1]); return true; }

@@ -491,6 +491,7 @@ class Game {
       s.emergeT = Math.max(0, s.emergeT - dt);
       s.nadeCd = Math.max(0, (s.nadeCd || 0) - dt);
       s.suppCd = Math.max(0, (s.suppCd || 0) - dt);
+      if ((s.crossT || 0) > 0) s.crossT = Math.max(0, s.crossT - dt);
       // a focus order must never outlive its target, or the squad keeps its
       // concentration bonus pointed at a squad that no longer exists
       if (s.focus && !this.squadAlive(s.focus).length) s.focus = null;
@@ -853,11 +854,52 @@ class Game {
       return this._squadGrenade(s);
     } else if (order === 'focus') {
       return this._squadFocus(s);
+    } else if (order === 'crosslane') {
+      return this._squadCrossLane(s);
     }
     if (order === 'smoke') {
       return this._squadSmoke(s);
     } else if (order === 'suppress') {
       return this._squadSuppress(s);
+    }
+    return true;
+  }
+
+  /* CROSS TO THE OTHER LANE.
+   *
+   * Lane was fixed at spawn, so "where you fight" was never a decision — you
+   * chose a lane when you bought a squad and lived with it. Everything else in
+   * the game is about position, and the largest positional choice on the board
+   * was unavailable.
+   *
+   * The cost is what makes it a decision rather than a free teleport: a squad
+   * crossing is in the open, out of cover, and holding its fire for the whole
+   * traverse. Sending your MG to the collapsing lane means it does not shoot for
+   * two seconds and cannot be recalled mid-crossing.
+   *
+   * The lane flips IMMEDIATELY — targeting, cover lookups and the render pass
+   * all key off `lane`, and leaving it on the old value for the duration would
+   * have men shooting across a lane they are no longer in. What interpolates is
+   * only the DRAWN y (see _updateUnits), so the move reads as a walk rather than
+   * a teleport.
+   */
+  _squadCrossLane(s) {
+    if (LANE_N < 2) return false;
+    const men = this.squadAlive(s);
+    if (!men.length || (s.crossT || 0) > 0) return false;
+    const to = s.lane === 0 ? 1 : 0;
+    // release cover: it belongs to the lane being left
+    if (s.cover && s.cover.occ === s) s.cover.occ = null;
+    s.cover = null; s.inCover = false; s.coverTarget = null;
+    s.crossFrom = s.lane;
+    s.crossT = CROSS_TIME;
+    s.lane = to;
+    s.order = 'hold';
+    s.hold = true; s.holdX = s.x; s.playerHeld = true;
+    for (const m of men) {
+      m.crossFrom = m.lane;
+      m.crossT = CROSS_TIME;
+      m.lane = to;
     }
     return true;
   }
@@ -1557,7 +1599,21 @@ class Game {
         if (u.deadT > (u.gibbed ? 0.05 : u.wounded ? 3.0 : 1.5)) this.units.splice(i, 1);
         continue;
       }
-      u.y = groundY(map, u.lane, u.x);
+      /* Mid-crossing a man is drawn between the two lane baselines. `lane` is
+       * already the DESTINATION, so this walks him in from where he came. */
+      if ((u.crossT || 0) > 0) {
+        u.crossT = Math.max(0, u.crossT - dt);
+        const k = 1 - u.crossT / CROSS_TIME;          // 0 at the start, 1 done
+        const e = k * k * (3 - 2 * k);                 // ease, so he does not jerk off
+        const from = groundY(map, u.crossFrom, u.x);
+        const to = groundY(map, u.lane, u.x);
+        u.y = from + (to - from) * e;
+        u.crossK = e;
+        u.moving = true;
+      } else {
+        u.crossK = null;
+        u.y = groundY(map, u.lane, u.x);
+      }
       u.muzzleT = Math.max(0, u.muzzleT - dt);
       u.suppressT = Math.max(0, u.suppressT - dt);
       u.slowT = Math.max(0, u.slowT - dt);
@@ -1652,7 +1708,8 @@ class Game {
       } else {
         u.fireT -= dt;
         // squads breaking for cover or repositioning hold their fire and run
-        const rushing = u.squad && (u.squad.order === 'tocover' || u.squad.order === 'moveto');
+        const rushing = (u.crossT || 0) > 0 ||
+          (u.squad && (u.squad.order === 'tocover' || u.squad.order === 'moveto'));
         const t = !rushing && d.rof > 0 ? this._acquire(u) : null;
         if (t) {
           u.moving = false;
@@ -2212,6 +2269,24 @@ class Game {
           (s.underFireT || 0) > 0 && Math.random() < 0.4) {
         this.orderSquad(s, 'fallback');
         s.playerHeld = false;
+      }
+
+      /* FLANK: a squad standing in a lane it has already won is worth more in
+       * the lane that is losing.
+       *
+       * Without this the AI can win one lane decisively, lose the other, and
+       * lose the match — because it has no way to move the surplus. It only
+       * crosses when the sums are clear both ways (comfortably ahead here,
+       * clearly behind there), and never out of cover it is holding, so it does
+       * not wander out of a good position for a marginal gain. */
+      if (LANE_N > 1 && (s.crossT || 0) <= 0 && !s.inCover && left) {
+        const oLane = s.lane === 0 ? 1 : 0;
+        const here = this._lanePower(side, s.lane), hereFoe = this._lanePower(foe, s.lane);
+        const there = this._lanePower(side, oLane), thereFoe = this._lanePower(foe, oLane);
+        if (here > hereFoe * 1.6 && thereFoe > there * 1.25 && Math.random() < 0.22) {
+          this.orderSquad(s, 'crosslane');
+          s.playerHeld = false;
+        }
       }
     }
   }

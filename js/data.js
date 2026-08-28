@@ -30,6 +30,10 @@ const STANCE_TRANS = 0.28;
  * long enough to swallow the sub-100ms runs and short enough that a man who
  * genuinely halts still settles promptly. */
 const MOVE_HOLD = 0.16;
+// Seconds a squad spends crossing between lanes. Long enough that the move is a
+// commitment — out of cover, holding fire, unrecallable — and short enough that
+// it stays a tactic rather than a punishment.
+const CROSS_TIME = 1.9;
 
 const ELEV_PX = 230;
 // a little more air between the tiers, so raised ground reads as levels

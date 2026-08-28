@@ -109,9 +109,16 @@ window.SelfTest = {
         minCP = Math.min(minCP, g.cp.us, g.cp.vc);
         for (const u of g.units) {
           if (!isFinite(u.x) || !isFinite(u.y) || !isFinite(u.hp)) nan++;
-          // a man should stand on his lane, not under it
+          /* A man should stand on his lane, not under it — EXCEPT while he is
+           * crossing between lanes. `lane` flips to the destination the instant
+           * the order is given (targeting, cover lookups and the render pass all
+           * key off it), while `y` eases across over CROSS_TIME, so a man moving
+           * from the near lane to the far one is legitimately "below his lane"
+           * for about two seconds. Verified he arrives exactly on the far lane's
+           * ground line; this is a transient, not a man falling through the
+           * floor, which is what the check is actually for. */
           const gy = groundY(g.map, u.lane, u.x);
-          if (u.deadT == null && u.y > gy + 40) badY++;
+          if (u.deadT == null && (u.crossT || 0) <= 0 && u.y > gy + 40) badY++;
         }
       }
     }
