@@ -1239,6 +1239,60 @@ const Renderer = {
       ctx.restore();
     }
 
+    /* GROUND PATCHWORK — the ground needs COLOUR variety, not just value.
+     *
+     * Everything the terrain passes do works in VALUE: the slope shading gives
+     * it form, the cloud shadow gives it large-scale movement, the incident pass
+     * gives it detail. All of them modulate light on a single hue, so the field
+     * came out beautifully lit and monochrome — one green, evenly dyed, from the
+     * treeline to the boots.
+     *
+     * A real field is a patchwork. Ground dries out where it drains and stays
+     * lush where it does not; it is scuffed to bare earth where it is walked on
+     * and darkens where it holds water. Those are HUE differences, and they are
+     * what makes the eye read acres rather than a painted floor.
+     *
+     * Drawn early, so the slope shading, cloud shadow and incident all land on
+     * top and unify it — otherwise the patches read as stains rather than as the
+     * ground being different there. Baked, so it costs nothing per frame.
+     */
+    {
+      const base = p.laneBody[lane];
+      const kinds = [
+        this._tint(base, 34, 30, -12),   // dry, sun-bleached
+        this._tint(base, -14, 10, -16),  // lush, holding water
+        this._tint(base, 26, 8, -14),    // scuffed to bare earth
+        this._tint(base, -26, -14, 6),   // damp and dark
+      ];
+      const nP = Math.round((WORLD_W / 1280) * 9);
+      ctx.save();
+      for (let i = 0; i < nP; i++) {
+        const cx = rng() * WORLD_W;
+        const gy = groundY(map, lane, cx);
+        const band = Math.max(60, (lane + 1 < LANE_N
+          ? groundY(map, lane + 1, cx) - gy : CANVAS_H - gy));
+        const rx = 140 + rng() * 320;
+        const ry = band * (0.42 + rng() * 0.55);
+        const cy = gy + band * (0.28 + rng() * 0.5);
+        const col = kinds[(rng() * kinds.length) | 0];
+        const a = 0.11 + rng() * 0.13;
+        const g4 = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+        g4.addColorStop(0, this._fade(col, a));
+        g4.addColorStop(0.6, this._fade(col, a * 0.62));
+        g4.addColorStop(1, this._fade(col, 0));
+        ctx.fillStyle = g4;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(1, ry / rx);
+        ctx.translate(-cx, -cy);
+        ctx.beginPath();
+        ctx.arc(cx, cy, rx, 0, 7);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
     /* Soil texture: speckles + faint strata under the surface.
      *
      * This was drawn in pure black and white at alpha 0.12 — value-only noise on
