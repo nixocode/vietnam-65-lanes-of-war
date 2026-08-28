@@ -410,6 +410,10 @@ const MAPS = {
     id: 'khesanh', name: 'KHE SANH', year: 'JANUARY 1968', mode: 'siege', siegeTime: 640,
     desc: 'A besieged Marine combat base on a red-earth plateau. The NVA press; the garrison holds and calls the sky.',
     trees: 'shattered', treeDensity: 0.5, seed: 41968, tod: 'night',
+    /* The wire, the trench, the revetments and the airstrip. `mode: 'siege'`
+     * described a besieged combat base and nothing in the frame had ever been
+     * fortified — see _wireBelt / _trenchLine / _airstrip. */
+    dressing: 'firebase',
     weather: { fog: 0.5 },
     detectPenalty: 0.8,
     pal: {
@@ -458,9 +462,29 @@ const MAPS = {
        * lifts and the canopy drops to near-black. Range 45 -> 58. */
       skyTop: '#6a7a82', skyBot: '#b3c0bf', sun: { x: 900, y: 120, r: 70, color: 'rgba(230,235,235,0.35)' },
       hillFar: '#4a5a52', hillNear: '#3a4a40',
-      laneTop: ['#55603c', '#4d5836', '#455031'], laneBody: ['#3a4326', '#343c22', '#2e361e'],
+      /* The ground goes to MUD, and this is the one map where that belongs in
+       * laneBody rather than in `soil`.
+       *
+       * Cu Chi's note is the opposite case and both are right: there, laterite
+       * in laneBody painted the whole map red and traded one monochrome for
+       * another, because jungle floor is vegetated with the clay showing
+       * THROUGH. Hill 937 in May 1969 was not vegetated. Eleven assaults, ten
+       * days of artillery and air, and monsoon rain on top had taken the ridge
+       * down to bare churned earth and stumps — the frame was rendering deep
+       * healthy grass over it. Here the mud IS the surface and the green is
+       * what survived, which is why `brush` stays where it was: it is now the
+       * only green in the frame, and it reads as leftovers. */
+      laneTop: ['#6a5c3e', '#61543a', '#584c34'], laneBody: ['#4a3d28', '#433725', '#3c3121'],
       brush: '#495830', tree: '#232a24', haze: 'rgba(190,205,205,0.22)',
+      /* THE HILL IS MUD. Ten days, eleven assaults, artillery and air between
+       * each one, in the monsoon — by the time this map is set the ridge had
+       * been stripped to bare churned earth and splintered stumps, which is
+       * where the name came from. The frame was rendering deep healthy grass.
+       * `soil` puts the churn into the patchwork pass, and `dressing: 'churned'`
+       * lays the slides, the runnels and the water standing in the craters. */
+      soil: '#7d5638',
     },
+    dressing: 'churned',
     lanes: [
       { pts: [[0, .06], [.3, .18], [.55, .42], [.78, .68], [1, .88]], conceal: [[.4, .62]] },
       { pts: [[0, .05], [.32, .16], [.58, .4], [.8, .66], [1, .86]], conceal: [[.46, .68]] },

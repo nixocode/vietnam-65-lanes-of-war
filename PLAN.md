@@ -485,11 +485,21 @@ Two more (`frame_a`, `frame_b`) were referenced by nothing at all. Replaced with
 built Vietnamese fittings; prop set 35 -> 29.
 
 *Two visual languages:* donor models are smooth meshes, everything built here
-was assembled from boxes with SQUARE ENDS. That reads worst on vegetation, where
-organic form is the whole point — grass and tuft now use a tapering polygon
-blade (`_grassblade`) instead of beam chains. Architecture is exempt: a roof
-plane really is a plane, which is why the built shrine and stall sit fine beside
-the donor huts.
+was assembled from boxes with SQUARE ENDS. Fixed at the root — `_blade` now
+delegates to `_leafpoly`, which covers `bush_low`, `fern_a`, `vine_a` and
+bamboo's sprays in one place. Architecture is exempt: a roof plane really is a
+plane, which is why the built shrine and stall sit fine beside the donor huts.
+
+The correction worth keeping: widening a thin leaf to survive the 4px outline
+took them to 1.1:1, which is a circle — the bush became grapes and the fern a
+pinecone. A leaf wants about 3:1, so the area has to come from LENGTH.
+
+*And the horizon was still inked.* `drawTex('mtn', ...)` pasted hand-drawn
+mountains across the sky on all five maps — the last of the old kit, and the
+widest band in the frame. Replaced with `_farRange`, two tiers of peaks sharing
+`_massif`'s shoulder profile. That closes the inked-art thread for the
+background; `dike`, `stonewall` and `gate` slices remain as fallbacks behind
+prop paths that are present, so they no longer draw.
 
 *And one prop simply disagreed with the palette:* `palm_a`, the commonest prop on
 the palm maps, had a PINK trunk — hue 15 degrees against 32.3 for palm_b/c/d,
@@ -498,15 +508,28 @@ and 80/58/50 against their 57/49/37. Now 26.1 and 56/46/36.
 **Rule: before adding art to a map, audit what is already there — origin,
 palette, and whether it belongs in 1965 Vietnam.**
 
+**The declared-but-never-drawn fault.** Five map faults in a row have now had
+the same shape: the DATA already said the thing was there and the renderer never
+put it on screen. Cu Chi named `soil` it never showed; Ia Drang named a massif
+that was not drawn; Mekong computed 63% and 65% of its two lanes under water and
+delivered 0.13% of the frame; Khe Sanh declared `mode: 'siege'` with no
+fortification anywhere in it; Hill 937 declared eleven assaults through a
+monsoon and rendered deep healthy grass.
+
+**Rule: when a map looks wrong, diff it against itself before redesigning it.**
+Render twice, once with the suspect feature disabled, and count changed pixels.
+The Mekong water measured perfectly by its own arithmetic and reached the screen
+as five rows; nothing short of a diff would have caught that, and I would have
+"fixed" a system that was already correct.
+
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | The other three maps' identity | Mekong's paddies are a thin far strip on a map named for a delta; Khe Sanh is a besieged firebase with no wire, revetments or airstrip; Hill 937 is Hamburger Hill with no mud and no shell-torn ground. |
-| 2 | Remaining faceted vegetation | `bamboo_a`, `fern_a`, `vine_a`, `bush_low` still read harder than the donor meshes. `_grassblade` and `_leafpoly` are the tools; this is more of the same work. |
-| 3 | HUD group rails | Needs a category field on the 13 squads; none exists. |
-| 4 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. |
-| 5 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
-| 6 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
-| 7 | CSS duplicate cleanup | `#hud-controls button` is declared four times, `#hud-bottom` twice. |
+| 1 | HUD group rails | Needs a category field on the 13 squads; none exists. |
+| 2 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. |
+| 3 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
+| 4 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
+| 5 | CSS duplicate cleanup | `#hud-controls button` is declared four times, `#hud-bottom` twice. |
+| 6 | Night contrast on Khe Sanh | Mid-value objects (the village masonry) sit noticeably lighter than everything around them once the night grade lands. The prop set itself measures unified — Lmean 48-96 across all 29, no outliers — so this is the grade, not the art. |
 
 
 **Checked and NOT a gap: audio.** It was about to go on this list as "an M60 and

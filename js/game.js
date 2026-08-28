@@ -82,6 +82,7 @@ const STRUCT_DEFS = {
   cart:      { w: 28, hp: 24 },
   shrine:    { w: 18, hp: 30 },
   stall:     { w: 32, hp: 30 },
+  crates:    { w: 22, hp: 40 },   // stacked ammunition, at a firebase
 };
 
 function buildSettlement(map, s, structures) {
@@ -108,7 +109,13 @@ function buildSettlement(map, s, structures) {
     put('stilt', -54); put('stilt', 8); put('stilt', 66); put('hay', -14);
     put('banana', 100); put('cart', -88);
   } else if (s.kind === 'bunkers') {
-    put('bunker', -34); put('bunker', 38); put('hay', 0);
+    /* There was a HAYSTACK here. `bunkers` is used by exactly two maps — the
+     * Marine perimeter at Khe Sanh and the NVA crest positions on Hill 937 —
+     * and both were getting a piece of farm dressing dropped between the
+     * fighting positions, because this branch was copied from the hamlet one.
+     * A position gets more position: sandbags and a stack of ammunition. */
+    put('bunker', -34); put('bunker', 38);
+    put('mgnest', 2); put('crates', -74);
   }
 }
 

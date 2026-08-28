@@ -784,7 +784,15 @@ const Renderer = {
      * band that redraws every frame. It also reads as a six-metre shrub. Near
      * growth is tall growth: grass and hanging vine, which frame tightly and are
      * what you would actually be looking through. */
-    const kinds = ['grass', 'fern', 'bush', 'plant', 'grass', 'bush'];
+    /* And the same shattered-ground rule as the lane scatter: Khe Sanh's
+     * plateau and Hill 937's ridge were being framed through broad-leaved bush
+     * and hanging vine, so the two maps where every tree in the frame has been
+     * blown to a splinter were viewed through a healthy jungle. Grass and dead
+     * fern spray on those. */
+    const blasted = map.trees === 'shattered';
+    const kinds = blasted
+      ? ['grass', 'fern', 'grass', 'grass', 'fern', 'grass']
+      : ['grass', 'fern', 'bush', 'plant', 'grass', 'bush'];
     // No vine in the near band. Its leaves alternate at regular intervals down a
     // near-straight strand, which at 260 px reads as a rope ladder rather than
     // growth; at ground-clutter size the same regularity is invisible. Fern
@@ -1194,6 +1202,144 @@ const Renderer = {
    * grass is a puddle; a dark ellipse with a heap of fresh subsoil thrown out
    * next to it is something that was dug.
    */
+/* ---- A COMBAT BASE UNDER SIEGE ----------------------------------------
+   *
+   * Khe Sanh's briefing is "a besieged Marine combat base" and its mode is
+   * literally `siege`, and what the frame actually showed was empty red ground,
+   * a brick village longhouse and lush leafy bushes. Nothing in the picture had
+   * been fortified, shelled, or defended. The map's identity existed only in
+   * its text.
+   *
+   * Four things carry a firebase in a side-on view, in order of how much they
+   * say: the WIRE, the TRENCH, the REVETMENTS, and the AIRSTRIP. All four are
+   * baked into the lane layer, so they cost nothing per frame, and all four are
+   * built from value the way the rest of the terrain is. */
+
+  /* Concertina. The single most identifying object on a defended perimeter, and
+   * the hardest to draw honestly — a coil is a helix, and a helix seen side-on
+   * is a run of overlapping ellipses whose overlap is the whole read. Drawn as
+   * three bands so the belt has depth rather than being one fence, and picked
+   * out in light strokes because at night, under fog 0.5, a dark wire on dark
+   * laterite is nothing at all. */
+  _wireBelt(ctx, rng, map, lane, x0, x1) {
+    const gy = (x) => groundY(map, lane, x);
+    const dep = LANE_DEPTH[lane];
+    for (let band = 0; band < 3; band++) {
+      const lift = band * 3.4 * dep;
+      const r = (6.5 - band * 0.9) * dep;
+      const yOff = -2 - lift;
+      // pickets first, so the coils sit in front of them
+      ctx.strokeStyle = 'rgba(30,26,20,0.75)';
+      ctx.lineWidth = 1.3 * dep;
+      for (let x = x0; x < x1; x += 46 * dep) {
+        const y = gy(x) + yOff;
+        ctx.beginPath(); ctx.moveTo(x, y + r * 0.7); ctx.lineTo(x + 1.5, y - r * 1.5); ctx.stroke();
+      }
+      ctx.strokeStyle = band === 0 ? 'rgba(214,206,186,0.5)' : 'rgba(196,188,170,0.34)';
+      ctx.lineWidth = Math.max(0.7, 1.05 * dep);
+      // step is HALF the loop radius: the loops have to interpenetrate or the
+      // belt reads as a row of separate hoops instead of a coil
+      for (let x = x0; x < x1; x += r * 0.95) {
+        const y = gy(x) + yOff - r * 0.5;
+        ctx.beginPath();
+        ctx.ellipse(x, y, r * (0.8 + rng() * 0.3), r * (0.62 + rng() * 0.3),
+                    (rng() - 0.5) * 0.4, 0, 7);
+        ctx.stroke();
+        if (rng() < 0.35) {                    // barbs catching what light there is
+          ctx.beginPath();
+          ctx.moveTo(x - r * 0.4, y - r * 0.4); ctx.lineTo(x - r * 0.7, y - r * 0.8);
+          ctx.stroke();
+        }
+      }
+    }
+  },
+
+  /* A fighting trench: a dark slot with the spoil thrown up in front of it.
+   * The parapet is what makes it read — a black line on the ground is a crack,
+   * a black line with a lit lip above it is something men are standing in. */
+  _trenchLine(ctx, rng, map, lane, x0, x1) {
+    const p = map.pal, dep = LANE_DEPTH[lane];
+    const lip = this._tint(p.laneTop[lane], 26, 18, 8);
+    const slot = 'rgba(10,8,6,0.88)';
+    const cols = [];
+    for (let x = x0; x <= x1; x += 10) cols.push(x);
+    const top = (x) => groundY(map, lane, x) - 2 * dep;
+    // spoil parapet
+    ctx.beginPath();
+    ctx.moveTo(x0, top(x0));
+    for (const x of cols) ctx.lineTo(x, top(x) - (5 + Math.sin(x * 0.07) * 1.6) * dep);
+    for (let i = cols.length - 1; i >= 0; i--) ctx.lineTo(cols[i], top(cols[i]) + 1);
+    ctx.closePath();
+    ctx.fillStyle = lip; ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath();
+    ctx.moveTo(x0, top(x0));
+    for (const x of cols) ctx.lineTo(x, top(x) - 1.6 * dep);
+    for (let i = cols.length - 1; i >= 0; i--) ctx.lineTo(cols[i], top(cols[i]) + 1);
+    ctx.closePath(); ctx.fill();
+    // the slot itself, just under the parapet
+    ctx.fillStyle = slot;
+    ctx.beginPath();
+    ctx.moveTo(x0, top(x0) + 0.5);
+    for (const x of cols) ctx.lineTo(x, top(x) + 0.5);
+    for (let i = cols.length - 1; i >= 0; i--) ctx.lineTo(cols[i], top(cols[i]) + 4.2 * dep);
+    ctx.closePath(); ctx.fill();
+    // sandbags along the lip at intervals, and a firing step notch
+    for (let x = x0 + 20; x < x1; x += 60 + rng() * 70) {
+      if (typeof Props !== 'undefined' && Props.ready && Props.has('sandbags_row')) {
+        // fit = PIXEL height. The 5th argument is a SCALE, and passing pixels
+        // there renders the prop at 9x, which is how a sandbag row became a
+        // building. See Props.draw(ctx, name, x, groundY, scale, opts).
+        Props.draw(ctx, 'sandbags_row', x, top(x) - 4 * dep, 1,
+                   { flip: rng() < 0.5, fit: 11 * dep });
+      }
+    }
+  },
+
+  /* PIERCED STEEL PLANK. The Khe Sanh airstrip is the reason the place could be
+   * held at all, and it is unmistakable: interlocking perforated mat, laid on
+   * red mud, patched where shells took it out. A grey metal band across the far
+   * lane is also the only cool, man-made horizontal in a map of earth. */
+  _airstrip(ctx, rng, map, lane, x0, x1) {
+    const dep = LANE_DEPTH[lane];
+    const h = 13 * dep;
+    const gy = (x) => groundY(map, lane, x) - h + 2;
+    const cols = [];
+    for (let x = x0; x <= x1; x += 12) cols.push(x);
+    const band = (yA, yB, fill) => {
+      ctx.beginPath();
+      ctx.moveTo(x0, gy(x0) + yA);
+      for (const x of cols) ctx.lineTo(x, gy(x) + yA);
+      for (let i = cols.length - 1; i >= 0; i--) ctx.lineTo(cols[i], gy(cols[i]) + yB);
+      ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+    };
+    band(0, h, '#6d7069');                      // the mat
+    band(0, h * 0.24, '#878a80');               // light caught on the near lip
+    band(h * 0.82, h, 'rgba(16,14,11,0.45)');   // shadow under the edge
+    // plank seams and the perforation rows
+    ctx.strokeStyle = 'rgba(28,28,26,0.5)'; ctx.lineWidth = 1;
+    for (let x = x0; x < x1; x += 17 * dep) {
+      ctx.beginPath(); ctx.moveTo(x, gy(x) + 1); ctx.lineTo(x, gy(x) + h - 1); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(30,30,28,0.42)';
+    for (let x = x0 + 4; x < x1; x += 6 * dep)
+      for (let r = 0; r < 2; r++)
+        ctx.fillRect(x, gy(x) + h * (0.34 + r * 0.3), 1.4 * dep, 1.4 * dep);
+    // shell damage: plates lifted and mud showing through
+    for (let i = 0; i < (x1 - x0) / 320; i++) {
+      const x = x0 + rng() * (x1 - x0);
+      ctx.fillStyle = this._shade(map.pal.laneBody[lane], 12);
+      ctx.beginPath();
+      ctx.ellipse(x, gy(x) + h * 0.55, 9 * dep, h * 0.4, 0, 0, 7);
+      ctx.fill();
+      ctx.strokeStyle = '#9a9d93'; ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x - 9 * dep, gy(x) + h * 0.5);
+      ctx.lineTo(x - 13 * dep, gy(x) + h * 0.1);
+      ctx.stroke();
+    }
+  },
+
   _tunnelMouth(ctx, rng, x, gy, map, lane) {
     const soil = map.pal.soil || this._tint(map.pal.laneBody[lane], 26, 8, -14);
     const k = LANE_DEPTH[lane];
@@ -2306,7 +2452,15 @@ const Renderer = {
     for (let i = 0; i < vegN * (WORLD_W / 1280); i++) {
       const x = 120 + rng() * (WORLD_W - 240);
       if (Math.abs(x - map.flags[lane] * WORLD_W) < 60) continue;
-      const kind = ['tuft', 'bush', 'fern', 'tuft'][Math.floor(rng() * 4)];
+      /* A SHELLED PLATEAU IS NOT LEAFY. Khe Sanh and Hill 937 both declare
+       * `trees: 'shattered'` — everything standing has been blown apart — and
+       * both were being scattered with the same broad-leaved bush and fern as
+       * the jungle maps, so the ground under the splintered trunks looked like
+       * a garden. On those maps the scatter drops to grass and tufts, which is
+       * what actually comes back first on churned ground. */
+      const kind = map.trees === 'shattered'
+        ? ['tuft', 'grass', 'tuft', 'grass'][Math.floor(rng() * 4)]
+        : ['tuft', 'bush', 'fern', 'tuft'][Math.floor(rng() * 4)];
       // sized off the prop's authored real height, so a tuft is ankle-high and a
       // bush is knee-high against a 1.8 m man rather than whatever width the
       // inked slice happened to be
@@ -2325,6 +2479,75 @@ const Renderer = {
         if (Math.abs(tx - map.flags[lane] * WORLD_W) < 70) continue;
         this._tunnelMouth(ctx, rng, tx, groundY(map, lane, tx) + 2, map, lane);
       }
+    }
+
+    /* THE FIREBASE. Laid out from the defended end outward, which is how the
+     * position was actually built: the strip and the bunker line at the back,
+     * the trench along the perimeter, then belt after belt of wire pushed out
+     * into the approach. The attacker crosses all of it. */
+    if (map.dressing === 'firebase') {
+      if (lane === 0) this._airstrip(ctx, rng, map, lane, WORLD_W * 0.05, WORLD_W * 0.34);
+      this._trenchLine(ctx, rng, map, lane, WORLD_W * 0.14, WORLD_W * 0.27);
+      this._wireBelt(ctx, rng, map, lane, WORLD_W * 0.28, WORLD_W * 0.46);
+      // an outpost belt further out, where the listening posts were. The first
+      // pass put both belts inside the left 42% and the camera spends most of a
+      // match past that, so the perimeter was invisible for most of the fight.
+      this._wireBelt(ctx, rng, map, lane, WORLD_W * 0.56, WORLD_W * 0.66);
+      // revetted positions behind the trench
+      if (typeof Props !== 'undefined' && Props.ready && Props.has('sandbag_wall')) {
+        for (let i = 0; i < 5; i++) {
+          const x = WORLD_W * (0.07 + 0.048 * i) + rng() * 40;
+          Props.draw(ctx, i % 2 ? 'sandbag_wall' : 'sandbags_pile', x,
+                     groundY(map, lane, x) + 2, 1,
+                     { flip: rng() < 0.5, fit: (17 + rng() * 6) * LANE_DEPTH[lane] });
+        }
+      }
+    }
+
+    /* GROUND FOUGHT OVER UNTIL NOTHING GREW ON IT.
+     *
+     * The slope is the whole of Hill 937 — the mission is to climb it — so the
+     * churn is drawn as things that RUN DOWNHILL: slides where the surface came
+     * away, runnels cut by the rain, and water standing in every hole. That
+     * last one is the specific detail of this battle: it was fought through the
+     * monsoon, so the craters were full, and men went up a hill that was
+     * sliding back down under them. */
+    if (map.dressing === 'churned') {
+      const dep = LANE_DEPTH[lane];
+      const soil = map.pal.soil || '#6b4a34';
+      const n = Math.round(30 * (WORLD_W / 2560));
+      for (let i = 0; i < n; i++) {
+        const x = 60 + rng() * (WORLD_W - 120);
+        const gy = groundY(map, lane, x);
+        // a slide: bare earth pulled downhill, wide at the bottom
+        const w = (16 + rng() * 46) * dep, h = (7 + rng() * 15) * dep;
+        ctx.globalAlpha = 0.34 + rng() * 0.3;
+        ctx.fillStyle = soil;
+        ctx.beginPath();
+        ctx.moveTo(x - w * 0.3, gy + 1);
+        ctx.quadraticCurveTo(x - w * 0.5, gy + h * 0.6, x - w * 0.5, gy + h);
+        ctx.lineTo(x + w * 0.5, gy + h);
+        ctx.quadraticCurveTo(x + w * 0.4, gy + h * 0.5, x + w * 0.28, gy + 1);
+        ctx.closePath(); ctx.fill();
+        // and the wet gloss on it — mud in rain is not matte
+        ctx.globalAlpha = 0.14;
+        ctx.fillStyle = this._mix(map.pal.skyBot, '#ffffff', 0.3);
+        ctx.beginPath();
+        ctx.ellipse(x, gy + h * 0.55, w * 0.34, h * 0.22, 0, 0, 7); ctx.fill();
+      }
+      // runnels: thin channels the rain cut, all of them going the same way
+      ctx.globalAlpha = 0.3;
+      ctx.strokeStyle = this._shade(soil, -34);
+      ctx.lineWidth = 1.2 * dep;
+      for (let i = 0; i < n * 1.6; i++) {
+        const x = 40 + rng() * (WORLD_W - 80);
+        const gy = groundY(map, lane, x), len = (8 + rng() * 22) * dep;
+        ctx.beginPath();
+        ctx.moveTo(x, gy);
+        ctx.quadraticCurveTo(x + (rng() - 0.5) * 6, gy + len * 0.5, x + (rng() - 0.5) * 10, gy + len);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
     }
 
     // base dressing: watchtower over the US end, village gate at the VC end
@@ -2352,16 +2575,62 @@ const Renderer = {
       }
     }
 
-    // pre-battle craters on shattered ground
+    /* GROUND THAT HAS BEEN SHELLED.
+     *
+     * Seven flat dark ellipses per lane, which on a 2560px world is one crater
+     * every 366px — and each was a shadow with a thin rim, so even those seven
+     * read as puddles. Khe Sanh took artillery every day for seventy-seven days
+     * and Hill 937 was prepped by air and gun before each of eleven assaults;
+     * on both, churned ground is not decoration, it IS the terrain, and it is
+     * also what fills the empty stretches these two maps are made of.
+     *
+     * A crater reads from three parts, and the old one had one of them: the
+     * BOWL in shadow, the LIP of pale subsoil thrown up around it, and the
+     * SPRAY of ejecta trailing away downwind. The lip is the part that matters
+     * — fresh subsoil is lighter than the surface it came out of, so a crater
+     * is a bright ring with a dark centre, not a dark smudge. */
     if (map.trees === 'shattered') {
-      for (let i = 0; i < 7; i++) {
-        const x = 300 + rng() * (WORLD_W - 600);
+      const heavy = map.dressing === 'firebase' || map.mode === 'assault';
+      const n = Math.round((heavy ? 26 : 11) * (WORLD_W / 2560));
+      const soil = this._tint(p.laneTop[lane], 34, 26, 14);
+      for (let i = 0; i < n; i++) {
+        const x = 140 + rng() * (WORLD_W - 280);
         const y = groundY(map, lane, x);
-        const s = 8 + rng() * 14;
-        ctx.fillStyle = 'rgba(18,14,9,0.45)';
-        ctx.beginPath(); ctx.ellipse(x, y + 2, s, s * 0.3, 0, 0, 7); ctx.fill();
-        ctx.strokeStyle = 'rgba(60,48,30,0.4)'; ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.ellipse(x, y + 1, s * 1.1, s * 0.34, 0, Math.PI, 0); ctx.stroke();
+        const sz = (6 + rng() * 16) * LANE_DEPTH[lane];
+        // ejecta first, so the lip is drawn over its inner end
+        ctx.fillStyle = this._fade(soil, 0.3);
+        for (let k = 0; k < 7; k++) {
+          const a = (rng() - 0.5) * 3.4, d = sz * (1.1 + rng() * 1.9);
+          ctx.beginPath();
+          ctx.ellipse(x + Math.cos(a) * d, y + 1 + Math.sin(a) * d * 0.22,
+                      1.4 + rng() * 2.6, 0.9 + rng() * 1.2, 0, 0, 7);
+          ctx.fill();
+        }
+        // the lip: pale subsoil, brightest on the sun side
+        ctx.fillStyle = soil;
+        ctx.beginPath();
+        ctx.ellipse(x, y + 1, sz * 1.22, sz * 0.4, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = this._fade('#fff2d2', 0.12);
+        ctx.beginPath();
+        ctx.ellipse(x, y - 0.6, sz * 1.16, sz * 0.36, 0, Math.PI, 0); ctx.fill();
+        // the bowl
+        ctx.fillStyle = 'rgba(14,11,7,0.62)';
+        ctx.beginPath(); ctx.ellipse(x, y + 1.6, sz * 0.86, sz * 0.3, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(x, y + 0.4, sz * 0.8, sz * 0.24, 0, Math.PI, 0); ctx.fill();
+        /* IN THE MONSOON THEY FILL. Hill 937 was fought in the rain for ten
+         * days; a shell hole there is not a dry bowl, it is a pool holding a
+         * disc of grey sky, and that is the brightest thing on a mud slope. */
+        if (map.weather && map.weather.rain && rng() < 0.72) {
+          ctx.fillStyle = this._mix(map.pal.skyBot, '#2e3330', 0.42);
+          ctx.beginPath();
+          ctx.ellipse(x, y + 1.9, sz * 0.62, sz * 0.2, 0, 0, 7); ctx.fill();
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = this._mix(map.pal.skyBot, '#ffffff', 0.25);
+          ctx.beginPath();
+          ctx.ellipse(x - sz * 0.12, y + 1.6, sz * 0.34, sz * 0.09, 0, 0, 7); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
       }
     }
 
@@ -3608,6 +3877,28 @@ const Renderer = {
       ctx.beginPath(); ctx.moveTo(-5, -2); ctx.lineTo(-5, -12); ctx.moveTo(5, -2); ctx.lineTo(5, -12); ctx.stroke();
       ctx.fillStyle = '#8a7443';
       ctx.beginPath(); ctx.moveTo(-8, -12); ctx.lineTo(0, -16); ctx.lineTo(8, -12); ctx.closePath(); ctx.fill();
+    } else if (st.kind === 'crates') {
+      // stacked ammunition boxes under a tarp corner — the thing a firebase has
+      // most of, and what the haystack that used to stand here should have been
+      const box = (bx, by, bw, bh) => {
+        ctx.fillStyle = '#6a6141';
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.fillStyle = 'rgba(255,240,200,0.14)';
+        ctx.fillRect(bx, by, bw, 1.6);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(bx + bw - 2, by, 2, bh);
+        ctx.strokeStyle = 'rgba(24,20,12,0.6)'; ctx.lineWidth = 0.8;
+        ctx.strokeRect(bx + 0.4, by + 0.4, bw - 0.8, bh - 0.8);
+      };
+      box(-w / 2 + 1, -8, 12, 8);
+      box(-w / 2 + 12, -7, 10, 7);
+      box(-w / 2 + 4, -14, 11, 6);
+      ctx.fillStyle = dmg ? 'rgba(30,22,14,0.7)' : '#4b4c3c';
+      ctx.beginPath();                                   // tarp thrown over
+      ctx.moveTo(-w / 2 + 2, -14);
+      ctx.quadraticCurveTo(-w / 2 + 9, -19, -w / 2 + 16, -13);
+      ctx.lineTo(-w / 2 + 14, -12); ctx.lineTo(-w / 2 + 3, -12);
+      ctx.closePath(); ctx.fill();
     } else if (st.kind === 'hay') {
       ctx.fillStyle = dmg ? '#6e5f36' : '#a58c52';
       ctx.beginPath();
