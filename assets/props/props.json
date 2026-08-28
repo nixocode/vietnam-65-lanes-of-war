@@ -2,13 +2,13 @@
  "props": [
   {
    "name": "bamboo_a",
-   "hM": 4.892,
-   "wM": 2.726,
+   "hM": 4.878,
+   "wM": 2.717,
    "groundY": 480.6,
-   "ppm": 91.8,
+   "ppm": 92.08,
    "res": 512,
    "realH": 4.8,
-   "aspect": 0.5572
+   "aspect": 0.557
   },
   {
    "name": "banana_a",
@@ -22,13 +22,13 @@
   },
   {
    "name": "bush_low",
-   "hM": 0.678,
-   "wM": 1.633,
-   "groundY": 349.3,
-   "ppm": 275.1,
+   "hM": 0.727,
+   "wM": 1.768,
+   "groundY": 348.3,
+   "ppm": 253.98,
    "res": 512,
    "realH": 0.85,
-   "aspect": 2.4086
+   "aspect": 2.4319
   },
   {
    "name": "cart_v",
@@ -62,13 +62,13 @@
   },
   {
    "name": "fern_a",
-   "hM": 0.667,
+   "hM": 0.699,
    "wM": 1.168,
-   "groundY": 384.2,
+   "groundY": 390.3,
    "ppm": 384.36,
    "res": 512,
    "realH": 0.75,
-   "aspect": 1.7511
+   "aspect": 1.671
   },
   {
    "name": "grass_a",
@@ -262,13 +262,13 @@
   },
   {
    "name": "vine_a",
-   "hM": 1.305,
-   "wM": 1.492,
-   "groundY": 452.5,
-   "ppm": 301.11,
+   "hM": 1.33,
+   "wM": 1.601,
+   "groundY": 442.6,
+   "ppm": 280.54,
    "res": 512,
    "realH": 1.3,
-   "aspect": 1.1433
+   "aspect": 1.2038
   },
   {
    "name": "watchtower",

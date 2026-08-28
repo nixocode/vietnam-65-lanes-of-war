@@ -215,19 +215,22 @@ def _grassblade(mat, x0, z0, x1, z1, bow=0.0, w=0.026, segs=7, y=0.0, yt=0.016):
 
 
 def _blade(mat, x0, z0, x1, z1, bow=0.0, wmax=0.09, segs=6, y=0.0, yt=0.02):
-    """A leaf with actual blade area: half-width swells to `wmax` near the middle
-    and comes to a point at the tip.
+    """A leaf with actual blade area: half-width swells toward the middle and
+    comes to a point at the tip.
 
-    The first banana plant was six narrow ribbons tracing an outline with nothing
-    between them, which at 60 px read as a croquet hoop. A leaf is a surface.
+    ONE POLYGON, not a chain of boxes. This used to lay down `_beam` segments,
+    and a beam is a rotated box with SQUARE ENDS — so every leaf in the game
+    finished on a little flat edge and every bend in one showed a corner. That is
+    the whole reason the built vegetation read as a different material from the
+    donor palms beside it: the palms are meshes with organic silhouettes and the
+    undergrowth was made of rectangles.
+    
+    Fixed here rather than in each plant, because `bush_low`, `fern_a`, `vine_a`
+    and bamboo's leaf sprays all come through this one function. `_leafpoly`
+    already builds exactly the tapering shape this was approximating.
     """
-    import math as _m
-    pts = _curve(x0, z0, x1, z1, bow, segs)
-    for k in range(segs):
-        tm = (k + 0.5) / segs
-        w = wmax * _m.sin(_m.pi * tm) ** 0.55
-        _beam(mat, pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1],
-              t=max(w, 0.008), y=y, yt=yt)
+    return _leafpoly(mat, x0, z0, x1, z1, bow=bow, wmax=wmax,
+                     segs=max(6, segs + 2), y=y, yt=yt)
 
 
 def _frond(rachis, leaf, x0, z0, x1, z1, bow=0.0, pairs=9, leafL=0.20,
@@ -259,8 +262,16 @@ def _frond(rachis, leaf, x0, z0, x1, z1, bow=0.0, pairs=9, leafL=0.20,
             ang = sgn * 1.02
             lx = ax + (dx * _m.cos(ang) - dz * _m.sin(ang)) * L
             lz = az + (dx * _m.sin(ang) + dz * _m.cos(ang)) * L
-            _blade(leaf, ax, az, lx, lz, bow=sgn * L * 0.22, wmax=L * 0.20,
-                   segs=2, y=y + sgn * 0.006, yt=yt * 0.7)
+            # LONGER, not fatter. The outline pass strokes a fixed 4px rim at
+            # render resolution, so on a thin element the rim IS the element,
+            # which is what still separated the built plants from the donor
+            # meshes after their silhouettes were fixed. The first correction
+            # widened the leaves instead and took them to about 1.1:1, which is
+            # a circle — bush_low came out as a pile of grapes and the fern as a
+            # pinecone. A leaf wants roughly 3:1, so the area has to come from
+            # length.
+            _blade(leaf, ax, az, lx, lz, bow=sgn * L * 0.22, wmax=L * 0.22,
+                   segs=3, y=y + sgn * 0.006, yt=yt * 0.7)
 
 
 def build_watchtower():
@@ -547,14 +558,14 @@ def build_bushlow():
         rad = 0.72 * (0.35 + 0.65 * _r.random() ** 0.6)
         bx = _m.cos(ang) * rad
         bz = 0.10 + _m.sin(ang) * rad * 0.62
-        out = 0.10 + _r.random() * 0.11
+        out = 0.17 + _r.random() * 0.14
         oa = ang + (_r.random() - 0.5) * 1.5
         # pale on top where light lands, deep underneath — the only way a mass
         # of one colour ever reads as round
         m = pale if bz > 0.34 and _r.random() < 0.6 else (deep if bz < 0.22 else mid)
         _blade(m, bx, bz, bx + _m.cos(oa) * out, bz + _m.sin(oa) * out * 0.8,
-               bow=(_r.random() - 0.5) * 0.06, wmax=0.030 + _r.random() * 0.018,
-               segs=2, y=(_r.random() - 0.5) * 0.30, yt=0.012)
+               bow=(_r.random() - 0.5) * 0.06, wmax=0.034 + _r.random() * 0.014,
+               segs=3, y=(_r.random() - 0.5) * 0.30, yt=0.012)
 
 
 def build_fern():
@@ -574,7 +585,7 @@ def build_fern():
         _frond(frond, pale if i % 3 == 0 else leaf,
                0.0, 0.06, sx * reach, top,
                bow=sx * 0.16 if sx else 0.04, pairs=9,
-               leafL=0.15 + 0.03 * _r.random(), y=(i - 3) * 0.055)
+               leafL=0.23 + 0.05 * _r.random(), y=(i - 3) * 0.055)
 
 
 def build_vine():
@@ -604,11 +615,11 @@ def build_vine():
             for sgn in (-1, 1):
                 if _r.random() < 0.32:
                     continue
-                L = 0.10 + _r.random() * 0.07
+                L = 0.17 + _r.random() * 0.10
                 ang = sgn * (0.7 + _r.random() * 0.5) - _m.pi / 2
                 _blade(leaf if (k + i) % 2 else deep, x, z,
                        x + _m.cos(ang) * L, z + _m.sin(ang) * L * 0.7,
-                       bow=sgn * 0.03, wmax=0.026 + _r.random() * 0.012, segs=2,
+                       bow=sgn * 0.03, wmax=0.030 + _r.random() * 0.010, segs=3,
                        y=(i - 2.5) * 0.055 + sgn * 0.02, yt=0.011)
             px, pz = x, z
 
