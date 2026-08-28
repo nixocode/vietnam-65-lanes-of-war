@@ -2952,7 +2952,8 @@ const Renderer = {
     // rigged puppet corpse — the fallen pose, baked in place
     if (typeof Sprite3D !== 'undefined' && Sprite3D.enabled && Sprite3D.has(u.key)) {
       Sprite3D.drawCorpse(ctx, u.key,
-        { x: u.x, y: u.y + 1, dir: u.dir, scale, wounded: u.wounded });
+        { x: u.x, y: u.y + 1, dir: u.dir, scale, wounded: u.wounded,
+          gaitOff: u.gaitOff, dieLean: u.dieLean });
     } else if (typeof Rig !== 'undefined' && Rig.enabled) {
       Rig.drawCorpse(ctx, u.key, { x: u.x, y: u.y + 1, dir: u.dir, scale, wounded: u.wounded });
       return;
@@ -4189,6 +4190,7 @@ const Renderer = {
         phase: u.phase, dist: u.dist || 0, spd: u.spd || 0,
         gaitOff: u.gaitOff || 0, gaitK: u.gaitK || 1,
         pose, deadT: u.deadT, alpha,
+        dieK: u.dieK, dieLag: u.dieLag, dieLean: u.dieLean,
         flash: u.muzzleT > 0,
         combat: (u.combatT || 0) > 0,
         hitT: u.hitT || 0,

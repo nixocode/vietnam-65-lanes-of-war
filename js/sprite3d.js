@@ -105,8 +105,15 @@ const Sprite3D = {
     if (o.deadT != null) {
       const c = pick('death');
       const f = C[c];
-      // play once over 0.75s then hold the last frame — matches Rig's death blend
-      const p = Math.min(1, (o.deadT || 0) / 0.75);
+      /* Play once then hold the last frame — matches Rig's death blend.
+       *
+       * The 0.75s is now per-man (`dieK`) and starts after a short per-man lag
+       * (`dieLag`), because with one death clip and no budget for a second, a
+       * squad killed by a single burst played the same animation five times in
+       * exact sync. Rate and stagger are the two axes that cost nothing and
+       * break the unison; `dieLean` handles the third, in the draw. */
+      const dur = 0.75 * (o.dieK || 1);
+      const p = Math.min(1, Math.max(0, (o.deadT || 0) - (o.dieLag || 0)) / dur);
       return [c, Math.min(f.length - 1, Math.floor(p * (f.length - 1) + 0.0001))];
     }
     if (o.pose === 'prone' && (o.transT || 0) <= 0) {
@@ -357,6 +364,15 @@ const Sprite3D = {
     ctx.translate(o.x, o.y + (swayY || 0) + S3_TARGET_H * (o.scale || 1) * S3_FOOT);
     const dv = dirV == null ? (o.dir || 1) : dirV;
     ctx.scale(Math.abs(dv) < S3_TURN_MIN ? (dv < 0 ? -S3_TURN_MIN : S3_TURN_MIN) : dv, 1);
+    /* The third death axis: nobody lands square. Rotated about the FEET, which
+     * is where the translate already put the origin, so the body pivots on the
+     * ground instead of sliding off it. Eased in over the fall so a man who has
+     * just been hit is still upright, and it is tiny — 9 degrees at the limit,
+     * enough that five bodies read as five, not as five copies. */
+    if (o.deadT != null && o.dieLean) {
+      const k = Math.min(1, Math.max(0, (o.deadT - (o.dieLag || 0))) / (0.75 * (o.dieK || 1)));
+      ctx.rotate(o.dieLean * k * k);
+    }
     // the cell's x centre is the model's centreline; groundY is its ground plane
     ctx.drawImage(U.img, sx, sy, cw, ch,
       -cw * s / 2, -M.groundY * s, cw * s, ch * s);
@@ -392,8 +408,14 @@ const Sprite3D = {
   },
 
   drawCorpse(ctx, key, o) {
+    /* deadT 0.8 used to land on the last frame because the fall was always
+     * 0.75s. It is per-man now, so a slow faller (dieK up to 1.34) would bake
+     * his corpse 80% of the way down — a body frozen mid-collapse. Forcing
+     * dieK/dieLag to the reference values puts p past 1 for every man, and the
+     * clamp in _sel does the rest. `dieLean` is passed THROUGH, so the corpse
+     * keeps the angle the man was settling into and the bake does not pop. */
     return this.draw(ctx, key, Object.assign({}, o, {
-      deadT: 0.8, alpha: 0.92, moving: false, combat: false,
+      deadT: 0.8, dieK: 1, dieLag: 0, alpha: 0.92, moving: false, combat: false,
     }));
   },
 

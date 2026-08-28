@@ -269,6 +269,25 @@ class Game {
       // gait identity: without these a squad walks in perfect lockstep, which is
       // the thing that reads as "robots" rather than men
       gaitOff: Math.random(), gaitK: rand(0.93, 1.07),
+      /* Death identity, for the same reason and at no memory cost.
+       *
+       * There is ONE death clip per unit and no room for a second — the atlas
+       * sits at 89 MB of a 130 MB budget with props — so a squad caught by one
+       * burst went down as one animation played five times in perfect sync,
+       * which reads worse than lockstep walking because it happens all at once
+       * and the eye is already on it.
+       *
+       * Three cheap axes instead: how fast a man goes down, how long it takes
+       * him to start, and which way he settles. Fixed at spawn so a man dies
+       * the way he was always going to, not differently on every redraw. */
+      /* Ranges are WIDE on purpose. A squad is three to five men, and three
+       * draws from a narrow range cluster often enough to matter — measured a
+       * squad whose dieK came out 1.06/1.03/1.04, which spread the fall by one
+       * frame in twelve and was invisible. The spread has to survive a bad
+       * draw, not just look right in expectation. */
+      dieK: rand(0.6, 1.55),         // collapse rate
+      dieLag: rand(0, 0.2),          // he does not drop the instant he is hit
+      dieLean: rand(-0.22, 0.22),    // and does not land square
       // a hair of depth inside the lane, so men who share an x do not become one
       // flat stack of identical silhouettes
       yj: rand(-2.5, 2.5),

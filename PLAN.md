@@ -524,12 +524,27 @@ as five rows; nothing short of a diff would have caught that, and I would have
 
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | HUD group rails | Needs a category field on the 13 squads; none exists. |
-| 2 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. |
-| 3 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
-| 4 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
-| 5 | CSS duplicate cleanup | `#hud-controls button` is declared four times, `#hud-bottom` twice. |
-| 6 | Night contrast on Khe Sanh | Mid-value objects (the village masonry) sit noticeably lighter than everything around them once the night grade lands. The prop set itself measures unified — Lmean 48-96 across all 29, no outliers — so this is the grade, not the art. |
+| 1 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
+| 2 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
+| 3 | CSS duplicate cleanup | `#hud-controls button` is declared four times, `#hud-bottom` twice. |
+| 4 | Night contrast on Khe Sanh | Mid-value objects (the village masonry) sit noticeably lighter than everything around them once the night grade lands. The prop set itself measures unified — Lmean 48-96 across all 29, no outliers — so this is the grade, not the art. |
+| 5 | A SECOND death clip | The per-man rate/lag/lean variation below is cheap and works, but it is one pose played at different speeds. A real second clip costs ~7 MB of a 11.7 MB headroom, so it is affordable — it just needs Blender time. |
+
+**Death variety is done without spending memory.** There is one death clip per
+unit and the atlas is at 89 MB of a 130 MB budget with props, so a second clip
+was not the first move. Three axes fixed at spawn instead — collapse rate,
+start lag, and settle angle — which cost nothing and break the unison.
+
+The ranges had to be WIDE. A squad is three to five men, and the first attempt
+(dieK 0.72-1.34) drew 1.06/1.03/1.04 for one squad: a one-frame spread out of
+twelve, invisible. At 0.6-1.55 the measured spread across six sampled four-man
+groups is 2-4 frames mid-fall, median 3. The spread has to survive a bad draw,
+not just look right in expectation.
+
+`drawCorpse` needed the matching fix: it forced `deadT: 0.8`, which landed on
+the last frame only while every fall was exactly 0.75s. It now pins dieK/dieLag
+to reference values so every corpse bakes fully fallen, and passes `dieLean`
+through so the bake does not pop the body upright.
 
 
 **Checked and NOT a gap: audio.** It was about to go on this list as "an M60 and
