@@ -46,6 +46,16 @@ FIXUP = {
     # with green running 14-17 points above red — the only vivid thing in a dusty
     # frame, and the first thing the eye went to. palm_a took the global grade
     # well; b/c/d start much greener and need their own pull.
+    # palm_a is the ONE palm with a pink trunk. Measured against its siblings it
+    # sits at hue 15 degrees where palm_b/c/d are all at 32.3, and comes out
+    # 80/58/50 against their 57/49/37 — lighter and redder, in the prop that
+    # appears most often on the palm maps. Everything else in the frame agreed
+    # about the palette and this one did not.
+    # Tuning note: a first attempt at (0.74, +0.026 green, sat 0.30) overshot to
+    # hue 60 and 42/43/32 — yellow and too dark. `sat_keep` runs BEFORE the
+    # multiply, so pulling saturation to 0.30 collapsed the red channel first
+    # and then everything got darkened on top of it.
+    'palm_a':        (0.92, (0.020, 0.004, -0.004), 0.46),
     'palm_b':        (0.60, (0.034, 0.020, 0.004), 0.30),
     'palm_c':        (0.60, (0.034, 0.020, 0.004), 0.30),
     'palm_d':        (0.60, (0.034, 0.020, 0.004), 0.30),

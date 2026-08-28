@@ -72,13 +72,13 @@
   },
   {
    "name": "grass_a",
-   "hM": 2.012,
-   "wM": 2.722,
-   "groundY": 422.0,
-   "ppm": 164.98,
+   "hM": 1.999,
+   "wM": 2.656,
+   "groundY": 425.0,
+   "ppm": 169.07,
    "res": 512,
    "realH": 1.8,
-   "aspect": 1.3529
+   "aspect": 1.3287
   },
   {
    "name": "hut_a",
@@ -242,13 +242,13 @@
   },
   {
    "name": "tuft_a",
-   "hM": 0.576,
-   "wM": 0.881,
-   "groundY": 402.9,
-   "ppm": 509.85,
+   "hM": 0.561,
+   "wM": 0.832,
+   "groundY": 407.5,
+   "ppm": 539.88,
    "res": 512,
    "realH": 0.55,
-   "aspect": 1.5295
+   "aspect": 1.4831
   },
   {
    "name": "village_row",

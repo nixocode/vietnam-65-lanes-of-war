@@ -474,29 +474,39 @@ There were simply not enough frames in it.
 
 ## 2. Open, ranked
 
-**Map identity — the pattern worth remembering.** Ia Drang and Cu Chi had every
-systemic art pass and still did not look like themselves, and in all four cases
-the cause was the same: something the DATA ALREADY DECLARED was never drawn.
+**The asset audit, and the rule it produced.** Laying all 31 props side by side
+tagged by origin found two separate faults, and the second was worse than the
+first.
 
-- the prop scatter was gated to `palm`/`jungle`, so the valley named for elephant
-  grass got no props at all
-- the turf pass hardcoded +30 green, so a map whose palette says dry-season gold
-  came out green anyway
-- `soil: #7a4526` sat in Cu Chi's palette with a comment explaining the tunnels
-  were dug through it, and only a >0.14 slope could paint it, on a flat map
-- `hillFar: #8c93a8` existed to describe the Chu Pong massif, and the map drew a
-  row of interchangeable triangles
+*Wrong world:* four props came from a generic fantasy pack — a European
+half-timbered house frame standing in for a Vietnamese shrine, a storybook
+wishing well, a market stall with CROSSED SWORDS on it, and a European handcart.
+Two more (`frame_a`, `frame_b`) were referenced by nothing at all. Replaced with
+built Vietnamese fittings; prop set 35 -> 29.
 
-**Before adding new art to a map, check what its palette already promises.**
+*Two visual languages:* donor models are smooth meshes, everything built here
+was assembled from boxes with SQUARE ENDS. That reads worst on vegetation, where
+organic form is the whole point — grass and tuft now use a tapering polygon
+blade (`_grassblade`) instead of beam chains. Architecture is exempt: a roof
+plane really is a plane, which is why the built shrine and stall sit fine beside
+the donor huts.
+
+*And one prop simply disagreed with the palette:* `palm_a`, the commonest prop on
+the palm maps, had a PINK trunk — hue 15 degrees against 32.3 for palm_b/c/d,
+and 80/58/50 against their 57/49/37. Now 26.1 and 56/46/36.
+
+**Rule: before adding art to a map, audit what is already there — origin,
+palette, and whether it belongs in 1965 Vietnam.**
 
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | The other three maps' identity | Mekong is a delta with the paddies as a thin far strip; Khe Sanh is a besieged firebase with no wire, revetments or airstrip; Hill 937 is Hamburger Hill with no mud and no shell-torn ground. Same audit as above: read the palette and the brief first. |
-| 2 | HUD group rails | The design's BASIC INFANTRY / HEAVY WEAPONS / SPECIALISTS rails need a category field on the 13 squads; none exists. |
-| 3 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. ~9 MB spare would cover it. |
-| 4 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
-| 5 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
-| 6 | CSS duplicate cleanup | `#hud-controls button` is declared four times in `css/style.css` and `#hud-bottom` twice, so the cascade is the only reliable way to land a HUD change. |
+| 1 | The other three maps' identity | Mekong's paddies are a thin far strip on a map named for a delta; Khe Sanh is a besieged firebase with no wire, revetments or airstrip; Hill 937 is Hamburger Hill with no mud and no shell-torn ground. |
+| 2 | Remaining faceted vegetation | `bamboo_a`, `fern_a`, `vine_a`, `bush_low` still read harder than the donor meshes. `_grassblade` and `_leafpoly` are the tools; this is more of the same work. |
+| 3 | HUD group rails | Needs a category field on the 13 squads; none exists. |
+| 4 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. |
+| 5 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
+| 6 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
+| 7 | CSS duplicate cleanup | `#hud-controls button` is declared four times, `#hud-bottom` twice. |
 
 
 **Checked and NOT a gap: audio.** It was about to go on this list as "an M60 and

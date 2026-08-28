@@ -184,6 +184,36 @@ def _leafpoly(mat, x0, z0, x1, z1, bow=0.0, wmax=0.09, segs=10, y=0.0, yt=0.012)
     return _poly(mat, left + list(reversed(right)), y=y, yt=yt)
 
 
+def _grassblade(mat, x0, z0, x1, z1, bow=0.0, w=0.026, segs=7, y=0.0, yt=0.016):
+    """A blade of grass: widest at the base, tapering to a point, bent by its own
+    weight.
+
+    `_beam` chains have SQUARE ENDS, and a field of square-ended sticks is what
+    made the built vegetation read as a different material from the donor palms
+    standing next to it — the palms are real meshes with organic silhouettes and
+    the grass was a bundle of rectangles. Blades taper. That single property is
+    most of the difference between "grass" and "sticks", and it costs nothing
+    because _leafpoly already builds a tapering polygon.
+    """
+    import math as _m
+    mid = _curve(x0, z0, x1, z1, bow, segs)
+    left, right = [], []
+    for k, (px, pz) in enumerate(mid):
+        t = k / float(segs)
+        ww = w * (1.0 - t) ** 0.75          # widest at the root, a point at the tip
+        if k == 0:
+            dx, dz = mid[1][0] - px, mid[1][1] - pz
+        elif k == segs:
+            dx, dz = px - mid[k - 1][0], pz - mid[k - 1][1]
+        else:
+            dx, dz = mid[k + 1][0] - mid[k - 1][0], mid[k + 1][1] - mid[k - 1][1]
+        d = _m.hypot(dx, dz) or 1e-6
+        nx, nz = -dz / d, dx / d
+        left.append((px + nx * ww, pz + nz * ww))
+        right.append((px - nx * ww, pz - nz * ww))
+    return _poly(mat, left + list(reversed(right)), y=y, yt=yt)
+
+
 def _blade(mat, x0, z0, x1, z1, bow=0.0, wmax=0.09, segs=6, y=0.0, yt=0.02):
     """A leaf with actual blade area: half-width swells to `wmax` near the middle
     and comes to a point at the tip.
@@ -459,8 +489,11 @@ def build_grass():
         x = -1.05 + 2.1 * (i / 43.0)
         h = 1.15 + _r.random() * 0.85
         lean = (_r.random() - 0.5) * 0.85
-        _beam(deep if i % 3 else pale, x, 0.0, x + lean, h,
-              t=0.034, y=(_r.random() - 0.5) * 0.34, yt=0.026)
+        # bowed AND tapered: elephant grass falls away under its own weight, and
+        # a stand of straight square-ended stems reads as a bundle of canes
+        _grassblade(deep if i % 3 else pale, x, 0.0, x + lean, h,
+                    bow=lean * 0.55, w=0.032,
+                    y=(_r.random() - 0.5) * 0.34, yt=0.020)
 
 
 # ---- small ground cover -------------------------------------------------
@@ -485,8 +518,10 @@ def build_tuft():
     for i in range(30):
         x = (_r.random() - 0.5) * 0.66
         h = 0.20 + _r.random() * 0.36
-        _beam(deep if i % 3 else pale, x, 0.0, x + (_r.random() - 0.5) * 0.34, h,
-              t=0.026, y=(_r.random() - 0.5) * 0.24, yt=0.020)
+        lean = (_r.random() - 0.5) * 0.34
+        _grassblade(deep if i % 3 else pale, x, 0.0, x + lean, h,
+                    bow=lean * 0.5, w=0.024,
+                    y=(_r.random() - 0.5) * 0.24, yt=0.015)
 
 
 def build_bushlow():
