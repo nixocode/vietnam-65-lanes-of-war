@@ -2842,6 +2842,25 @@ const Renderer = {
         ctx.restore();
         break;
       }
+      /* AMMUNITION, shown only when it starts to matter.
+       *
+       * A resource the player cannot see is a resource he cannot plan around,
+       * but a bar over every squad all match is clutter for a number that is
+       * full 90% of the time. It appears as the load runs down and turns red
+       * when the rate of fire is actually suffering. */
+      if (s.side === game.player && s.ammo != null && s.ammo < 0.55) {
+        const ax = game.squadAnchor(s);
+        const ay = groundY(game.map, lane, ax) - 92 * LANE_DEPTH[lane];
+        const w = 20 * LANE_DEPTH[lane];
+        const low = s.ammo < AMMO_LOW;
+        ctx.save();
+        ctx.globalAlpha = low ? 0.6 + 0.3 * Math.sin(time * 7) : 0.75;
+        ctx.fillStyle = 'rgba(8,10,6,0.72)';
+        ctx.fillRect(ax - w / 2 - 1, ay - 1, w + 2, 4);
+        ctx.fillStyle = low ? '#d4544a' : '#c9a86a';
+        ctx.fillRect(ax - w / 2, ay, w * s.ammo, 2);
+        ctx.restore();
+      }
       if (s.pinned) {
         const ax = game.squadAnchor(s);
         const ay = groundY(game.map, lane, ax) - 84 * LANE_DEPTH[lane];

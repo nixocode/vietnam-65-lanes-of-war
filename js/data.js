@@ -35,6 +35,29 @@ const MOVE_HOLD = 0.16;
 // it stays a tactic rather than a punishment.
 const CROSS_TIME = 1.9;
 
+/* AMMUNITION, as a sustained-fire resource rather than a bullet count.
+ *
+ * The game already abstracts individual rounds into burst-and-pause cadence, so
+ * counting magazines would be a second, contradictory abstraction. What was
+ * actually missing is a LIMIT ON SUSTAINED FIRE: a squad could sit in cover and
+ * shoot forever, which is why parking one was so often the right answer and why
+ * covering fire had no opportunity cost.
+ *
+ * A squad carries what it carries. Firing draws it down, suppressive fire draws
+ * it down fast (that is what a belt-fed gun burning a box actually does), and it
+ * comes back only while the squad is NOT shooting — resupply from the rear. Low
+ * ammo slows the rate of fire rather than stopping it, so a dry squad is
+ * degraded and still dangerous instead of a spectator.
+ *
+ * ~220 shots of normal fire before a squad is dry, and ~26s of quiet to refill.
+ * Tuned so a firefight is decided long before ammo is, and ammo only bites on
+ * the squad that has been shooting all match.
+ */
+const AMMO_PER_SHOT = 1 / 220;
+const AMMO_SUPP_MULT = 3.2;      // suppressive fire eats a box
+const AMMO_REGEN = 1 / 26;       // per second, only while not firing
+const AMMO_LOW = 0.25;           // below this the rate of fire suffers
+
 const ELEV_PX = 230;
 // a little more air between the tiers, so raised ground reads as levels
 /* HOW MANY LANES ARE IN PLAY.

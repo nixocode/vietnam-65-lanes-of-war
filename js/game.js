@@ -492,6 +492,12 @@ class Game {
       s.nadeCd = Math.max(0, (s.nadeCd || 0) - dt);
       s.suppCd = Math.max(0, (s.suppCd || 0) - dt);
       if ((s.crossT || 0) > 0) s.crossT = Math.max(0, s.crossT - dt);
+      /* Resupply, but only out of contact. A squad that has fired in the last
+       * 1.2s is still in the fight and gets nothing — otherwise ammo would top
+       * up between bursts and the limit would never bind. */
+      s.firedT = Math.max(0, (s.firedT || 0) - dt);
+      if (s.ammo == null) s.ammo = 1;
+      if (s.firedT <= 0) s.ammo = Math.min(1, s.ammo + AMMO_REGEN * dt);
       // a focus order must never outlive its target, or the squad keeps its
       // concentration bonus pointed at a squad that no longer exists
       if (s.focus && !this.squadAlive(s.focus).length) s.focus = null;
@@ -986,6 +992,12 @@ class Game {
   _squadSuppress(s) {
     const sd = SQUADS[s.key];
     if (!sd.suppressive || (s.suppCd || 0) > 0) return false;
+    // covering fire is the most expensive thing a squad can do; it cannot be
+    // ordered on an empty load
+    if ((s.ammo != null ? s.ammo : 1) < AMMO_LOW) {
+      if (s.side === this.player) this.emit('OUT OF AMMUNITION', s.side);
+      return false;
+    }
     s.suppCd = 20;
     s.suppFireT = 5;
     if (s.side === this.player) this.emit(`SUPPRESSIVE FIRE — LANE ${s.lane + 1}`, s.side);
@@ -1344,11 +1356,21 @@ class Game {
 
   _fire(u, t) {
     const d = UNITS[u.key];
+    // every round comes out of the squad's load — see AMMO_PER_SHOT
+    if (u.squad) {
+      const supp = (u.squad.suppFireT || 0) > 0;
+      u.squad.ammo = Math.max(0, (u.squad.ammo == null ? 1 : u.squad.ammo) -
+        AMMO_PER_SHOT * (supp ? AMMO_SUPP_MULT : 1));
+      u.squad.firedT = 1.2;      // "recently shooting", so resupply cannot overlap a firefight
+    }
     const distT = Math.abs(t.x - u.x);
     const closeQuarters = distT < d.range * 0.45;
     // burst cadence: quick rounds inside a burst, a long breath between bursts —
     // shorter breaths when the enemy is right on top of you
     const suppressive = d.mg && u.squad && (u.squad.suppFireT || 0) > 0;
+    // running dry stretches the breath between bursts: degraded, still dangerous
+    const dry = u.squad && (u.squad.ammo != null) && u.squad.ammo < AMMO_LOW
+      ? 1 + 1.6 * (1 - u.squad.ammo / AMMO_LOW) : 1;
     if (suppressive) {
       u.fireT = 1 / d.rof; // the gun talks without pause
     } else if (d.burst) {
@@ -1356,9 +1378,9 @@ class Game {
       u.burstN--;
       const ammo = (typeof Perks !== 'undefined' && Perks.on(this, u.side, 'ammo')) ? 0.78 : 1;
       u.fireT = u.burstN > 0 ? 1 / d.rof
-        : rand(d.pause[0], d.pause[1]) * (closeQuarters ? 0.7 : 1) * ammo;
+        : rand(d.pause[0], d.pause[1]) * (closeQuarters ? 0.7 : 1) * ammo * dry;
     } else {
-      u.fireT = 1 / d.rof;
+      u.fireT = (1 / d.rof) * dry;
     }
     // 0.07 was ~4 frames — snappy, and gone before the eye caught it. 0.11 still
     // reads as a flash rather than a lamp, and roughly doubles the chance that
