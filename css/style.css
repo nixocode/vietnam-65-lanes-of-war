@@ -964,3 +964,44 @@ body.touch #unit-info { display: none !important; }
 /* cards keep their rivets; the name goes stencil */
 .card-name { font-family: var(--font-head); letter-spacing: .5px; }
 .card-key, .card-men { color: #8c9668; }
+
+
+/* ---- HUD GROUP RAILS -------------------------------------------------------
+ * Appended, like the rest of the field-manual pass, because `#unit-cards` and
+ * `#hud-controls button` are each declared several times higher up and the
+ * cascade is the only reliable way to land on top of all of them.
+ *
+ * The label sits ON a hairline rule rather than above it — the rule runs the
+ * width of the group and the label interrupts it, which is the printed-form
+ * convention the rest of this HUD borrows from. */
+#unit-cards { align-items: flex-end; gap: calc(13px * var(--uiK, 1)); }
+
+.card-group { display: flex; flex-direction: column; gap: calc(3px * var(--uiK, 1)); }
+
+/* The label and its rule are ONE flex row spanning the group. A first version
+ * absolutely positioned the rule at `left: 100%` with a fixed 200px width,
+ * which ran it straight over the next group's cards — the rule has to be
+ * bounded by the group it belongs to, so it is a flex child that takes the
+ * leftover width instead of a fixed length. */
+.group-label {
+  display: flex;
+  align-items: center;
+  gap: calc(4px * var(--uiK, 1));
+  width: 100%;
+  font: 700 calc(9px * var(--uiK, 1))/1 'Courier New', Courier, monospace;
+  letter-spacing: calc(1.3px * var(--uiK, 1));
+  color: var(--brass, #b79b5b);
+  opacity: 0.78;
+  padding-left: calc(2px * var(--uiK, 1));
+  white-space: nowrap;
+}
+.group-label::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  min-width: calc(6px * var(--uiK, 1));
+  background: linear-gradient(90deg, var(--brass, #b79b5b), rgba(183,155,91,0.15));
+  opacity: 0.5;
+}
+
+.group-rail { display: flex; gap: calc(6px * var(--uiK, 1)); }

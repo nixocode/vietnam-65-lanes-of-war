@@ -174,8 +174,28 @@ const UI = {
     this.callinKeys = CALLIN_ROSTERS[g.player];
     this.cardEls = {};
 
+    /* GROUP RAILS. Seven cards in one undivided row is a list, and a list is
+     * read left to right until the wanted thing turns up. Grouped under LINE /
+     * SUPPORT / SPECIAL it becomes three short lists chosen by what the player
+     * already knows they want — hold ground, put down fire, or do a job — which
+     * is how a field manual organises the same information.
+     *
+     * Groups are emitted in the order the roles first appear in the roster, so
+     * ROSTERS controls the layout and this does not need its own ordering. */
+    let rail = null, railRole = null;
     this.unitKeys.forEach((key, i) => {
       const d = SQUADS[key];
+      if (d.role !== railRole) {
+        railRole = d.role;
+        const grp = document.createElement('div');
+        grp.className = 'card-group';
+        grp.insertAdjacentHTML('beforeend',
+          `<div class="group-label">${ROLE_LABEL[d.role] || ''}</div>`);
+        rail = document.createElement('div');
+        rail.className = 'group-rail';
+        grp.appendChild(rail);
+        this.els.unitCards.appendChild(grp);
+      }
       const card = document.createElement('div');
       card.className = 'card';
       card.title = `${d.name} (${d.sub}) — ${d.cost} CP`;
@@ -201,7 +221,7 @@ const UI = {
       card.addEventListener('click', () => this.armUnit(key));
       card.addEventListener('mouseenter', () => this._showInfo(key));
       card.addEventListener('mouseleave', () => this._hideInfo());
-      this.els.unitCards.appendChild(card);
+      rail.appendChild(card);
       this.cardEls[key] = card;
     });
 

@@ -208,46 +208,46 @@ const UNITS = {
    The deployable is a SQUAD (Warfare 1944 style); comp lists the men, each drawing
    his stats from UNITS. cost/cd are squad-level. */
 const SQUADS = {
-  rifles:    { side: 'us', name: 'Rifle Squad', sub: '4 men · M16', cost: 26, cd: 8,
+  rifles:    { side: 'us', role: 'line', name: 'Rifle Squad', sub: '4 men · M16', cost: 26, cd: 8,
                comp: ['rifleman', 'rifleman', 'rifleman', 'rifleman'], portrait: 'port_rifleman',
                grenades: true, ability: 'Frag Grenades — flush dug-in enemies' },
-  arvnsq:    { side: 'us', name: 'ARVN Squad', sub: '3 men · Light', cost: 15, cd: 5.5,
+  arvnsq:    { side: 'us', role: 'line', name: 'ARVN Squad', sub: '3 men · Light', cost: 15, cd: 5.5,
                comp: ['arvn', 'arvn', 'arvn'], portrait: 'port_arvn',
                grenades: true, ability: 'Frag Grenades' },
-  weapons:   { side: 'us', name: 'Weapons Team', sub: 'M60 + rifle', cost: 30, cd: 12,
+  weapons:   { side: 'us', role: 'support', name: 'Weapons Team', sub: 'M60 + rifle', cost: 30, cd: 12,
                comp: ['m60', 'rifleman'], portrait: 'port_m60',
                suppressive: true, ability: 'Suppressive Fire — pins a target squad' },
-  engineers: { side: 'us', name: 'Engineer Team', sub: 'Demo ×2', cost: 24, cd: 10,
+  engineers: { side: 'us', role: 'special', name: 'Engineer Team', sub: 'Demo ×2', cost: 24, cd: 10,
                comp: ['engineer', 'engineer'], portrait: 'port_engineer',
                ability: 'Clears traps, tunnels, spider holes' },
-  lrrp:      { side: 'us', name: 'LRRP Team', sub: 'Recon ×2', cost: 22, cd: 11,
+  lrrp:      { side: 'us', role: 'special', name: 'LRRP Team', sub: 'Recon ×2', cost: 22, cd: 11,
                comp: ['recon', 'rifleman'], portrait: 'port_recon',
                ability: 'Spots concealed enemies at range' },
-  snipers:   { side: 'us', name: 'Sniper Team', sub: 'M40 + spotter', cost: 48, cd: 18,
+  snipers:   { side: 'us', role: 'special', name: 'Sniper Team', sub: 'M40 + spotter', cost: 48, cd: 18,
                comp: ['sniper', 'recon'], portrait: 'port_sniper',
                ability: 'One shot, one kill · spotter marks' },
 
-  apc:       { side: 'us', name: 'APC Section', sub: 'M113 · .50 cal', cost: 40, cd: 20,
+  apc:       { side: 'us', role: 'support', name: 'APC Section', sub: 'M113 · .50 cal', cost: 40, cd: 20,
                comp: ['m113'], portrait: 'port_rifleman',
                ability: 'Armour — shrugs off small arms, but sappers and mines kill it' },
 
-  rpgteam:   { side: 'vc', name: 'RPG Team', sub: 'B-40 + rifle', cost: 26, cd: 12,
+  rpgteam:   { side: 'vc', role: 'support', name: 'RPG Team', sub: 'B-40 + rifle', cost: 26, cd: 12,
                comp: ['rpgman', 'nva'], portrait: 'port_nva',
                ability: 'Rocket — ignores armour, wrecks cover' },
 
-  cell:      { side: 'vc', name: 'Guerrilla Cell', sub: '3 fighters', cost: 16, cd: 5.5,
+  cell:      { side: 'vc', role: 'line', name: 'Guerrilla Cell', sub: '3 fighters', cost: 16, cd: 5.5,
                comp: ['guerrilla', 'guerrilla', 'guerrilla'], portrait: 'port_guerrilla',
                grenades: true, ability: 'Stick Grenades · ambush from brush' },
-  nvasq:     { side: 'vc', name: 'NVA Squad', sub: '4 men · AK', cost: 30, cd: 9,
+  nvasq:     { side: 'vc', role: 'line', name: 'NVA Squad', sub: '4 men · AK', cost: 30, cd: 9,
                comp: ['nva', 'nva', 'nva', 'nva'], portrait: 'port_nva',
                grenades: true, ability: 'Stick Grenades' },
-  rpdteam:   { side: 'vc', name: 'RPD Team', sub: 'RPD + AK', cost: 28, cd: 12,
+  rpdteam:   { side: 'vc', role: 'support', name: 'RPD Team', sub: 'RPD + AK', cost: 28, cd: 12,
                comp: ['rpd', 'nva'], portrait: 'port_rpd',
                suppressive: true, ability: 'Suppressive Fire — pins a target squad' },
-  sapperu:   { side: 'vc', name: 'Sapper', sub: 'Satchel', cost: 20, cd: 10,
+  sapperu:   { side: 'vc', role: 'special', name: 'Sapper', sub: 'Satchel', cost: 20, cd: 10,
                comp: ['sapper'], portrait: 'port_sapper',
                ability: 'Satchel charge — devastates positions' },
-  marksmanu: { side: 'vc', name: 'Marksman', sub: 'Mosin', cost: 40, cd: 16,
+  marksmanu: { side: 'vc', role: 'special', name: 'Marksman', sub: 'Mosin', cost: 40, cd: 16,
                comp: ['marksman'], portrait: 'port_marksman',
                ability: 'One shot, one kill from concealment' },
 };
@@ -262,10 +262,16 @@ const SMOKE = {
   range: 140, radius: 88, life: 13, build: 1.1, cd: 22, flight: 0.8,
 };
 
+/* Order matters: the HUD groups cards by `role` and lays the groups out in the
+ * order they first appear here, so a roster must keep its roles contiguous.
+ * `line` holds ground, `support` is the heavy weapons and the track, `special`
+ * is recon, demolition and precision. */
 const ROSTERS = {
   us: ['rifles', 'arvnsq', 'weapons', 'apc', 'engineers', 'lrrp', 'snipers'],
   vc: ['cell', 'nvasq', 'rpdteam', 'rpgteam', 'sapperu', 'marksmanu'],
 };
+
+const ROLE_LABEL = { line: 'LINE', support: 'SUPPORT', special: 'SPECIAL' };
 
 /* ---------------- Call-ins / abilities ----------------
    target: 'point' needs lane+x click; 'none' fires immediately */
