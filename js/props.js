@@ -83,10 +83,37 @@ const Props = {
     return c;
   },
 
+  /* A soft contact shadow, built once and reused.
+   *
+   * Soldiers have had one since the sprite rig landed; props never did, so every
+   * hut, palm and sandbag wall met the ground on a hard cut edge and read as a
+   * sticker laid on grass. That is most of what "the assets and the terrain do
+   * not blend" is describing — the men are planted in the scene and the scenery
+   * is sitting on top of it.
+   *
+   * A gradient rather than a flat ellipse: the hard rim of a solid one is its
+   * own cut edge, which trades one problem for another. */
+  _shadowBlob() {
+    if (this._blob) return this._blob;
+    const R = 64;
+    const c = document.createElement('canvas');
+    c.width = c.height = R * 2;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(R, R, 0, R, R, R);
+    g.addColorStop(0, 'rgba(10,14,8,0.52)');
+    g.addColorStop(0.45, 'rgba(10,14,8,0.30)');
+    g.addColorStop(1, 'rgba(10,14,8,0)');
+    x.fillStyle = g;
+    x.fillRect(0, 0, R * 2, R * 2);
+    this._blob = c;
+    return c;
+  },
+
   /* Draw with its base planted on (x, groundY). `fit` overrides the authored
    * height when a map wants a specific size — the aspect ratio is kept either
    * way, so nothing ever stretches. `shade` (0-1) darkens the prop, for growth
-   * that sits between the camera and the light. */
+   * that sits between the camera and the light. `noShadow` opts out for props
+   * that are not standing on the ground the camera can see. */
   draw(ctx, name, x, groundY, scale, opts = {}) {
     const it = this.items[name];
     if (!it) return false;
@@ -99,6 +126,19 @@ const Props = {
     const src = this._scaled(it, dw, opts.shade);
     ctx.save();
     if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
+    /* Grounded BEFORE the prop and outside the flip, so a mirrored prop does not
+     * mirror its own shadow. Width follows the prop's real footprint, not the
+     * square cell, or a tall narrow palm would cast a shadow as wide as it is
+     * high. */
+    if (!opts.noShadow) {
+      const fw = (m.wM / Math.max(0.01, m.hM)) * h;      // drawn footprint width
+      const sw = Math.max(6, fw * 0.62);
+      const sh = Math.max(2.2, sw * 0.19);
+      const prev = ctx.globalAlpha;
+      ctx.globalAlpha = prev * 0.9;
+      ctx.drawImage(this._shadowBlob(), x - sw, groundY - sh * 0.85, sw * 2, sh * 2);
+      ctx.globalAlpha = prev;
+    }
     ctx.translate(x, groundY);
     if (opts.flip) ctx.scale(-1, 1);
     ctx.drawImage(src, -dw / 2, -m.groundY * k, dw, dw);

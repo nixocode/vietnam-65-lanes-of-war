@@ -1101,6 +1101,55 @@ const Renderer = {
     ctx.restore();
   },
 
+  /* Litter where a prop meets the ground.
+   *
+   * A prop's silhouette ends on a clean curve, and a clean curve against flat
+   * turf is the giveaway that it was pasted rather than grown there. Real
+   * objects gather things at the base: fallen fronds, scrub, a scuff of bare
+   * soil. Three or four marks that STRADDLE the boundary are enough — they give
+   * the eye something to read as "this continues into the ground" instead of a
+   * cut edge.
+   *
+   * Drawn AFTER the prop so the litter sits in front of its base, and only into
+   * a baked layer, so it costs nothing per frame. */
+  _baseLitter(ctx, rng, x, gy, width, map, lane) {
+    const soil = this._tint(map.pal.laneBody[lane], 16, 8, -6);
+    const leaf = this._tint(map.pal.brush, -8, 2, -8);
+    const dark = this._tint(map.pal.laneBody[lane], -22, -16, -4);
+    const w = Math.max(7, width);
+    ctx.save();
+    // a scuff of bare earth, wider than it is tall and sat ON the line
+    ctx.globalAlpha = 0.30 + rng() * 0.16;
+    ctx.fillStyle = soil;
+    ctx.beginPath();
+    ctx.ellipse(x + (rng() - 0.5) * w * 0.3, gy - 1,
+      w * (0.34 + rng() * 0.22), 2.2 + rng() * 1.8, 0, 0, 7);
+    ctx.fill();
+    // debris straddling the base — the part that actually breaks the edge
+    for (let i = 0; i < 3 + ((rng() * 3) | 0); i++) {
+      const px = x + (rng() - 0.5) * w * 0.85;
+      const py = gy - rng() * 3;
+      ctx.globalAlpha = 0.34 + rng() * 0.30;
+      ctx.fillStyle = rng() < 0.45 ? dark : leaf;
+      const lw = 2 + rng() * 5, lh = 1 + rng() * 2;
+      ctx.beginPath();
+      ctx.ellipse(px, py, lw, lh, (rng() - 0.5) * 0.8, 0, 7);
+      ctx.fill();
+    }
+    // a couple of blades standing up through it
+    ctx.globalAlpha = 0.34 + rng() * 0.22;
+    ctx.strokeStyle = leaf;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 2 + ((rng() * 3) | 0); i++) {
+      const px = x + (rng() - 0.5) * w * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(px, gy);
+      ctx.lineTo(px + (rng() - 0.5) * 3, gy - 2 - rng() * 4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
   _ridge(ctx, rng, w, baseY, amp, color, alpha) {
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -1296,6 +1345,43 @@ const Renderer = {
     ctx.moveTo(0, groundY(map, lane, 0) + 2);
     for (let x = 0; x <= WORLD_W; x += 16) ctx.lineTo(x, groundY(map, lane, x) + 2);
     ctx.stroke();
+
+    /* BREAK THE LANE EDGE.
+     *
+     * A lane is a filled slab, so where it meets the lane behind it the join is
+     * a single continuous stroke — a ruled line across the whole battlefield.
+     * The eye reads a ruled line as a CUT, which is the other half of "the
+     * assets and the terrain do not blend": the props were floating on the
+     * ground and the ground itself was made of sheets of paper laid over one
+     * another.
+     *
+     * Growth straddling the line fixes it for the same reason base litter fixes
+     * a prop: give the eye things that cross the boundary and it stops reading
+     * the boundary. Small, dense, and drawn in the lane's own top colour so it
+     * reads as the turf itself rather than as scattered objects. */
+    ctx.save();
+    const edgeLit = this._tint(p.laneTop[lane], 12, 16, -4);
+    const edgeDark = this._tint(p.laneTop[lane], -26, -20, -6);
+    for (let x = 0; x < WORLD_W; x += 5 + rng() * 9) {
+      const gy = groundY(map, lane, x) + 2;
+      const h = 2 + rng() * 5;
+      ctx.globalAlpha = 0.30 + rng() * 0.34;
+      ctx.strokeStyle = rng() < 0.4 ? edgeDark : edgeLit;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, gy + 2);
+      ctx.lineTo(x + (rng() - 0.5) * 3.2, gy - h);
+      ctx.stroke();
+      // the occasional low clump, so the line is not a uniform fringe
+      if (rng() < 0.16) {
+        ctx.globalAlpha = 0.24 + rng() * 0.22;
+        ctx.fillStyle = edgeDark;
+        ctx.beginPath();
+        ctx.ellipse(x, gy - 1, 3 + rng() * 6, 1.6 + rng() * 2, 0, 0, 7);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
 
     /* SLOPE SHADING — the ground takes its form from the LIGHT.
      *
@@ -1707,6 +1793,9 @@ const Renderer = {
             const h = Props.pxHeight(pick, LANE_DEPTH[lane]) * (0.58 + rng() * 0.72);
             Props.draw(ctx, pick, cx, gy, LANE_DEPTH[lane],
               { fit: h, flip: rng() < 0.5, alpha: 0.88 + rng() * 0.10 });
+            const meta = Props.items[pick] && Props.items[pick].meta;
+            const fw = meta ? (meta.wM / Math.max(0.01, meta.hM)) * h : h * 0.5;
+            this._baseLitter(ctx, rng, cx, gy, fw * 0.7, map, lane);
             ok = true;
           }
           if (ok) continue;
@@ -1728,8 +1817,9 @@ const Renderer = {
       // bush is knee-high against a 1.8 m man rather than whatever width the
       // inked slice happened to be
       const vh = vegH(kind, LANE_DEPTH[lane]) * (0.74 + rng() * 0.52);
-      drawVeg(ctx, kind, 0, x, groundY(map, lane, x) + 2, vh,
-        { alpha: 0.92, flip: rng() < 0.5 });
+      const vgy = groundY(map, lane, x) + 2;
+      drawVeg(ctx, kind, 0, x, vgy, vh, { alpha: 0.92, flip: rng() < 0.5 });
+      if (rng() < 0.5) this._baseLitter(ctx, rng, x, vgy, vh * 0.8, map, lane);
     }
 
     // base dressing: watchtower over the US end, village gate at the VC end
