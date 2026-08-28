@@ -474,35 +474,29 @@ There were simply not enough frames in it.
 
 ## 2. Open, ranked
 
-**Done since the last pass**
-- **Terrain blending.** Soldiers had contact shadows since the sprite rig
-  landed; props never did, so every hut, palm and sandbag wall ended on a hard
-  cut curve and read as a sticker on grass. Props now ground from one place in
-  `Props.draw`, gather litter at the base, and the LANE EDGE — a ruled line
-  across the whole battlefield where one slab met the next — is broken by growth
-  straddling the join.
-- **Ground colour.** Every terrain pass worked in VALUE, so the field came out
-  beautifully lit and monochrome. Nine soft hue-shifted patches per 1280px
-  (dry / lush / scuffed / damp) drawn EARLY so the lighting lands on top and
-  unifies them. Ground pixels >12 degrees off the dominant hue: 20.7% -> 38.8%.
-- **Lane switching.** `V` or the CROSS button. Lane was fixed at spawn, so the
-  largest positional choice on the board did not exist. The cost is what makes
-  it a decision: out of cover, holding fire, unrecallable for ~1.9s. `lane`
-  flips immediately (targeting, covers and the render pass all key off it) while
-  the drawn y and the depth SCALE ease across — without the scale easing a man
-  jumped 17% in size on the first frame.
-- **The AI flanks with it**, moving surplus out of a lane it has already won
-  into one it is losing — without which it can win a lane decisively, lose the
-  other, and lose the match with no way to move the difference.
+**Map identity — the pattern worth remembering.** Ia Drang and Cu Chi had every
+systemic art pass and still did not look like themselves, and in all four cases
+the cause was the same: something the DATA ALREADY DECLARED was never drawn.
+
+- the prop scatter was gated to `palm`/`jungle`, so the valley named for elephant
+  grass got no props at all
+- the turf pass hardcoded +30 green, so a map whose palette says dry-season gold
+  came out green anyway
+- `soil: #7a4526` sat in Cu Chi's palette with a comment explaining the tunnels
+  were dug through it, and only a >0.14 slope could paint it, on a flat map
+- `hillFar: #8c93a8` existed to describe the Chu Pong massif, and the map drew a
+  row of interchangeable triangles
+
+**Before adding new art to a map, check what its palette already promises.**
 
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | Attrition | Ammo and reload as a resource. The last of the four depth directions asked for. Touches every unit's balance, so it wants care. |
+| 1 | The other three maps' identity | Mekong is a delta with the paddies as a thin far strip; Khe Sanh is a besieged firebase with no wire, revetments or airstrip; Hill 937 is Hamburger Hill with no mud and no shell-torn ground. Same audit as above: read the palette and the brief first. |
 | 2 | HUD group rails | The design's BASIC INFANTRY / HEAVY WEAPONS / SPECIALISTS rails need a category field on the 13 squads; none exists. |
 | 3 | Death variety | One death clip per unit, so a squad wiped by one burst falls in unison. ~9 MB spare would cover it. |
 | 4 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
 | 5 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
-| 6 | CSS duplicate cleanup | `#hud-controls button` is declared four times in `css/style.css` and `#hud-bottom` twice, so the cascade is currently the only reliable way to land a HUD change. |
+| 6 | CSS duplicate cleanup | `#hud-controls button` is declared four times in `css/style.css` and `#hud-bottom` twice, so the cascade is the only reliable way to land a HUD change. |
 
 
 **Checked and NOT a gap: audio.** It was about to go on this list as "an M60 and

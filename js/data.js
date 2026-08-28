@@ -313,6 +313,12 @@ const MAPS = {
        * goes blue-grey with distance, which is both what haze actually does to a
        * far ridge and the contrast the foreground was missing. Spread 195. */
       hillFar: '#8c93a8', hillNear: '#8f6a42',
+     /* THE CHU PONG MASSIF. Not scenery — the reason there was a battle here:
+      * two NVA regiments came down off it into a clearing, and LZ X-Ray sits at
+      * its foot. Wide, tall enough to run past the top of the ridge band, and
+      * set left of centre so the sun (x 1020) lights its near shoulder and
+      * throws the far one into shadow. */
+     massif: { x: 0.34, w: 1750, h: 340, baseY: 348, alpha: 0.95 },
       laneTop: ['#a8954f', '#9c8a46', '#8f7c3e'], laneBody: ['#7d6c38', '#726231', '#67582b'],
       brush: '#5f7a38', tree: '#44502c', haze: 'rgba(240,195,130,0.13)',
     },
@@ -331,7 +337,10 @@ const MAPS = {
   cuchi: {
     id: 'cuchi', name: 'CU CHI DISTRICT', year: 'JANUARY 1966', mode: 'standard',
     desc: 'Dense jungle over a vast tunnel network northwest of Saigon. The ground itself is hostile.',
-    trees: 'jungle', treeDensity: 1.0, seed: 21966,
+    trees: 'jungle', treeDensity: 1.0,
+    // the ground here is dug through — see _tunnelMouth. Decoration, not
+    // mechanics: the playable tunnels are the ones a VC player digs.
+    dressing: 'tunnels', seed: 21966,
     weather: { fog: 0.35 },
     detectPenalty: 0.85,
     pal: {

@@ -907,6 +907,9 @@ const Renderer = {
       drawTex(ctx, 'mtn', Math.floor(rng() * 3), mx, 288 + rng() * 18, mw, { alpha: 0.52 });
       mx += mw * (0.55 + rng() * 0.3);
     }
+    // a named landform is drawn BEFORE the ridges, so they overlap its foot and
+    // it reads as standing behind the country rather than in front of it
+    if (map.pal.massif) this._massif(ctx, rng, w, map, map.pal.massif);
     this._ridge(ctx, rng, w, 260, 70, map.pal.hillFar, 0.85);
     this._ridge(ctx, rng, w, 300, 55, map.pal.hillNear, 1);
     /* Blend the far band toward the SKY, not toward its own hill colour.
@@ -1112,6 +1115,58 @@ const Renderer = {
    *
    * Drawn AFTER the prop so the litter sits in front of its base, and only into
    * a baked layer, so it costs nothing per frame. */
+  /* A TUNNEL MOUTH, as map dressing.
+   *
+   * Cu Chi's mission is called THE EARTH FIGHTS and the whole place is two
+   * hundred kilometres of hand-dug tunnel — but tunnels only exist in this game
+   * once a player digs one, so from the opening frame nothing said the ground
+   * was honeycombed. These are decoration, not mechanics: no cover, no entrance,
+   * nothing to interact with. They are there so the ground looks used.
+   *
+   * A hole reads as a hole because of the SPOIL beside it. A dark ellipse on
+   * grass is a puddle; a dark ellipse with a heap of fresh subsoil thrown out
+   * next to it is something that was dug.
+   */
+  _tunnelMouth(ctx, rng, x, gy, map, lane) {
+    const soil = map.pal.soil || this._tint(map.pal.laneBody[lane], 26, 8, -14);
+    const k = LANE_DEPTH[lane];
+    const w = (11 + rng() * 7) * k;
+    ctx.save();
+    // spoil first, so the hole is cut into it
+    ctx.globalAlpha = 0.5 + rng() * 0.24;
+    ctx.fillStyle = soil;
+    for (let i = 0; i < 5; i++) {
+      const sx = x + (rng() - 0.5) * w * 2.6;
+      ctx.beginPath();
+      ctx.ellipse(sx, gy - rng() * 2, (3 + rng() * 6) * k, (1.4 + rng() * 2) * k, 0, 0, 7);
+      ctx.fill();
+    }
+    // the shaft: black, with a lip of turned earth on its upper rim
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = 'rgba(10,8,6,0.92)';
+    ctx.beginPath();
+    ctx.ellipse(x, gy - 1 * k, w * 0.5, w * 0.24, 0, 0, 7);
+    ctx.fill();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = this._shade(soil, 22);
+    ctx.lineWidth = 1.2 * k;
+    ctx.beginPath();
+    ctx.ellipse(x, gy - 1.6 * k, w * 0.5, w * 0.24, 0, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.stroke();
+    // a couple of poles, the way a real one is shored and hidden
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = this._tint(map.pal.brush, -14, -4, -10);
+    ctx.lineWidth = 1.1 * k;
+    for (let i = 0; i < 2 + ((rng() * 2) | 0); i++) {
+      const px = x + (rng() - 0.5) * w * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(px, gy);
+      ctx.lineTo(px + (rng() - 0.5) * 4 * k, gy - (4 + rng() * 7) * k);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
   _baseLitter(ctx, rng, x, gy, width, map, lane) {
     const soil = this._tint(map.pal.laneBody[lane], 16, 8, -6);
     const leaf = this._tint(map.pal.brush, -8, 2, -8);
@@ -1147,6 +1202,73 @@ const Renderer = {
       ctx.lineTo(px + (rng() - 0.5) * 3, gy - 2 - rng() * 4);
       ctx.stroke();
     }
+    ctx.restore();
+  },
+
+  /* A MASSIF — one mountain that owns the horizon.
+   *
+   * The ridge generator makes a row of interchangeable bumps, which is right for
+   * background and wrong when a single landform IS the battlefield. At Ia Drang
+   * the Chu Pong massif is the reason there was a battle: two NVA regiments came
+   * down off it into a clearing, and `hillFar: #8c93a8` has been sitting in the
+   * palette to describe a mountain the map never actually drew. A row of equal
+   * triangles says "some hills"; one mass that runs off the top of the band says
+   * "that is the mountain".
+   *
+   * Built as a silhouette with a LIT and a SHADOWED face split down the ridge
+   * line, because at this size a flat fill reads as a cut-out no matter how big
+   * it is. The split follows the map's own sun.
+   */
+  _massif(ctx, rng, w, map, spec) {
+    const cx = spec.x * w;
+    const halfW = spec.w / 2;
+    const baseY = spec.baseY != null ? spec.baseY : 330;
+    const peakY = baseY - spec.h;
+    const sunSide = (map.pal.sun && map.pal.sun.x < CANVAS_W / 2) ? -1 : 1;
+    const body = map.pal.hillFar;
+    /* The value split has to survive the haze that sits on top of it. A gentle
+     * one plus a 0.62 wash of sky came out as a flat pink slab — the form was
+     * there in the fill and gone by the time it reached the screen. */
+    const lit = this._tint(body, 40, 40, 34);
+    const dark = this._shade(body, -40);
+
+    // the ridge line: a long shoulder up to a peak set off-centre, then a
+    // shorter fall — symmetrical mountains do not exist
+    const ridge = [];
+    const peakAt = -0.18 + rng() * 0.14;
+    const N = 26;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;                       // 0..1 across the base
+      const d = Math.abs((t - 0.5) - peakAt * 0.5) * 2;
+      // a shoulder profile: steep near the peak, flattening out to the plain
+      const prof = Math.pow(Math.max(0, 1 - d), 1.7);
+      const jag = (rng() - 0.5) * spec.h * 0.06;
+      ridge.push([cx - halfW + spec.w * t, baseY - spec.h * prof + jag]);
+    }
+    const fill = (col, from, to) => {
+      ctx.beginPath();
+      ctx.moveTo(ridge[from][0], baseY + 60);
+      for (let i = from; i <= to; i++) ctx.lineTo(ridge[i][0], ridge[i][1]);
+      ctx.lineTo(ridge[to][0], baseY + 60);
+      ctx.closePath();
+      ctx.fillStyle = col;
+      ctx.fill();
+    };
+    // find the peak, and split the faces there
+    let pk = 0;
+    for (let i = 1; i < ridge.length; i++) if (ridge[i][1] < ridge[pk][1]) pk = i;
+    ctx.save();
+    ctx.globalAlpha = spec.alpha != null ? spec.alpha : 0.92;
+    fill(body, 0, ridge.length - 1);
+    if (sunSide > 0) { fill(lit, pk, ridge.length - 1); fill(dark, 0, pk); }
+    else { fill(lit, 0, pk); fill(dark, pk, ridge.length - 1); }
+    // a haze band across its foot, so it sits BEHIND the ridges rather than on
+    // the same plane as them
+    const hz = ctx.createLinearGradient(0, peakY, 0, baseY + 20);
+    hz.addColorStop(0, this._fade(map.pal.skyBot, 0.05));
+    hz.addColorStop(1, this._fade(map.pal.skyBot, 0.38));
+    ctx.fillStyle = hz;
+    ctx.fillRect(cx - halfW - 20, peakY - 10, spec.w + 40, (baseY + 20) - peakY);
     ctx.restore();
   },
 
@@ -1906,6 +2028,17 @@ const Renderer = {
       const vgy = groundY(map, lane, x) + 2;
       drawVeg(ctx, kind, 0, x, vgy, vh, { alpha: 0.92, flip: rng() < 0.5 });
       if (rng() < 0.5) this._baseLitter(ctx, rng, x, vgy, vh * 0.8, map, lane);
+    }
+
+    /* Ground worked by the people who live on it. Data-driven so a map opts in
+     * rather than the renderer knowing map names. */
+    if (map.dressing === 'tunnels') {
+      const nT = Math.round((WORLD_W / 1280) * 5);
+      for (let i = 0; i < nT; i++) {
+        const tx = 140 + rng() * (WORLD_W - 280);
+        if (Math.abs(tx - map.flags[lane] * WORLD_W) < 70) continue;
+        this._tunnelMouth(ctx, rng, tx, groundY(map, lane, tx) + 2, map, lane);
+      }
     }
 
     // base dressing: watchtower over the US end, village gate at the VC end
