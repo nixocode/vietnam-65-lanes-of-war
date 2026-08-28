@@ -913,19 +913,25 @@ const Renderer = {
   _godRays(ctx, map, rng) {
     const s = map.pal.sun;
     if (!s) return;
-    const n = 9;
+    /* FIVE, NOT NINE, and a tenth of the strength.
+     *
+     * The first cut fanned nine bright wedges across the whole sky and produced
+     * a hard-edged cartoon sunburst — the exact bicycle wheel the comment above
+     * claimed to be avoiding. Light shafts work when you are not sure whether
+     * you are seeing them. Narrow the fan so they fall AWAY from the sun rather
+     * than radiating all round it, and keep the alpha low enough that they read
+     * as air rather than as geometry. */
+    const n = 5;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (let i = 0; i < n; i++) {
-      // fan them across a wedge pointing down and away from the sun, with
-      // uneven spacing — evenly fanned rays read as a bicycle wheel
-      const a = Math.PI * (0.62 + 0.52 * (i / (n - 1))) + (rng() - 0.5) * 0.10;
-      const spread = (0.012 + rng() * 0.030);
+      const a = Math.PI * (0.78 + 0.30 * (i / (n - 1))) + (rng() - 0.5) * 0.07;
+      const spread = (0.010 + rng() * 0.022);
       const len = 620 + rng() * 460;
       const x1 = s.x + Math.cos(a) * len;
       const y1 = s.y - Math.sin(a) * len;
       const g = ctx.createLinearGradient(s.x, s.y, x1, y1);
-      const k = 0.05 + rng() * 0.07;
+      const k = 0.012 + rng() * 0.016;
       g.addColorStop(0, this._fade(s.color, k));
       g.addColorStop(0.45, this._fade(s.color, k * 0.55));
       g.addColorStop(1, this._fade(s.color, 0));
@@ -2552,14 +2558,20 @@ const Renderer = {
      */
     if (!this._night && map.pal.sun) {
       const su = map.pal.sun;
-      const vg = ctx.createRadialGradient(su.x, 430, 30, su.x, 430, CANVAS_W * 0.85);
-      vg.addColorStop(0, this._fade(su.color, 0.20));
-      vg.addColorStop(0.42, this._fade(su.color, 0.10));
+      /* Filled over the FULL height, not a band.
+       *
+       * A 330px-tall rect clipped the radial gradient long before it faded, so
+       * the effect arrived with a hard horizontal seam ruled across the whole
+       * sky — a glow with a visible box around it. The gradient already reaches
+       * zero on its own; it just has to be given the room to. */
+      const vg = ctx.createRadialGradient(su.x, 430, 30, su.x, 430, CANVAS_W * 0.72);
+      vg.addColorStop(0, this._fade(su.color, 0.13));
+      vg.addColorStop(0.45, this._fade(su.color, 0.06));
       vg.addColorStop(1, this._fade(su.color, 0));
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.fillStyle = vg;
-      ctx.fillRect(camX - 4, 250, CANVAS_W + 8, 330);
+      ctx.fillRect(camX - 4, 0, CANVAS_W + 8, CANVAS_H);
       ctx.restore();
     }
     this._drawForeground(ctx, camX);
@@ -2625,6 +2637,26 @@ const Renderer = {
     v.addColorStop(1, this._night ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.28)');
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    /* The bottom edge falls into shadow.
+     *
+     * Reference art of this genre is built on one relationship: near-black
+     * foreground framing a bright middle distance, so the eye falls through the
+     * dark into the light. Shading the foreground PLANTS got the separation from
+     * 46 to 55 grey levels and stalled, because the band is mostly GROUND and
+     * the ground was not shaded at all.
+     *
+     * Only below the near lane's ground line, which is scenery rather than
+     * playable space — darkening the lane itself would hide the fight that is
+     * the entire point of the frame. */
+    const nearY = LANE_BASE[LANE_N - 1] + 34;
+    if (nearY < CANVAS_H) {
+      const fg = ctx.createLinearGradient(0, nearY, 0, CANVAS_H);
+      fg.addColorStop(0, 'rgba(0,0,0,0)');
+      fg.addColorStop(1, this._night ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.42)');
+      ctx.fillStyle = fg;
+      ctx.fillRect(0, nearY, CANVAS_W, CANVAS_H - nearY);
+    }
 
     this.drawMinimap(game);
     if (this.showPerf) this._drawPerf(ctx, game);
