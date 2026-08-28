@@ -1264,6 +1264,14 @@ const Renderer = {
         this._tint(base, 26, 8, -14),    // scuffed to bare earth
         this._tint(base, -26, -14, 6),   // damp and dark
       ];
+      /* A map that NAMES its soil gets it in the patchwork, twice over.
+       *
+       * Cu Chi's whole identity is that two hundred kilometres of tunnel were
+       * dug through red laterite, and the palette has carried `soil: #7a4526`
+       * to say so — but the only thing that ever painted it was the scour pass,
+       * which needs a slope above 0.14, and Cu Chi is flat. The map's defining
+       * colour was declared, documented, and never once drawn. */
+      if (p.soil) { kinds.push(p.soil, p.soil); }
       const nP = Math.round((WORLD_W / 1280) * 9);
       ctx.save();
       for (let i = 0; i < nP; i++) {
@@ -1332,7 +1340,7 @@ const Renderer = {
     for (let x = 0; x < WORLD_W; x += 7) {
       const y0 = groundY(map, lane, x);
       const slope = (groundY(map, lane, x + 12) - y0) / 12;
-      if (Math.abs(slope) > 0.14) {
+      if (Math.abs(slope) > (p.soil ? 0.07 : 0.14)) {
         /* Scoured ground shows the subsoil. A map may name that soil outright —
          * Cu Chi's red laterite — and where it does, this is where the colour
          * belongs: exposed on the steep bits, with vegetation everywhere else.
@@ -1346,9 +1354,14 @@ const Renderer = {
           ctx.fillRect(x + rng() * 5, y0 + 2 + rng() * 6, 2 + rng() * 3, 1.5 + rng() * 2);
         }
       } else if (rng() < 0.42) {
-        // standing turf catches the light greener than the flat it grows from
+        /* Standing turf catches the light, so it lifts — but it must not be
+         * DYED. A hardcoded +30 green pushed every map toward grass, which is
+         * fine on the jungle maps and wrong on Ia Drang, where the palette says
+         * dry-season gold (`laneTop: #a8954f`) and the field still came out
+         * green. Lift the value, nudge the hue, and let the map's own colour
+         * decide what the grass is. */
         ctx.globalAlpha = 0.34 + rng() * 0.26;
-        ctx.strokeStyle = this._tint(p.laneTop[lane], 4, 30, -6);
+        ctx.strokeStyle = this._tint(p.laneTop[lane], 12, 16, -6);
         ctx.lineWidth = 1;
         const h = 2 + rng() * 4;
         ctx.beginPath();
@@ -1810,13 +1823,23 @@ const Renderer = {
        * the same orthographic camera as the soldiers, so the treeline stops being
        * a different drawing from the men standing in it. Four variants, mirrored
        * at random, sized off each prop's authored real height. */
-      if (typeof Props !== 'undefined' && Props.ready &&
-          (map.trees === 'palm' || map.trees === 'jungle')) {
+      /* Every map type, not just the two with palms in them.
+       *
+       * This was gated to `palm` and `jungle`, so Ia Drang — which is
+       * `trees: 'grass'` and is NAMED for the elephant grass that famously hid
+       * an NVA regiment at twenty metres — received no props whatsoever and was
+       * dressed entirely by the vector fallback. A bare lawn with round shrubs
+       * on it, for the one battlefield whose defining feature is that you
+       * cannot see through the vegetation. */
+      if (typeof Props !== 'undefined' && Props.ready) {
         // sparse: a palm is ~4x a man's height, so even a few fill the frame
         // Raised from 0.26/0.16 when the painted palm and banana slices were
         // deleted below — that share has to go somewhere, and props are the
         // whole point. What is left over falls through to the vector _tree.
-        const chance = map.trees === 'palm' ? 0.46 : 0.30;
+        const chance = map.trees === 'palm' ? 0.46
+          : map.trees === 'jungle' ? 0.30
+          : map.trees === 'grass' ? 0.62      // elephant grass: the point of the place
+          : 0.24;                              // shattered: stumps, and not many
         if (rng() < chance) {
           /* EIGHT silhouettes, not four, and they arrive in CLUMPS.
            *
@@ -1832,6 +1855,15 @@ const Renderer = {
           const bag = map.trees === 'jungle'
             ? ['palm_a', 'palm_b', 'bamboo_a', 'bamboo_a', 'banana_a', 'deadtree_a',
                'palm_c', 'grass_a']
+            : map.trees === 'grass'
+            // Ia Drang is a SEA OF GRASS with scattered scrub in it, so the bag
+            // is grass eight times over and everything else is an accent.
+            ? ['grass_a', 'grass_a', 'grass_a', 'grass_a', 'grass_a', 'grass_a',
+               'grass_a', 'grass_a', 'bush_low', 'deadtree_a', 'bamboo_a']
+            : map.trees === 'shattered'
+            // a hill worked over by artillery: broken trunks and what grew back
+            ? ['deadtree_a', 'deadtree_a', 'deadtree_a', 'grass_a', 'bush_low',
+               'bamboo_a']
             : ['palm_a', 'palm_b', 'palm_c', 'palm_d', 'bamboo_a', 'banana_a',
                'grass_a', 'deadtree_a'];
           // a clump of 1-4, tighter and more varied than an even scatter
