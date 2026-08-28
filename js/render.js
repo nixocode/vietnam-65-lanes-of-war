@@ -828,10 +828,10 @@ const Renderer = {
          * of the value structure the whole frame is short of: something genuinely
          * dark in the foreground is what gives the fight a lit pocket to sit in. */
         drawVeg(ctx, p.kind, p.i, dx, CANVAS_H + 16, p.w,
-          { flip: p.flip, alpha: 0.94, shade: 0.78 });
+          { flip: p.flip, alpha: 0.94, shade: 0.90 });
       } else {
         drawVeg(ctx, p.kind, p.i, dx, CANVAS_H - 30, p.w,
-          { alpha: 0.96, flip: p.flip, shade: 0.46 });
+          { alpha: 0.96, flip: p.flip, shade: 0.58 });
       }
     }
   },
@@ -892,6 +892,52 @@ const Renderer = {
     sg.addColorStop(1, this._fade(s.color, 0));
     ctx.fillStyle = sg;
     ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 2.2, 0, 7); ctx.fill();
+
+    // and the air between the sun and the ground
+    this._godRays(ctx, map, seeded(map.seed + 991));
+  },
+
+  /* CREPUSCULAR RAYS — shafts of light through the canopy.
+   *
+   * The single most atmospheric thing in the reference art, and the one the game
+   * was missing entirely: the sun was a bright disc in a gradient and the air
+   * between it and the ground was empty. Real light in a humid valley is
+   * VISIBLE — it picks out dust and mist in shafts, and those shafts are what
+   * makes the space read as deep and full of air rather than as a flat backdrop.
+   *
+   * Drawn as long soft wedges radiating from the map's own sun, in `lighter` so
+   * they accumulate where they cross rather than stacking into flat bands, and
+   * fading out well before the ground so they read as light in the air rather
+   * than as painted stripes. Baked into the sky layer — no per-frame cost.
+   */
+  _godRays(ctx, map, rng) {
+    const s = map.pal.sun;
+    if (!s) return;
+    const n = 9;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < n; i++) {
+      // fan them across a wedge pointing down and away from the sun, with
+      // uneven spacing — evenly fanned rays read as a bicycle wheel
+      const a = Math.PI * (0.62 + 0.52 * (i / (n - 1))) + (rng() - 0.5) * 0.10;
+      const spread = (0.012 + rng() * 0.030);
+      const len = 620 + rng() * 460;
+      const x1 = s.x + Math.cos(a) * len;
+      const y1 = s.y - Math.sin(a) * len;
+      const g = ctx.createLinearGradient(s.x, s.y, x1, y1);
+      const k = 0.05 + rng() * 0.07;
+      g.addColorStop(0, this._fade(s.color, k));
+      g.addColorStop(0.45, this._fade(s.color, k * 0.55));
+      g.addColorStop(1, this._fade(s.color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x + Math.cos(a - spread) * len, s.y - Math.sin(a - spread) * len);
+      ctx.lineTo(s.x + Math.cos(a + spread) * len, s.y - Math.sin(a + spread) * len);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   },
 
   _drawFar(ctx, map, w) {
@@ -2491,6 +2537,31 @@ const Renderer = {
 
     this._drawStrikes(ctx, game, time);
     this._drawParticles(ctx, fx, camX);
+    /* VALLEY LIGHT — the air itself, lit.
+     *
+     * Reference art of this kind is built on one relationship: a near-black
+     * foreground framing a bright, hazy middle distance, so the eye falls
+     * through the dark into the light. Measured, the game had 46 grey levels
+     * between the two where the look wants 60+, because the mid distance was
+     * merely *unshaded* rather than actively LIT.
+     *
+     * A soft band of the sun's own colour laid over the middle of the frame in
+     * `lighter`, brightest under the sun and falling away with distance from
+     * it. Not a vignette in reverse — it is keyed to where the light is coming
+     * from, so it reads as haze catching the sun rather than as a glow effect.
+     */
+    if (!this._night && map.pal.sun) {
+      const su = map.pal.sun;
+      const vg = ctx.createRadialGradient(su.x, 430, 30, su.x, 430, CANVAS_W * 0.85);
+      vg.addColorStop(0, this._fade(su.color, 0.20));
+      vg.addColorStop(0.42, this._fade(su.color, 0.10));
+      vg.addColorStop(1, this._fade(su.color, 0));
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = vg;
+      ctx.fillRect(camX - 4, 250, CANVAS_W + 8, 330);
+      ctx.restore();
+    }
     this._drawForeground(ctx, camX);
     this._drawNight(ctx, game, map);
     if (ui) this._drawTargeting(ctx, game, ui);
@@ -3072,17 +3143,31 @@ const Renderer = {
    * painted kit was drawn in 3/4 view and read as a collage next to profile men.
    * Sized from the prop's authored real-world height, so a 3 m hut stands
    * correctly against a 1.8 m soldier instead of being eyeballed. */
+  /* Structure kind -> the prop that stands in for it.
+   *
+   * Four of these used to point at donor models from a generic fantasy pack and
+   * had no business in a 1965 Vietnam game: `shrine` was a EUROPEAN HALF-TIMBERED
+   * HOUSE FRAME with cross-bracing, `well` was a storybook wishing well with a
+   * peaked shingle roof and a bucket on a rope, `stall` was a market stall with
+   * CROSSED SWORDS on its sign, and `cart` was a European handcart. They are
+   * replaced by built props — a roadside spirit house, a block-ring village
+   * well, a bamboo-and-tarp market stall, and a two-wheel ox cart.
+   *
+   * Architecture is the one place box geometry is honestly right: a roof plane
+   * is a plane and a post is a post, which is why these are built rather than
+   * sourced. The organic props are the ones that need real meshes.
+   */
   PROP_KINDS: {
     hooch: ['hut_a', 'hut_c'],
     longhouse: ['village_row'],
     stilt: ['hut_b'],
-    stall: ['stall'],
-    shrine: ['frame_c'],
+    stall: ['stall_v'],
+    shrine: ['shrine_a'],
     // an MG position IS a sandbag parapet — the props already model one
     mgnest: ['sandbags_pile', 'sandbag_wall'],
     tower: ['watchtower'],
-    well: ['well_a'],
-    cart: ['cart_a'],
+    well: ['well_v'],
+    cart: ['cart_v'],
   },
 
   _drawBuilding(ctx, st, rng, dmg, time) {

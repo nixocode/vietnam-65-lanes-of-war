@@ -31,14 +31,14 @@
    "aspect": 2.4086
   },
   {
-   "name": "cart_a",
-   "hM": 0.98,
-   "wM": 2.9,
-   "groundY": 331.9,
-   "ppm": 154.87,
+   "name": "cart_v",
+   "hM": 0.965,
+   "wM": 1.698,
+   "groundY": 383.6,
+   "ppm": 264.58,
    "res": 512,
-   "realH": 1.1,
-   "aspect": 2.9592
+   "realH": 1.4,
+   "aspect": 1.7596
   },
   {
    "name": "deadtree_a",
@@ -69,36 +69,6 @@
    "res": 512,
    "realH": 0.75,
    "aspect": 1.7511
-  },
-  {
-   "name": "frame_a",
-   "hM": 0.765,
-   "wM": 0.869,
-   "groundY": 453.5,
-   "ppm": 516.64,
-   "res": 512,
-   "realH": 2.8,
-   "aspect": 1.1359
-  },
-  {
-   "name": "frame_b",
-   "hM": 0.765,
-   "wM": 0.869,
-   "groundY": 453.5,
-   "ppm": 516.64,
-   "res": 512,
-   "realH": 2.8,
-   "aspect": 1.1359
-  },
-  {
-   "name": "frame_c",
-   "hM": 1.347,
-   "wM": 1.037,
-   "groundY": 480.6,
-   "ppm": 333.39,
-   "res": 512,
-   "realH": 2.9,
-   "aspect": 0.7699
   },
   {
    "name": "grass_a",
@@ -241,14 +211,24 @@
    "aspect": 2.5234
   },
   {
-   "name": "stall",
-   "hM": 0.893,
-   "wM": 1.01,
-   "groundY": 454.6,
-   "ppm": 444.85,
+   "name": "shrine_a",
+   "hM": 1.201,
+   "wM": 1.064,
+   "groundY": 480.6,
+   "ppm": 373.83,
    "res": 512,
-   "realH": 2.6,
-   "aspect": 1.131
+   "realH": 1.5,
+   "aspect": 0.8859
+  },
+  {
+   "name": "stall_v",
+   "hM": 1.362,
+   "wM": 1.507,
+   "groundY": 459.0,
+   "ppm": 298.1,
+   "res": 512,
+   "realH": 2.1,
+   "aspect": 1.1065
   },
   {
    "name": "stonewall_a",
@@ -301,14 +281,14 @@
    "aspect": 0.4979
   },
   {
-   "name": "well_a",
-   "hM": 2.24,
-   "wM": 1.84,
-   "groundY": 480.6,
-   "ppm": 200.5,
+   "name": "well_v",
+   "hM": 0.48,
+   "wM": 1.13,
+   "groundY": 351.4,
+   "ppm": 397.45,
    "res": 512,
-   "realH": 2.1,
-   "aspect": 0.8214
+   "realH": 0.9,
+   "aspect": 2.3542
   }
  ]
 }

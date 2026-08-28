@@ -32,22 +32,23 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # CDN uuid -> the name the game knows it by. Without this a re-render drops a
 # fresh set of uuid-named PNGs beside the renamed ones and silently doubles the
 # manifest, which is exactly what happened the first time.
+# Removed: frame_a / frame_b / frame_c (European half-timbered house frames),
+# stall (a market stall with crossed swords on it), well_a (a storybook wishing
+# well) and cart_a (a European handcart). All four came from a generic fantasy
+# pack and are replaced by built Vietnamese fittings in BUILT below. The .glb
+# files stay in art/props with their provenance; they are simply not rendered.
 GLB_NAME = {
     '00e71997-0e9f-4083-9507-3935639996c7': 'sandbags_pile',
     '07d9ceb2-8b8d-4eba-8823-a7d39c8aeb20': 'hut_a',
     '1ac1bf37-184f-4e45-98a8-9da30bf37ffa': 'palm_a',
     '21d44b5b-efef-4abd-96ad-fc59e4ad373b': 'palm_b',
-    '36d65045-d2ff-4689-a34d-a4acbe1873cb': 'frame_a',
     '4c17decd-3087-4afe-9611-cfd92cca47cd': 'palm_c',
-    '4dd57aa3-e10b-43c8-9661-080167b1e060': 'stall',
     '5a6e6186-ab59-4c81-a5e1-9beb5e1bb8e9': 'sandbags_row',
     '5c18a372-e0fb-490f-aa90-8bdd04d7e92f': 'sandbag_one',
     '66cd7d94-abba-471e-8d8b-c8ad30aa5c70': 'palm_d',
-    '76843ec7-2056-43ed-853e-d32d0b8253c4': 'frame_b',
     '8d6e4780-251c-49f6-9a49-b28ea28a03f8': 'hut_b',
     '96654c1e-dbc8-4bbc-a1c0-0dfacd8e9d93': 'sandbag_wall',
     '99bbd0c0-b60d-4923-bfbf-a7849e26766f': 'hut_c',
-    'a0c33317-3662-478e-b826-78590c348d83': 'frame_c',
     'd4bcb445-6ef3-4aef-b39c-3bacd95f1b29': 'village_row',
     'd80aaa87-23d8-4e45-83a2-5ffd22c36356': 'rock',
     # 88fb0209 is a 26 m row of seedlings — a whole scene, not a prop
@@ -267,44 +268,6 @@ def build_watchtower():
     _beam(dark, 0.30, 0.1, 0.30, P, t=0.06, y=0.65, yt=0.05)
 
 
-def build_well():
-    stone = _pmat('wl_stone', (0.105, 0.100, 0.092))
-    wood = _pmat('wl_wood', (0.115, 0.070, 0.032))
-    thatch = _pmat('wl_thatch', (0.190, 0.150, 0.070))
-    _box(stone, -0.66, -0.66, 0, 0.66, 0.66, 0.70)            # kerb
-    _box(stone, -0.74, -0.74, 0.70, 0.74, 0.74, 0.86)         # cap
-    for sx in (-1, 1):
-        _box(wood, sx * 0.52 - 0.09, -0.10, 0.86, sx * 0.52 + 0.09, 0.10, 1.92)
-    _box(wood, -0.70, -0.12, 1.78, 0.70, 0.12, 1.98)          # headbeam
-    _box(wood, -0.20, -0.16, 1.72, 0.20, 0.16, 1.86)          # winch drum
-    _box(thatch, -0.92, -0.62, 1.96, 0.92, 0.62, 2.24)        # little roof
-    _box(wood, -0.15, -0.15, 1.22, 0.15, 0.15, 1.56)          # bucket
-    _beam(wood, -0.02, 1.56, -0.02, 1.72, t=0.03, yt=0.03)    # rope
-
-
-def build_cart():
-    wood = _pmat('ct_wood', (0.120, 0.074, 0.034))
-    dark = _pmat('ct_dark', (0.058, 0.038, 0.019))
-    _box(wood, -1.00, -0.52, 0.46, 1.00, 0.52, 0.66)          # bed
-    _box(wood, -1.00, -0.56, 0.66, 1.00, -0.44, 1.00)         # sideboards
-    _box(wood, -1.00, 0.44, 0.66, 1.00, 0.56, 1.00)
-    _box(wood, -1.04, -0.52, 0.66, -0.92, 0.52, 1.00)         # tailgate
-    for sx in (-1, 1):                                        # wheels, edge-on
-        for sy in (-0.58, 0.48):
-            _box(dark, sx * 0.44 - 0.09, sy, 0.02, sx * 0.44 + 0.09, sy + 0.10, 0.92)
-            _beam(dark, sx * 0.44 - 0.34, 0.47, sx * 0.44 + 0.34, 0.47,
-                  t=0.05, y=sy + 0.05, yt=0.05)
-    _box(wood, 1.00, -0.13, 0.54, 1.86, -0.04, 0.64)          # shafts
-    _box(wood, 1.00, 0.04, 0.54, 1.86, 0.13, 0.64)
-
-
-# NOT SHIPPED. Two iterations of procedural box geometry (thicker timber, then
-# diagonal X-bracing and a ladder) still read as a pile of loose sticks at game
-# scale — worse than the painted watchtower they were meant to replace. The
-# generators are kept because the approach is sound for simpler shapes and the
-# camera/lighting plumbing is already here, but nothing below is in props.json.
-# If this is picked up again, the missing ingredient is solid mass: a side-on
-# sprite needs filled planes, not a wireframe of separate members.
 def build_m113():
     """An M113 APC, side on.
 
@@ -665,11 +628,126 @@ def build_stonewall():
 
 
 
+# ---- Vietnamese village fittings ----------------------------------------
+# These replace donor props that came from a generic fantasy/medieval pack and
+# had no business in a 1965 Vietnam game: a half-timbered European house frame
+# standing in for a roadside shrine, a storybook wishing well with a peaked roof
+# and a bucket on a rope, and a market stall with CROSSED SWORDS on its sign.
+# Architecture is the one place box geometry is honestly right — a roof plane is
+# a plane, a post is a post — so these are built rather than sourced.
+
+def build_shrine():
+    """A roadside spirit house. Small, raised, tiled roof, offerings below.
+
+    You see these on every roadside and in every yard in Vietnam. The thing it
+    replaces was a European timber A-frame with cross-bracing.
+    """
+    stone = _pmat('sh_stone', (0.126, 0.118, 0.100))
+    wall = _pmat('sh_wall', (0.190, 0.120, 0.078))     # ochre render
+    tile = _pmat('sh_tile', (0.145, 0.052, 0.036))     # red pantile
+    dark = _pmat('sh_dark', (0.070, 0.058, 0.046))
+    _box(stone, -0.38, -0.30, 0.0, 0.38, 0.30, 0.34)          # plinth
+    _box(stone, -0.30, -0.24, 0.34, 0.30, 0.24, 0.44)
+    _box(wall, -0.26, -0.21, 0.44, 0.26, 0.21, 0.96)          # the house itself
+    _box(dark, -0.15, -0.22, 0.52, 0.15, -0.19, 0.84)         # the shrine niche
+    # tiled roof: two pitches with the eaves kicked up, which is the line that
+    # says East Asia rather than Europe
+    for side in (-1, 1):
+        _beam(tile, 0.0, 1.16, side * 0.40, 0.99, t=0.045, y=0.0, yt=0.26)
+        _beam(tile, side * 0.40, 0.99, side * 0.52, 1.03, t=0.038, y=0.0, yt=0.24)
+    _box(tile, -0.05, -0.26, 1.14, 0.05, 0.26, 1.20)          # ridge
+    # incense pot and a couple of offerings on the plinth
+    _box(dark, -0.06, -0.10, 0.44, 0.06, 0.02, 0.53)
+    _box(wall, 0.14, -0.08, 0.44, 0.22, 0.02, 0.49)
+
+
+def build_wellviet():
+    """A village well: a low ring of blockwork, a plank lid, a tin pail.
+
+    No gantry, no shingled roof, no crank — the thing this replaces was a
+    storybook wishing well.
+    """
+    ring = _pmat('wv_ring', (0.150, 0.140, 0.120))
+    dark = _pmat('wv_dark', (0.052, 0.050, 0.044))
+    wood = _pmat('wv_wood', (0.120, 0.088, 0.052))
+    tin = _pmat('wv_tin', (0.130, 0.134, 0.130))
+    import math as _m
+    # the ring, as a low drum of blocks
+    for i in range(14):
+        a = (i / 14.0) * _m.pi * 2
+        x, y = _m.cos(a) * 0.42, _m.sin(a) * 0.42
+        _box(ring, x - 0.09, y - 0.07, 0.0, x + 0.09, y + 0.07, 0.40)
+    _box(dark, -0.34, -0.26, 0.36, 0.34, 0.26, 0.42)          # the water, in shadow
+    # a couple of planks laid across it
+    _beam(wood, -0.44, 0.44, 0.44, 0.45, t=0.030, y=-0.10, yt=0.07)
+    _beam(wood, -0.44, 0.42, 0.44, 0.43, t=0.026, y=0.12, yt=0.06)
+    _box(tin, 0.46, -0.10, 0.0, 0.62, 0.10, 0.19)             # pail beside it
+
+
+def build_stallviet():
+    """A market stall: bamboo uprights, a tarp awning, produce on a low table."""
+    bam = _pmat('sv_bam', (0.150, 0.130, 0.062))
+    tarp = _pmat('sv_tarp', (0.140, 0.120, 0.086))
+    wood = _pmat('sv_wood', (0.112, 0.082, 0.050))
+    green = _pmat('sv_green', (0.090, 0.130, 0.048))
+    red = _pmat('sv_red', (0.170, 0.070, 0.045))
+    for x in (-0.62, -0.20, 0.22, 0.64):                      # four uprights
+        _beam(bam, x, 0.0, x + 0.03, 1.32, t=0.026, y=0.0, yt=0.024)
+    # awning: a shallow sag between the posts, the way a tarp actually hangs
+    pts = _curve(-0.74, 1.34, 0.76, 1.30, bow=-0.13, segs=8)
+    for i in range(len(pts) - 1):
+        _beam(tarp, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1],
+              t=0.022, y=0.0, yt=0.34)
+    _box(wood, -0.66, -0.26, 0.52, 0.68, 0.26, 0.60)          # the table
+    for x in (-0.52, 0.56):
+        _box(wood, x - 0.03, -0.22, 0.0, x + 0.03, 0.22, 0.52)
+    # produce, in baskets
+    import random as _r
+    _r.seed(61)
+    for i in range(9):
+        bx = -0.56 + 0.14 * i
+        _box(green if i % 3 else red, bx - 0.05, -0.16, 0.60,
+             bx + 0.05, 0.16, 0.60 + 0.06 + _r.random() * 0.05)
+
+
+def build_cartviet():
+    """A two-wheel wooden cart. Big spoked wheels, a woven cover, shafts down.
+
+    Replaces a European handcart. The wheels are what carry it at game size, so
+    they are built as real rims and spokes rather than discs.
+    """
+    wood = _pmat('cv_wood', (0.118, 0.086, 0.050))
+    dark = _pmat('cv_dark', (0.062, 0.048, 0.032))
+    weave = _pmat('cv_weave', (0.155, 0.140, 0.092))
+    import math as _m
+    _box(wood, -0.52, -0.30, 0.40, 0.52, 0.30, 0.52)          # bed
+    _box(wood, -0.52, -0.32, 0.52, 0.52, -0.26, 0.76)         # side boards
+    _box(wood, -0.52, 0.26, 0.52, 0.52, 0.32, 0.76)
+    # a woven cover arched over the bed
+    cov = _curve(-0.46, 0.76, 0.46, 0.76, bow=0.30, segs=8)
+    for i in range(len(cov) - 1):
+        _beam(weave, cov[i][0], cov[i][1], cov[i + 1][0], cov[i + 1][1],
+              t=0.026, y=0.0, yt=0.30)
+    for side in (-1, 1):                                       # two wheels
+        cx, cz, R = side * 0.30, 0.40, 0.40
+        for k in range(12):                                    # rim
+            a0 = (k / 12.0) * _m.pi * 2
+            a1 = ((k + 1) / 12.0) * _m.pi * 2
+            _beam(dark, cx + _m.cos(a0) * R, cz + _m.sin(a0) * R,
+                  cx + _m.cos(a1) * R, cz + _m.sin(a1) * R,
+                  t=0.030, y=side * 0.32, yt=0.028)
+        for k in range(6):                                     # spokes
+            a = (k / 6.0) * _m.pi
+            _beam(wood, cx - _m.cos(a) * R * 0.92, cz - _m.sin(a) * R * 0.92,
+                  cx + _m.cos(a) * R * 0.92, cz + _m.sin(a) * R * 0.92,
+                  t=0.017, y=side * 0.32, yt=0.016)
+    _beam(wood, -0.50, 0.46, -0.96, 0.30, t=0.026, y=-0.16, yt=0.024)   # shafts
+    _beam(wood, -0.50, 0.46, -0.96, 0.30, t=0.026, y=0.16, yt=0.024)
+
+
 BUILT = {
     'm113':       (build_m113, 2.6),
     'watchtower': (build_watchtower, 5.2),
-    'well_a':     (build_well, 2.1),
-    'cart_a':     (build_cart, 1.1),
     # foliage — real heights, so they scale against a 1.8 m soldier
     'bamboo_a':   (build_bamboo, 4.8),
     'deadtree_a': (build_deadtree, 4.5),
@@ -683,6 +761,11 @@ BUILT = {
     # cover — the last of the inked kit to be replaced
     'dike_a':      (build_dike, 0.62),
     'stonewall_a': (build_stonewall, 1.05),
+    # village fittings, replacing donor props from a fantasy pack
+    'shrine_a':    (build_shrine, 1.5),
+    'well_v':      (build_wellviet, 0.9),
+    'stall_v':     (build_stallviet, 2.1),
+    'cart_v':      (build_cartviet, 1.4),
 }
 
 
