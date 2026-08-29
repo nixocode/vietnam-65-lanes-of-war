@@ -527,7 +527,7 @@ as five rows; nothing short of a diff would have caught that, and I would have
 | # | Item | Why it is here |
 |---|---|---|
 | A | Animations | PARTLY DONE — see below. Clip churn and the two slow loops are fixed and measured. What is NOT yet addressed: `walk` still plays at 7.4-12.8 fps, and the run/walk threshold is the largest remaining churn source (~90 switches a match). Walk is only 1.5% of screen time, which is why it went second. |
-| B | The guns are still not up to par | Owner's words. The M16, M60 and AK are built now and read correctly at 3x, but the sniper's M40, the marksman's SVD and the RPG are still donor stand-ins, and nothing has been checked at ACTUAL game size against a moving man rather than in a zoomed contact sheet. |
+| B | The guns | DONE for now. Five of six are built (M16, M60, AK, M40, RPG); the SVD stays a donor because it already carries a scope and reads. Checked at TRUE game size, not just zoomed. If the owner still wants more, the remaining lever is the M60's bipod and the AK magazine, which are 1-2 px at 84 px and only read at 2x+. |
 | C | ~~The VC play with the US HUD~~ | DONE. `body.side-vc` carried exactly one rule, so the whole field-manual treatment stayed US. Now 120 of 204 HUD elements differ by side. |
 
 | # | Item | Why it is here |
@@ -557,6 +557,21 @@ captured at breaks the grip, including one applied through a common ancestor.**
 A sixth attempt has to re-bind the weapon after posing, or hand-pose the arms —
 it cannot be done by rotating bones above the wrist. The shipped workaround (the
 `aim` pose dropped toward the ground, see js/sprite3d.js) stays.
+
+**The last two guns, and the size you have to judge them at.** Drawing every
+weapon at TRUE game size — an 84 px man, so a rifle is about 30 px — rather than
+in a zoomed sheet showed which details survive and which do not. Two weapons
+failed at any size, because their DEFINING feature was missing entirely rather
+than merely small:
+
+- the M40 had no visible scope, and a sniper rifle without one is just a thin
+  rifle;
+- the RPG had neither a tube nor a warhead, and read as a bulky rifle.
+
+Both are built now. At 84 px the RPG is identifiable by the bulb at its muzzle
+and the sniper rifles by the raised scope line, which is the most that can be
+asked at 30 px of weapon. The SVD stays a donor mesh: it already carries a
+visible scope and reads correctly, so rebuilding it would be work for nothing.
 
 **The prone clip: solved by looking for the pose instead of building it.**
 Seven attempts to synthesise it failed. Two of them produced findings worth

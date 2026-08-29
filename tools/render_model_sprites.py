@@ -337,9 +337,12 @@ WEAPON_MESH = {
     # fault at weapon scale, so the AK gets the same treatment.
     'ak':  'BUILT:ak',
     'm60': 'BUILT:m60',
-    'svd': 'Sniper_2',   # wood stock and scope, for the marksman
-    'm40': 'Sniper',
-    'rpg': 'RocketLauncher',
+    'svd': 'Sniper_2',   # wood stock and scope, for the marksman — reads fine
+    # The pack's Sniper has no visible scope and its RocketLauncher has neither
+    # a tube nor a warhead, so at 3x the sniper carried a plain thin bar and the
+    # RPG man carried a bulky rifle. Those two shapes ARE their weapons.
+    'm40': 'BUILT:m40',
+    'rpg': 'BUILT:rpg',
 }
 # barrel length in metres, used to scale each mesh to a believable size
 WEAPON_LEN = {'m16': 0.99, 'ak': 0.87, 'm60': 1.10, 'svd': 1.20, 'm40': 1.16,
@@ -520,6 +523,37 @@ def _build_weapon(kind):
         box(0.71, 0.94, -0.022, 0.022, 0.030, METAL)                 # barrel
         box(0.855, 0.895, 0.022, 0.080, 0.026, METAL)                # front sight
         box(0.945, 1.00, -0.028, 0.028, 0.034, METAL)                # muzzle nut
+    elif kind == 'm40':
+        # THE SCOPE IS THE WHOLE TELL. A sniper rifle without one reads as a
+        # thin rifle, which is what the donor mesh gave us.
+        box(0.00, 0.30, -0.056, 0.046, 0.050, WOOD)                  # stock
+        box(0.06, 0.14, -0.088, -0.056, 0.046, WOOD)                 # cheek/pistol swell
+        box(0.30, 0.53, -0.048, 0.048, 0.048, METAL)                 # action
+        box(0.40, 0.47, -0.088, -0.048, 0.040, METAL)                # floorplate
+        box(0.455, 0.50, 0.048, 0.070, 0.030, METAL)                 # bolt handle
+        # scope: tube on two rings, standing clear above the action
+        box(0.345, 0.395, 0.048, 0.078, 0.026, METAL)                # rear ring
+        box(0.505, 0.555, 0.048, 0.078, 0.026, METAL)                # front ring
+        box(0.33, 0.60, 0.078, 0.116, 0.034, METAL)                  # scope body
+        box(0.30, 0.34, 0.072, 0.122, 0.038, METAL)                  # ocular bell
+        box(0.59, 0.635, 0.070, 0.124, 0.040, METAL)                 # objective bell
+        box(0.53, 1.00, -0.020, 0.020, 0.028, METAL)                 # barrel
+    elif kind == 'rpg':
+        # RPG-7: a tube with a CONICAL WARHEAD. Both ends are distinctive and
+        # neither existed on the stand-in.
+        box(0.00, 0.10, -0.052, 0.052, 0.062, METAL)                 # blast flare
+        box(0.10, 0.20, -0.036, 0.036, 0.046, METAL)
+        box(0.20, 0.82, -0.030, 0.030, 0.042, METAL)                 # launch tube
+        box(0.40, 0.60, -0.044, 0.044, 0.056, WOOD)                  # heat shield
+        box(0.33, 0.41, -0.150, -0.030, 0.040, WOOD, shear=0.026)    # pistol grip
+        box(0.41, 0.45, -0.070, -0.030, 0.046, METAL)                # trigger guard
+        box(0.50, 0.56, 0.042, 0.092, 0.030, METAL)                  # optical sight
+        box(0.62, 0.66, 0.042, 0.078, 0.026, METAL)                  # iron sight
+        # the warhead: a shoulder, then a taper to the point
+        box(0.82, 0.865, -0.056, 0.056, 0.070, METAL)
+        box(0.865, 0.94, -0.062, 0.062, 0.078, METAL)
+        box(0.94, 0.975, -0.040, 0.040, 0.052, METAL)
+        box(0.975, 1.00, -0.016, 0.016, 0.024, METAL)
     else:
         box(0.00, 0.21, -0.058, 0.050, 0.056, WOOD)        # buttstock
         box(0.21, 0.53, -0.048, 0.058, 0.056, METAL)       # receiver
