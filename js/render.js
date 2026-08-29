@@ -4217,6 +4217,7 @@ const Renderer = {
         // reached the screen as clip thrash
         moving: u.movingVis != null ? u.movingVis : u.moving,
         phase: u.phase, dist: u.dist || 0, spd: u.spd || 0,
+        phWalk: u.phWalk, phRun: u.phRun,
         gaitOff: u.gaitOff || 0, gaitK: u.gaitK || 1,
         pose, deadT: u.deadT, alpha,
         dieK: u.dieK, dieLag: u.dieLag, dieLean: u.dieLean,

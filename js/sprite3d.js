@@ -251,12 +251,22 @@ const Sprite3D = {
        * index every time a man accelerated out of cover.
        *
        * Result: 19.3-20.7 fps across all twelve, against 13.9-25.9 before. */
-      const ud = typeof UNITS !== 'undefined' && UNITS[key];
-      const strideK = ud && ud.speed
-        ? clamp(ud.speed / S3_REF_SPD, 0.72, 1.25) : 1;
-      const cycle = h * (running ? S3_RUN_CYCLE : S3_WALK_CYCLE)
-        * (o.gaitK || 1) * strideK;
-      const f = ((o.dist || 0) / cycle + (o.gaitOff || 0)) % 1;
+      /* The phase is accumulated in the SIM, off the man's CURRENT speed — see
+       * the gait-phase block in game.js _moveUnit. It used to be computed here
+       * as `dist / cycle` with the cycle scaled by BASE speed, which disagreed
+       * with the speed `dist` was actually accruing at and gave walk cadences
+       * from 7.3 to 12.7 fps depending on the unit, against 31 running.
+       *
+       * Falls back to the old calculation for anything drawn without a unit
+       * behind it — the menu figures and the contact sheets. */
+      const ph = running ? o.phRun : o.phWalk;
+      let f;
+      if (ph != null) {
+        f = (ph + (o.gaitOff || 0)) % 1;
+      } else {
+        const cycle = h * (running ? S3_RUN_CYCLE : S3_WALK_CYCLE) * (o.gaitK || 1);
+        f = ((o.dist || 0) / cycle + (o.gaitOff || 0)) % 1;
+      }
       return [c, Math.floor((f < 0 ? f + 1 : f) * n) % n];
     }
     if (o.combat) {

@@ -1857,6 +1857,42 @@ class Game {
     // actually travelled instead of to a constant baked in here
     u.dist = (u.dist || 0) + Math.abs(step);
 
+    /* GAIT PHASE — the fix for animation cadence that varied 4.5x.
+     *
+     * The renderer used to derive the frame index as `dist / cycle`, where the
+     * cycle was scaled by the unit's BASE speed. Distance accumulates at the
+     * man's ACTUAL speed, so the two disagreed whenever he was not moving at
+     * his base speed — which is always, when walking. Measured: walk played at
+     * 7.3 fps for the sapper (base 56) and 12.7 for the sniper (base 30), a
+     * 1.74x spread between units, against 31 fps running. A man breaking from
+     * a walk into a run jumped 4.5x in cadence. That is the "mismatched fps".
+     *
+     * Sizing the cycle off CURRENT speed fixes both at once: every unit at a
+     * given speed now shares one cadence, and the walk/run step drops to 1.8x,
+     * which is what the difference between walking and running actually is.
+     *
+     * The exponent is the stride/cadence trade-off. At 1.0 the cycle is exactly
+     * proportional to speed, cadence is dead constant and the feet slide when a
+     * man accelerates. At 0 it is the old distance-locked behaviour with all of
+     * the spread. 0.85 keeps cadence nearly flat while leaving enough distance
+     * coupling that boots still read as gripping the ground.
+     *
+     * Accumulated INCREMENTALLY, and separately per gait, because that is what
+     * lets the cycle length change without popping: `dist / cycle` jumps the
+     * instant the divisor moves, but a phase that is only ever added to cannot.
+     * Both are advanced every frame so switching clip never lands mid-stride on
+     * a stale phase.
+     *
+     * Note there is no lane-depth scaling here, deliberately. The renderer used
+     * `S3_TARGET_H * scale`, which made men in the far lane (depth 0.92) walk
+     * 17% faster in cadence than men in the near lane. Cadence is a property of
+     * the man, not of how far away he is. */
+    const gp = Math.pow(Math.max(u.spd || 0, 6) / S3_REF_SPD, 0.85) * (u.gaitK || 1);
+    const cycW = S3_TARGET_H * S3_WALK_CYCLE * gp;
+    const cycR = S3_TARGET_H * S3_RUN_CYCLE * gp;
+    u.phWalk = ((u.phWalk || 0) + Math.abs(step) / cycW) % 1;
+    u.phRun = ((u.phRun || 0) + Math.abs(step) / cycR) % 1;
+
     /* Dust off the boots, emitted per STEP rather than per second, so it stays
      * locked to the stride at any speed. Half a gait cycle is one footfall. */
     const sc = LANE_DEPTH[u.lane] * (u.sj || 1);
