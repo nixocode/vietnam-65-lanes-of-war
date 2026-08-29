@@ -51,7 +51,25 @@ const S3_BLEND = 0.18;
  * than the cross-fade, so a blend always has time to finish before the next one
  * starts — the previous behaviour let a new change begin while the last was
  * still resolving, which is what stacked up into visible chatter. */
-const S3_CLIP_HOLD = 0.24;
+/* A blend needs time to LAND, and this is the single knob that decides whether
+ * a man ever settles into a pose.
+ *
+ * At 0.24 against S3_BLEND 0.18, a man switching at the gate limit was two
+ * thirds of the way through one cross-fade when the next began, so he read as
+ * vibrating between poses rather than holding either. Measured over a match,
+ * 57.7% of ALL clip changes came after a dwell shorter than 0.3s — most men,
+ * most of the time, were mid-blend. That is the jank.
+ *
+ * 0.5 takes that to 12.2% and p90 switch rate from 40.7 to 31.8 a minute, on
+ * identical sim runs across four seeds. It is still far below the ~4s dwell of
+ * states men genuinely hold, and events that must be seen on the frame they
+ * happen bypass it entirely — see URGENT.
+ *
+ * Two things tested alongside and rejected because the numbers did not support
+ * them: raising MOVE_HOLD to 0.45 (worth 0.05 switches a minute on top of this,
+ * and it makes a halted man run on the spot), and widening the run/walk
+ * hysteresis to 0.72/1.38 (32.8 -> 32.1 p90, inside the seed-to-seed spread). */
+const S3_CLIP_HOLD = 0.5;
 
 /* Seconds to pivot when a soldier reverses. Flipping the sprite in one frame is
  * a teleport; easing the horizontal scale through zero reads as a man turning on
@@ -243,7 +261,8 @@ const Sprite3D = {
       const c = (o.reload ? pick('idle', 'aim') : pick('aim', 'idle'));
       const n = C[c].length;
       const t = (o.time || 0) * 1.4 + (o.gaitOff || 0);
-      return [c, Math.floor(((t % 1) + 1) % 1 * n) % n];
+      const q = ((t % 1) + 1) % 1 * n;
+      return [c, Math.floor(q) % n, q - Math.floor(q)];
     }
     /* Two at-rest poses, and men DRIFT between them rather than being assigned
      * one for life.
@@ -263,8 +282,26 @@ const Sprite3D = {
     const n = C[c].length;
     // a per-soldier offset so a squad never breathes in lockstep
     const t = (o.time || 0) * 0.9 + (o.gaitOff || 0);
-    return [c, Math.floor(((t % 1) + 1) % 1 * n) % n];
+    const q = ((t % 1) + 1) % 1 * n;
+    return [c, Math.floor(q) % n, q - Math.floor(q)];
   },
+
+  /* Clips smooth enough to blend BETWEEN their own frames.
+   *
+   * The rule elsewhere in this file is that stepping frame to frame inside a
+   * cycle is the animation working, and cross-fading those reads as
+   * double-exposure rather than motion. That is true of a run, where a limb
+   * travels a long way between frames. It is not true here.
+   *
+   * These three are six-frame breathing loops and they are SLOW: `aim` advances
+   * at 8.4 animation fps and the two idles at 5.4, which is visibly stepped —
+   * and together they are 18.4% of every man-frame on screen, all of it on men
+   * standing still, where there is no movement to hide it. Between adjacent
+   * frames a chest moves two or three pixels, so blending them reads as
+   * breathing rather than as a second exposure.
+   *
+   * Deliberately NOT run, runfire, walk, death, dive or throw. */
+  SMOOTH: { idle: 1, idle2: 1, aim: 1 },
 
   /* ---------------- drawing ---------------- */
 
@@ -388,7 +425,7 @@ const Sprite3D = {
     }
     if (alpha <= 0) return true;
 
-    const [clip, fi] = this._sel(key, o);
+    const [clip, fi, frac] = this._sel(key, o);
     const st = this._anim(o, clip, fi);
     const dirV = st.dirV != null ? st.dirV : (o.dir || 1);
     // a man holding a sight picture is never perfectly still
@@ -403,6 +440,11 @@ const Sprite3D = {
       this._blit(ctx, U, clip, fi, o, alpha * st.t, dirV, sway);
     } else {
       this._blit(ctx, U, clip, fi, o, alpha, dirV, sway);
+      // sub-frame blend, only for the slow low-motion loops — see SMOOTH
+      if (frac > 0.02 && this.SMOOTH[clip]) {
+        const n = U.meta.clips[clip].length;
+        this._blit(ctx, U, clip, (fi + 1) % n, o, alpha * frac, dirV, sway);
+      }
     }
     return true;
   },

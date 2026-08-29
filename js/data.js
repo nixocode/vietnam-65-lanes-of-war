@@ -29,6 +29,13 @@ const STANCE_TRANS = 0.28;
  * The sim keeps its twitchy flag; the renderer gets a debounced one. 0.16s is
  * long enough to swallow the sub-100ms runs and short enough that a man who
  * genuinely halts still settles promptly. */
+/* How long a man keeps his LOCOMOTION look after his feet stop.
+ *
+ * Tried at 0.45 to damp clip chatter and REVERTED: measured on identical sim
+ * runs across four seeds, raising this alongside S3_CLIP_HOLD was worth nothing
+ * that the clip hold did not already deliver (p90 31.73 vs 31.78 switches a
+ * minute, short dwells 11.99% vs 12.15%). It is not free either — a man who has
+ * genuinely halted keeps running on the spot for that long. Left at 0.16. */
 const MOVE_HOLD = 0.16;
 // Seconds a squad spends crossing between lanes. Long enough that the move is a
 // commitment — out of cover, holding fire, unrecallable — and short enough that

@@ -526,7 +526,7 @@ as five rows; nothing short of a diff would have caught that, and I would have
 
 | # | Item | Why it is here |
 |---|---|---|
-| A | Animations are still not up to par | Owner's words, and measurement backs them. `run` is 76.7% of every man-frame on screen and plays at ~30 fps, which is fine — but the CLIP CHURN around it is not: one match logged 4090 `run`<->`aim` switches and 1361 `idle2`<->`idle` flips. `aim` (12.1% of screen time) runs at 8.4 fps and `idle`/`idle2` at 5.4. See §1.6. |
+| A | Animations | PARTLY DONE — see below. Clip churn and the two slow loops are fixed and measured. What is NOT yet addressed: `walk` still plays at 7.4-12.8 fps, and the run/walk threshold is the largest remaining churn source (~90 switches a match). Walk is only 1.5% of screen time, which is why it went second. |
 | B | The guns are still not up to par | Owner's words. The M16, M60 and AK are built now and read correctly at 3x, but the sniper's M40, the marksman's SVD and the RPG are still donor stand-ins, and nothing has been checked at ACTUAL game size against a moving man rather than in a zoomed contact sheet. |
 | C | ~~The VC play with the US HUD~~ | DONE. `body.side-vc` carried exactly one rule, so the whole field-manual treatment stayed US. Now 120 of 204 HUD elements differ by side. |
 
@@ -557,6 +557,40 @@ captured at breaks the grip, including one applied through a common ancestor.**
 A sixth attempt has to re-bind the weapon after posing, or hand-pose the arms —
 it cannot be done by rotating bones above the wrist. The shipped workaround (the
 `aim` pose dropped toward the ground, see js/sprite3d.js) stays.
+
+**The animation jank was never the frame rate.** The previous pass raised `walk`
+from 14 to 28 frames on the theory that low animation fps was the problem, and
+the owner still reported jank. Measuring what is actually ON SCREEN explains
+why: `run` is **76.7%** of every man-frame, `aim` 12.1%, the two idles 6.3% —
+and `walk`, the clip that was doubled, is **1.5%**. The fix had been applied to
+something nobody sees.
+
+What was actually wrong was CHURN. Over a match, **57.7% of all clip changes
+came after a dwell shorter than 0.3s**, against an `S3_BLEND` of 0.18 — so most
+men, most of the time, were part-way through a cross-fade and never settled into
+any pose. `S3_CLIP_HOLD` 0.24 -> 0.5 takes that to 12.2% and the p90 switch rate
+from 40.7 to 31.8 a minute.
+
+Two changes were tried alongside and REVERTED because the numbers did not
+support them, which is the part worth keeping:
+
+- `MOVE_HOLD` 0.16 -> 0.45 looked like an obvious companion fix. On identical
+  sim runs across four seeds it was worth 0.05 switches a minute on top of the
+  clip hold, and it makes a man who has genuinely halted keep running on the
+  spot. Reverted.
+- Widening the run/walk hysteresis to 0.72/1.38 moved p90 from 32.8 to 32.1 —
+  inside the seed-to-seed spread. A single unseeded run had shown it as a large
+  win and then as a large regression. Reverted.
+
+**Rule: this sim does not seed `Math.random`, so a single before/after run
+measures the seed, not the change.** Both of the above looked convincing once.
+
+The other half was the slow loops. `aim` runs at 8.4 animation fps and the idles
+at 5.4, on men standing still where nothing hides the stepping. Those three now
+blend BETWEEN their own frames (`Sprite3D.SMOOTH`) — which the file elsewhere
+rightly forbids, because cross-fading a run reads as double exposure. It does
+not read that way here: between adjacent frames of a six-frame breathing loop a
+chest moves two or three pixels. Costs +0.7 ms a frame at equal unit count.
 
 **The prop contact sheet is now part of the audit.** Drawing all of them at one
 world scale beside a 1.8 m bar found three faults that no frame had surfaced,
