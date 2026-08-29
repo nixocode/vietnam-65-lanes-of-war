@@ -522,6 +522,14 @@ The Mekong water measured perfectly by its own arithmetic and reached the screen
 as five rows; nothing short of a diff would have caught that, and I would have
 "fixed" a system that was already correct.
 
+**OWNER PRIORITIES, raised from play. These come first.**
+
+| # | Item | Why it is here |
+|---|---|---|
+| A | Animations are still not up to par | Owner's words, and measurement backs them. `run` is 76.7% of every man-frame on screen and plays at ~30 fps, which is fine — but the CLIP CHURN around it is not: one match logged 4090 `run`<->`aim` switches and 1361 `idle2`<->`idle` flips. `aim` (12.1% of screen time) runs at 8.4 fps and `idle`/`idle2` at 5.4. See §1.6. |
+| B | The guns are still not up to par | Owner's words. The M16, M60 and AK are built now and read correctly at 3x, but the sniper's M40, the marksman's SVD and the RPG are still donor stand-ins, and nothing has been checked at ACTUAL game size against a moving man rather than in a zoomed contact sheet. |
+| C | ~~The VC play with the US HUD~~ | DONE. `body.side-vc` carried exactly one rule, so the whole field-manual treatment stayed US. Now 120 of 204 HUD elements differ by side. |
+
 | # | Item | Why it is here |
 |---|---|---|
 | 1 | A real prone clip | Needs mocap or hand-posed arms. FIVE attempts have now failed; see below before starting a sixth. |

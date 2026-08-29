@@ -5,6 +5,15 @@
   --paper: #d8d2b0;
   --paper-dim: #b3ad8d;
   --brass: #c9a86a;
+  /* Components, so alpha variants of the accent can follow a side re-theme too —
+     rgba() cannot take a hex token apart. */
+  --brass-rgb: 201, 168, 106;
+  /* The HUD plate: the olive gradient every button and panel is stamped from,
+     and its hover. Tokenised for the same reason. */
+  --plate-hi: #2a3119;
+  --plate-lo: #1a2010;
+  --plate-hi-h: #333c1f;
+  --plate-lo-h: #1f2614;
   --us: #8aa06b;
   --us-bright: #b5c98f;
   --vc: #c25b45;
@@ -12,6 +21,35 @@
   --danger: #d24a2e;
   --font-head: 'Impact', 'Haettenschweiler', 'Arial Narrow Bold', sans-serif;
   --font-mono: 'Courier New', Courier, monospace;
+}
+
+/* ---- THE VC / NVA HUD ------------------------------------------------------
+ *
+ * `body.side-vc` existed and carried exactly ONE rule — a call-in card
+ * background — so playing as the VC gave you the US Army's HUD: olive drab
+ * plates, brass fittings, the whole field-manual treatment of the side you are
+ * fighting. Reported from play, and correct.
+ *
+ * The two sides had genuinely different visual worlds and the HUD should say
+ * which one you are. US is a printed field manual: olive plate, brass rivets,
+ * khaki paper. The NLF's is austere by comparison and its one bright note is
+ * the gold star of the flag, so the VC plate goes to a near-black worn brown
+ * — black cotton and bamboo rather than sprayed steel — and the accent goes
+ * from a brownish brass to a clean bright gold.
+ *
+ * Done entirely by re-pointing the tokens, which is why the 42 hardcoded
+ * accent and plate colours were routed through them first: custom properties
+ * set on `body` cascade to the whole HUD, so this block is the entire theme.
+ * The US side is unchanged, verified by computed-style diff over 404 elements. */
+body.side-vc {
+  --brass: #d9b436;
+  --brass-rgb: 217, 180, 54;
+  --plate-hi: #2b1f1c;
+  --plate-lo: #170f0e;
+  --plate-hi-h: #3a2a24;
+  --plate-lo-h: #1d1412;
+  --paper: #d4cfc0;
+  --paper-dim: #a9a494;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
@@ -112,7 +150,7 @@ body.touch #squad-panel button i { display: none; }
 }
 body.portrait #rotate-prompt { display: flex; }
 .rotate-icon {
-  font-size: 54px; color: var(--brass, #c9a86a);
+  font-size: 54px; color: var(--brass, var(--brass));
   animation: rotate-hint 2.4s ease-in-out infinite;
 }
 @keyframes rotate-hint {
@@ -220,7 +258,7 @@ h3 {
   transition: border-color .1s, background .1s;
 }
 .faction-card:hover { background: rgba(216,210,176,.08); }
-.faction-card.selected { border-color: var(--brass); background: rgba(201,168,106,.12); box-shadow: inset 0 0 24px rgba(201,168,106,.08); }
+.faction-card.selected { border-color: var(--brass); background: rgba(var(--brass-rgb),.12); box-shadow: inset 0 0 24px rgba(var(--brass-rgb),.08); }
 .fc-emblem { font-size: 26px; }
 .fc-emblem.us { color: var(--us-bright); }
 .fc-emblem.vc { color: var(--vc-bright); }
@@ -239,7 +277,7 @@ h3 {
   text-align: left;
 }
 .map-card:hover { background: rgba(216,210,176,.08); }
-.map-card.selected { border-color: var(--brass); background: rgba(201,168,106,.12); }
+.map-card.selected { border-color: var(--brass); background: rgba(var(--brass-rgb),.12); }
 .map-card .mc-name { font-family: var(--font-head); font-size: 15px; letter-spacing: 2px; }
 .map-card .mc-year { font-size: 10px; color: var(--brass); letter-spacing: 2px; margin: 2px 0 6px; }
 .map-card .mc-desc { font-size: 10px; line-height: 1.5; color: var(--paper-dim); }
@@ -252,7 +290,7 @@ h3 {
   border: 1px solid rgba(216,210,176,.25);
   padding: 8px 22px; cursor: pointer;
 }
-.diff-btn.selected { border-color: var(--brass); color: var(--brass); background: rgba(201,168,106,.1); }
+.diff-btn.selected { border-color: var(--brass); color: var(--brass); background: rgba(var(--brass-rgb),.1); }
 
 .setup-actions { display: flex; gap: 14px; justify-content: flex-end; margin-top: 22px; }
 .setup-actions.column { flex-direction: column; align-items: center; }
@@ -352,7 +390,7 @@ body.side-vc .card.callin { background: rgba(38,24,18,.92); }
   font-family: var(--font-head); font-size: 15px; letter-spacing: 3px;
   color: var(--brass); text-shadow: 0 1px 3px #000;
   background: rgba(8,10,6,.7); padding: 6px 18px;
-  border: 1px solid rgba(201,168,106,.5);
+  border: 1px solid rgba(var(--brass-rgb),.5);
   pointer-events: none;
 }
 
@@ -403,7 +441,7 @@ body.side-vc .card.callin { background: rgba(38,24,18,.92); }
 #screen-menu .big-btn::after {
   content: '★';
   position: absolute; top: 50%; transform: translateY(-50%);
-  color: #c9a86a; font-size: .95em; text-shadow: 0 1px 2px rgba(0,0,0,.6);
+  color: var(--brass); font-size: .95em; text-shadow: 0 1px 2px rgba(0,0,0,.6);
 }
 #screen-menu .big-btn::before { left: 9%; }
 #screen-menu .big-btn::after  { right: 9%; }
@@ -459,7 +497,7 @@ body.side-vc .card.callin { background: rgba(38,24,18,.92); }
   inset: 6px;
   border: 1px dashed rgba(216,210,176,.22);
   pointer-events: none;
-  border-color: rgba(201,168,106,.16);
+  border-color: rgba(var(--brass-rgb),.16);
 }
 
 h2 {
@@ -468,8 +506,8 @@ h2 {
   letter-spacing: 5px;
   margin-bottom: 16px;
   color: var(--brass);
-  text-shadow: 0 2px 0 rgba(0,0,0,.6), 0 0 22px rgba(201,168,106,.18);
-  border-bottom: 1px solid rgba(201,168,106,.22);
+  text-shadow: 0 2px 0 rgba(0,0,0,.6), 0 0 22px rgba(var(--brass-rgb),.18);
+  border-bottom: 1px solid rgba(var(--brass-rgb),.22);
   padding-bottom: 10px;
 }
 
@@ -528,7 +566,7 @@ h2 {
   font-size: 12px;
 }
 .mission-row .m-side.us {
-  color: #d8d2b0;
+  color: var(--paper);
 }
 .mission-row .m-side.vc {
   color: var(--vc-bright);
@@ -613,7 +651,7 @@ h2 {
 .faction-card.selected, .map-card.selected, .diff-btn.selected {
   border-color: var(--brass);
   background: linear-gradient(180deg, rgba(90,80,45,.4), rgba(60,55,30,.5));
-  box-shadow: inset 0 0 30px rgba(201,168,106,.12);
+  box-shadow: inset 0 0 30px rgba(var(--brass-rgb),.12);
 }
 
 /* ============================================================
@@ -632,8 +670,8 @@ h2 {
   overflow: hidden;
   transition: border-color .1s;
   background:
-    radial-gradient(circle at 6% 8%, rgba(201,168,106,.85) 0 5%, transparent 6%),
-    radial-gradient(circle at 94% 8%, rgba(201,168,106,.85) 0 5%, transparent 6%),
+    radial-gradient(circle at 6% 8%, rgba(var(--brass-rgb),.85) 0 5%, transparent 6%),
+    radial-gradient(circle at 94% 8%, rgba(var(--brass-rgb),.85) 0 5%, transparent 6%),
     linear-gradient(180deg, #3c4a2b 0%, #2f3a22 60%, #26301b 100%);
   border: 1px solid #55643a;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 2px 6px rgba(0,0,0,.45);
@@ -644,7 +682,7 @@ h2 {
 }
 .card.armed {
   border-color: var(--brass);
-  box-shadow: 0 0 14px rgba(201,168,106,.55), inset 0 0 14px rgba(201,168,106,.22);
+  box-shadow: 0 0 14px rgba(var(--brass-rgb),.55), inset 0 0 14px rgba(var(--brass-rgb),.22);
 }
 .card-men {
   position: absolute;
@@ -674,7 +712,7 @@ h2 {
   transition: opacity .25s;
   pointer-events: none;
   font-family: var(--font-head);
-  text-shadow: 0 3px 0 rgba(0,0,0,.6), 0 0 30px rgba(201,168,106,.35);
+  text-shadow: 0 3px 0 rgba(0,0,0,.6), 0 0 30px rgba(var(--brass-rgb),.35);
 }
 
 #squad-panel {
@@ -691,7 +729,7 @@ h2 {
   letter-spacing: 1px;
   z-index: 6;
   background: linear-gradient(180deg, rgba(30,38,22,.95), rgba(18,24,13,.96));
-  border: 1px solid rgba(201,168,106,.5);
+  border: 1px solid rgba(var(--brass-rgb),.5);
   box-shadow: 0 6px 20px rgba(0,0,0,.6);
 }
 #squad-panel .sp-name {
@@ -771,7 +809,7 @@ h2 {
   position: absolute; bottom: 132px; left: 50%; transform: translateX(-50%);
   width: 300px; z-index: 8; pointer-events: none;
   background: linear-gradient(180deg, rgba(26,32,19,.97), rgba(14,18,11,.98));
-  border: 1px solid rgba(201,168,106,.55);
+  border: 1px solid rgba(var(--brass-rgb),.55);
   box-shadow: 0 8px 26px rgba(0,0,0,.65);
   padding: 9px 11px; border-radius: 2px;
   font-family: var(--font-mono); color: var(--paper);
@@ -839,8 +877,8 @@ body.touch #unit-info { display: none !important; }
   padding: 8px 12px;
   pointer-events: auto;
   padding-top: 6px;
-  border-top: 1px solid rgba(201, 168, 106, .5);
-  box-shadow: 0 -1px 0 rgba(201, 168, 106, .14), 0 -10px 30px rgba(0, 0, 0, .6);
+  border-top: 1px solid rgba(var(--brass-rgb), .5);
+  box-shadow: 0 -1px 0 rgba(var(--brass-rgb), .14), 0 -10px 30px rgba(0, 0, 0, .6);
   background:
     linear-gradient(180deg, rgba(20, 25, 15, .55) 0%,
                             rgba(14, 18, 10, .94) 38%,
@@ -855,8 +893,8 @@ body.touch #unit-info { display: none !important; }
   justify-content: center;
   align-items: center;
   min-width: 76px;
-  background: linear-gradient(180deg, #2a3119, #1a2010);
-  border: 1px solid rgba(201, 168, 106, .55);
+  background: linear-gradient(180deg, var(--plate-hi), var(--plate-lo));
+  border: 1px solid rgba(var(--brass-rgb), .55);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 2px 10px rgba(0, 0, 0, .5);
 }
 #cp-value {
@@ -884,15 +922,15 @@ body.touch #unit-info { display: none !important; }
   cursor: pointer;
   clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px),
                      calc(100% - 5px) 100%, 0 100%, 0 5px);
-  background: linear-gradient(180deg, #2a3119, #1a2010);
-  border: 1px solid rgba(201, 168, 106, .34);
-  color: #d8d2b0;
+  background: linear-gradient(180deg, var(--plate-hi), var(--plate-lo));
+  border: 1px solid rgba(var(--brass-rgb), .34);
+  color: var(--paper);
   transition: border-color .1s, color .1s;
 }
 #hud-controls button:hover {
   border-color: var(--brass);
   color: var(--brass);
-  background: linear-gradient(180deg, #333c1f, #1f2614);
+  background: linear-gradient(180deg, var(--plate-hi-h), var(--plate-lo-h));
 }
 
 /* the top band reads as a printed strip rather than a fade */
@@ -905,7 +943,7 @@ body.touch #unit-info { display: none !important; }
   justify-content: space-between;
   align-items: flex-start;
   padding: 10px 14px;
-  border-bottom: 1px solid rgba(201, 168, 106, .22);
+  border-bottom: 1px solid rgba(var(--brass-rgb), .22);
   background: linear-gradient(180deg, rgba(20, 25, 15, .90) 0%,
                                       rgba(14, 18, 10, .78) 58%,
                                       rgba(14, 18, 10, 0) 100%);
@@ -929,7 +967,7 @@ body.touch #unit-info { display: none !important; }
 /* morale bars get ranging ticks — a bare bar reads as a health bar from any
    other game; the graduations are what make it an instrument */
 .morale-bar {
-  border: 1px solid rgba(201,168,106,.4);
+  border: 1px solid rgba(var(--brass-rgb),.4);
   background: rgba(0,0,0,.55);
   box-shadow: inset 0 1px 4px rgba(0,0,0,.6);
   height: 13px;
@@ -946,14 +984,14 @@ body.touch #unit-info { display: none !important; }
 /* info and squad panels: manual pages, with a brass rule under the heading */
 #unit-info, #squad-panel {
   background: linear-gradient(180deg, #2b3319 0%, #1e2412 62%, #171c0e 100%);
-  border: 1px solid rgba(201, 168, 106, .45);
+  border: 1px solid rgba(var(--brass-rgb), .45);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .05);
 }
 #unit-info .ui-head {
   padding-bottom: 5px;
   margin-bottom: 6px;
-  border-bottom: 1px solid rgba(201, 168, 106, .28);
-  background: linear-gradient(180deg, rgba(201, 168, 106, .10), transparent);
+  border-bottom: 1px solid rgba(var(--brass-rgb), .28);
+  background: linear-gradient(180deg, rgba(var(--brass-rgb), .10), transparent);
 }
 #unit-info .ui-name {
   font-size: 13px;
@@ -974,7 +1012,7 @@ body.touch #unit-info { display: none !important; }
   padding-top: 5px;
   font-size: 9.5px;
   line-height: 1.4;
-  border-top: 1px solid rgba(201,168,106,.22);
+  border-top: 1px solid rgba(var(--brass-rgb),.22);
   opacity: .8;
   font-style: italic;
   border-left: 2px solid var(--brass);
