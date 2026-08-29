@@ -550,6 +550,24 @@ A sixth attempt has to re-bind the weapon after posing, or hand-pose the arms �
 it cannot be done by rotating bones above the wrist. The shipped workaround (the
 `aim` pose dropped toward the ground, see js/sprite3d.js) stays.
 
+**The prop contact sheet is now part of the audit.** Drawing all of them at one
+world scale beside a 1.8 m bar found three faults that no frame had surfaced,
+and the rule that produced them is worth keeping: *a prop is wrong if you cannot
+name it from its silhouette alone.*
+
+- `cart_v` was a Conestoga — a twelve-segment rim on six thin spokes under a
+  hooped canvas tilt. Now an ox cart.
+- `well_v` read as nothing at all. A side-on orthographic camera cannot show a
+  well's mouth, so the shape has to come from the FRAME — posts, cross-pole,
+  pail — not from the ring.
+- `stonewall_a` read as fired brick, because level courses of equal-height
+  blocks are what the eye reads, not the block widths that were already being
+  randomised.
+
+Still weak, not yet wrong enough to spend on: `stall_v` reads as a mostly empty
+frame, and `vine_a`'s regular leaf spacing reads as a rope ladder at foreground
+size (already noted in `_drawForeground`, which keeps it out of the near band).
+
 **Weapons are built now, not borrowed.** `WEAPON_MESH` entries reading
 `BUILT:` are assembled in `_build_weapon` from boxes rather than lifted from the
 Quaternius pack. The pack has no M16 and no belt-fed GPMG, and the two nearest
@@ -607,35 +625,39 @@ ranking.
 
 ## 4. Current numbers
 
-Budget, measured at 1600×900 with ~35 live units, against caps of 13 src Mpx /
-220 particles / 130 MB decoded:
+Measured at 1600x900 after the map-identity, weapon and prop work, against caps
+of 13 src Mpx / 220 particles / 130 MB decoded.
 
-| map | src Mpx before | after props |
-|---|---|---|
-| iadrang | 7.93 | — |
-| cuchi | 7.64 | 8.47 |
-| mekong | 8.05 | 8.85 |
-| khesanh | 7.68 | 8.73 |
-| hill937 | 7.74 | — |
+**MEMORY**
 
-The vegetation swap costs a consistent **+0.8 to +1.0 src Mpx**, against a cap of
-13. The foreground band is 1.27 of the frame's total.
+| | MB |
+|---|---|
+| sprite atlases (12 units x 135 frames) | 89.3 |
+| props (27) | 27.0 |
+| **total** | **116.3** of 130 |
 
-Memory 121 MB decoded against a 130 MB cap. Roughly 5 Mpx spare per frame.
+Down from 118.3 after `rock` and `sandbag_one` — rendered, committed and decoded
+every load, drawn never — were removed. 13.7 MB spare.
 
-**FRAME COST**, measured with `tools/perf.js` at 1600x900, ~35 men, 70s in,
-60 samples:
+**SOURCE PIXELS**, on a FRESH PAGE LOAD, which is the only honest way to read it
+(see rule 6): 9.7 on iadrang, 11.6 on cuchi, against a cap of 13. Staging all
+five maps in one page reports 13.4 and means nothing.
 
-| map | frameMs | p95 | ceiling |
-|---|---|---|---|
-| iadrang | 2.9 | 3.7 | 345 fps |
-| cuchi | 3.1 | 3.7 | 323 fps |
-| mekong | **5.6** | 6.6 | 179 fps |
-| khesanh | 4.4 | 6.4 | 227 fps |
-| hill937 | 4.2 | 6.1 | 238 fps |
+**FRAME COST**, `tools/perf.js`, 60 samples, `degraded: false` on all five:
 
-Nowhere near frame-limited — 3-5x headroom against the 16.7ms that 60fps allows,
-and the whole TAIL is inside budget too.
+| map | men | frameMs | p95 | ceiling |
+|---|---|---|---|---|
+| iadrang | 25 | 4.4 | 5.1 | 227 fps |
+| cuchi | 44 | 5.9 | 6.6 | 169 fps |
+| mekong | 38 | 6.0 | 7.3 | 167 fps |
+| khesanh | 35 | 5.0 | 5.5 | 200 fps |
+| hill937 | 37 | 5.7 | 6.1 | 175 fps |
+
+Every map holds 60 fps with 2.3-3.3x headroom, and the TAIL is inside budget
+too. Costs are up roughly 1-2 ms against the previous table, on maps that gained
+paddy fields, a firebase, churned mud and denser cratering — all of which bake
+into the lane layer once, so the rise tracks unit and particle counts rather
+than the new terrain. `_buildLane` bakes in 4-24 ms per map.
 
 **Quote no p95 taken from fewer than 50 samples.** At `iters: 18` the same
 scenes reported medians of 6.1 and p95s of 17.7-18.5, which read as the FX work
