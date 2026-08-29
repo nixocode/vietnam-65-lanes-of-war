@@ -708,26 +708,47 @@ def build_shrine():
 
 
 def build_wellviet():
-    """A village well: a low ring of blockwork, a plank lid, a tin pail.
+    """A village well: a blockwork drum, a rope frame, a pail on the rim.
 
-    No gantry, no shingled roof, no crank — the thing this replaces was a
-    storybook wishing well.
+    The predecessor was a storybook wishing well and this replaced it with a low
+    ring of blocks — 0.84 m across and 0.40 m tall, which from the side camera
+    every prop is rendered with is a WIDE FLAT BAND, and in a contact sheet of
+    all 29 props it was the one thing that read as nothing at all.
+
+    Two things were wrong. The proportions: a well is about as tall as it is
+    wide, not half. And more importantly, a side-on orthographic camera cannot
+    see into the mouth, so the shape that says "well" in plan — a dark circle —
+    is unavailable here. What reads from the side is the FRAME: two forked posts,
+    a cross-pole and a pail on a rope. That silhouette is unmistakable, and it
+    is also what village wells in the delta actually carry.
     """
     ring = _pmat('wv_ring', (0.150, 0.140, 0.120))
+    cap = _pmat('wv_cap', (0.175, 0.163, 0.140))
     dark = _pmat('wv_dark', (0.052, 0.050, 0.044))
     wood = _pmat('wv_wood', (0.120, 0.088, 0.052))
     tin = _pmat('wv_tin', (0.130, 0.134, 0.130))
     import math as _m
-    # the ring, as a low drum of blocks
-    for i in range(14):
-        a = (i / 14.0) * _m.pi * 2
-        x, y = _m.cos(a) * 0.42, _m.sin(a) * 0.42
-        _box(ring, x - 0.09, y - 0.07, 0.0, x + 0.09, y + 0.07, 0.40)
-    _box(dark, -0.34, -0.26, 0.36, 0.34, 0.26, 0.42)          # the water, in shadow
-    # a couple of planks laid across it
-    _beam(wood, -0.44, 0.44, 0.44, 0.45, t=0.030, y=-0.10, yt=0.07)
-    _beam(wood, -0.44, 0.42, 0.44, 0.43, t=0.026, y=0.12, yt=0.06)
-    _box(tin, 0.46, -0.10, 0.0, 0.62, 0.10, 0.19)             # pail beside it
+    # the drum: taller than it is wide across the front, so it reads as a shaft
+    for i in range(16):
+        ang = (i / 16.0) * _m.pi * 2
+        x, y = _m.cos(ang) * 0.34, _m.sin(ang) * 0.34
+        _box(ring, x - 0.075, y - 0.062, 0.0, x + 0.075, y + 0.062, 0.62)
+    # a cap course, overhanging a little — the line that makes it a rim and not
+    # the top of a wall
+    for i in range(16):
+        ang = ((i + 0.5) / 16.0) * _m.pi * 2
+        x, y = _m.cos(ang) * 0.38, _m.sin(ang) * 0.38
+        _box(cap, x - 0.082, y - 0.068, 0.62, x + 0.082, y + 0.068, 0.70)
+    _box(dark, -0.26, -0.20, 0.66, 0.26, 0.20, 0.70)          # the shaft, in shadow
+    # THE FRAME. Two forked posts and a cross-pole, which is what actually
+    # reads as a well from a side view.
+    for sx in (-0.46, 0.46):
+        _beam(wood, sx, 0.0, sx + 0.02, 1.34, t=0.044, y=0.0, yt=0.042)
+        _beam(wood, sx, 1.18, sx + 0.13, 1.36, t=0.028, y=0.0, yt=0.026)   # fork
+    _beam(wood, -0.52, 1.34, 0.52, 1.34, t=0.036, y=0.0, yt=0.034)         # cross-pole
+    _beam(dark, 0.06, 1.32, 0.06, 0.84, t=0.012, y=0.0, yt=0.012)          # rope
+    _box(tin, -0.06, -0.10, 0.62, 0.18, 0.10, 0.84)                        # pail
+    _box(wood, 0.40, -0.12, 0.0, 0.60, 0.12, 0.10)                         # spill trough
 
 
 def build_stallviet():
@@ -826,7 +847,7 @@ BUILT = {
     'stonewall_a': (build_stonewall, 1.05),
     # village fittings, replacing donor props from a fantasy pack
     'shrine_a':    (build_shrine, 1.5),
-    'well_v':      (build_wellviet, 0.9),
+    'well_v':      (build_wellviet, 1.5),   # the rope frame is most of the height now
     'stall_v':     (build_stallviet, 2.1),
     'cart_v':      (build_cartviet, 1.4),
 }
