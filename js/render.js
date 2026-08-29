@@ -536,11 +536,69 @@ function drawHat(ctx, C, hat, hx, hy, prone) {
 }
 
 /* ---------- vehicle silhouettes ---------- */
+/* A UH-1, the most recognisable object of this war.
+ *
+ * This was an ellipse, a four-point tail, one stroked line for the rotor and two
+ * for the skids — a flat dark blob, at a time when every soldier and every tree
+ * in the frame had been rebuilt as lit geometry. The airframe is now a rendered
+ * prop (`huey`, see tools/render_props.py) and only the parts that MOVE are
+ * still drawn here.
+ *
+ * That split is the point: a rotor is a blur, not a shape, so baking it into
+ * the prop would freeze it. The prop is the machine; the code is the motion. */
 function drawHuey(ctx, x, y, t, opts = {}) {
   ctx.save();
   ctx.translate(x, y);
-  // the art is drawn nose-left; dir=+1 (default) means flying right, so mirror
   const dir = opts.dir != null ? opts.dir : 1;
+  const sc = opts.scale != null ? opts.scale : 1;
+  const usable = typeof Props !== 'undefined' && Props.ready && Props.has('huey');
+  if (usable) {
+    // the prop is built nose-RIGHT; dir=+1 means flying right, so no mirror
+    ctx.save();
+    if (dir < 0) ctx.scale(-1, 1);
+    const H = 30 * sc;
+    // noShadow — it is FLYING. Props.draw grounds a contact shadow under
+    // everything by default, which stuck an ellipse of dirt to an airborne
+    // aircraft and followed it across the sky.
+    Props.draw(ctx, 'huey', 0, H * 0.52, 1, { fit: H, noShadow: true });
+    // rotor disc: swept from the MAST, which sits above and slightly aft of the
+    // cabin, not from the centre of the sprite
+    const mx = -H * 0.06, my = -H * 0.62;
+    const spin = Math.cos(t * 42), rl = 46 * sc;
+    ctx.globalAlpha = 0.42;
+    ctx.strokeStyle = 'rgba(24,28,20,0.9)'; ctx.lineWidth = 2.2 * sc;
+    ctx.beginPath();
+    ctx.moveTo(mx - rl * spin, my); ctx.lineTo(mx + rl * spin, my); ctx.stroke();
+    ctx.globalAlpha = 0.16;
+    ctx.strokeStyle = 'rgba(226,232,220,0.9)'; ctx.lineWidth = 1.0 * sc;
+    ctx.beginPath();
+    ctx.moveTo(mx - rl * spin, my - 1.4 * sc); ctx.lineTo(mx + rl * spin, my - 1.4 * sc);
+    ctx.stroke();
+    // tail rotor, faster and edge-on
+    const ts = Math.cos(t * 66);
+    ctx.globalAlpha = 0.34; ctx.lineWidth = 1.3 * sc;
+    ctx.strokeStyle = 'rgba(24,28,20,0.9)';
+    const tx = -H * 1.34, ty = -H * 0.34;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty - 6.5 * sc * ts); ctx.lineTo(tx, ty + 6.5 * sc * ts); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    if (opts.medevac) {
+      // a red cross on the CABIN DOOR — mid-body, not on the nose
+      ctx.save();
+      if (dir < 0) ctx.scale(-1, 1);
+      const cx0 = -H * 0.20, cy0 = -H * 0.34, w = H * 0.26;
+      ctx.fillStyle = '#cfcfc4';
+      ctx.fillRect(cx0, cy0, w, w);
+      ctx.fillStyle = '#a2291d';
+      ctx.fillRect(cx0 + w * 0.36, cy0 + w * 0.10, w * 0.28, w * 0.80);
+      ctx.fillRect(cx0 + w * 0.12, cy0 + w * 0.36, w * 0.76, w * 0.28);
+      ctx.restore();
+    }
+    ctx.restore();
+    return;
+  }
+  // vector fallback, kept so the game still draws before props load
   if (dir > 0) ctx.scale(-1, 1);
   if (opts.flip) ctx.scale(-1, 1);
   const c = opts.color || '#2c3324';
@@ -552,17 +610,10 @@ function drawHuey(ctx, x, y, t, opts = {}) {
   ctx.strokeStyle = c; ctx.lineWidth = 1.6;
   ctx.beginPath(); ctx.moveTo(-10, 9); ctx.lineTo(-12, 13); ctx.moveTo(8, 9); ctx.lineTo(10, 13); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(-14, 13); ctx.lineTo(14, 13); ctx.stroke();
-  ctx.fillStyle = 'rgba(120,140,150,0.5)';
-  ctx.beginPath(); ctx.ellipse(6, -2.5, 5, 3.5, 0, 0, 7); ctx.fill();
   const spin = Math.cos(t * 42);
   ctx.strokeStyle = 'rgba(30,34,26,0.85)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(-34 * spin, -10); ctx.lineTo(34 * spin, -10); ctx.stroke();
   ctx.fillStyle = c; ctx.fillRect(-2, -11, 4, 5);
-  if (opts.medevac) {
-    ctx.fillStyle = '#b8b8b0'; ctx.fillRect(-6, -5, 10, 9);
-    ctx.fillStyle = '#a83226';
-    ctx.fillRect(-3, -3.5, 4, 6); ctx.fillRect(-5, -1.5, 8, 2);
-  }
   ctx.restore();
 }
 

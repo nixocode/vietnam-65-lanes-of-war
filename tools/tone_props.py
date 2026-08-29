@@ -26,7 +26,21 @@ from PIL import Image
 from scipy import ndimage
 
 LEDGER = '.toned.json'
-OUTLINE = (26, 30, 20)
+# THE PROPS WERE STILL INKED. The sprite pipeline moved off a hard keyline a
+# while back — see the long note at the top of tools/outline_sprites.py, which
+# measured a 3px black rim turning 6.7% dark pixels into 36.4% — but this file
+# was left stroking every prop with FOUR pixels of near-black at full alpha.
+#
+# So the soldiers were being lit and separated by their rim light while the
+# scenery around them carried a cartoon outline: two art languages in one frame,
+# and the reason the new Huey read as a sticker rather than an aircraft.
+#
+# Same treatment as the sprites now: one pixel, lifted off black and warmed so
+# it reads as contact shadow, at partial alpha so it blends instead of punching
+# a silhouette. Props render at 512 and draw far smaller, so one pixel here is
+# a fraction of a pixel on screen — which is the point.
+OUTLINE = (38, 40, 32)
+OUTLINE_ALPHA = 0.72
 
 # Per-prop correction, applied after the global grade. The donor sandbags are a
 # pale grey that reads as a heap of pebbles rather than filled hessian; they need
@@ -55,10 +69,21 @@ FIXUP = {
     # hue 60 and 42/43/32 — yellow and too dark. `sat_keep` runs BEFORE the
     # multiply, so pulling saturation to 0.30 collapsed the red channel first
     # and then everything got darkened on top of it.
-    'palm_a':        (0.92, (0.020, 0.004, -0.004), 0.46),
-    'palm_b':        (0.60, (0.034, 0.020, 0.004), 0.30),
-    'palm_c':        (0.60, (0.034, 0.020, 0.004), 0.30),
-    'palm_d':        (0.60, (0.034, 0.020, 0.004), 0.30),
+    # RE-TUNED after the outline came off. These numbers were set while a 4px
+    # black rim covered ~45% of every frond, which dragged the measured
+    # saturation of palm_b/c/d down to 0.33 and made them look corrected. With
+    # the rim gone they measure 0.66-0.68 against a 0.34 median across the prop
+    # set — the most saturated things in the game by a factor of two — and in
+    # frame they read as bright plastic leaves pasted over a muted field.
+    'palm_a':        (0.88, (0.018, 0.004, -0.004), 0.42),
+    'palm_b':        (0.50, (0.026, 0.016, 0.006), 0.22),
+    'palm_c':        (0.50, (0.026, 0.016, 0.006), 0.22),
+    'palm_d':        (0.50, (0.026, 0.016, 0.006), 0.22),
+    # the broadleaf ground cover came up the same way once the rim went
+    'bush_low':      (0.74, (0.020, 0.014, 0.004), 0.30),
+    'vine_a':        (0.74, (0.020, 0.014, 0.004), 0.30),
+    'banana_a':      (0.72, (0.022, 0.014, 0.004), 0.30),
+    'fern_a':        (0.78, (0.018, 0.012, 0.004), 0.32),
     # At Lmean 83 this was the palest thing on the ground and scattered bright
     # straw across the field at random — noise where the frame needs structure.
     'grass_a':       (0.78, (0.014, 0.010, 0.002)),
@@ -110,15 +135,19 @@ def tone(a, fix=None):
     return a
 
 
-def process(path, width=4):
+def process(path, width=1):
     im = Image.open(path).convert('RGBA')
-    a = np.array(im)
-    a = tone(a, FIXUP.get(os.path.splitext(os.path.basename(path))[0]))
+    a = np.array(im).astype(np.float32)
+    a = tone(a.astype(np.uint8), FIXUP.get(os.path.splitext(os.path.basename(path))[0]))
+    a = a.astype(np.float32)
     solid = a[:, :, 3] > 110
     grown = ndimage.binary_dilation(solid, np.ones((3, 3)), iterations=width)
     rim = grown & ~solid
-    a[rim] = (*OUTLINE, 255)
-    Image.fromarray(a).save(path)
+    if rim.any():
+        for c in range(3):
+            a[:, :, c][rim] = OUTLINE[c]
+        a[:, :, 3][rim] = 255.0 * OUTLINE_ALPHA
+    Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)).save(path)
 
 
 def digest(p):

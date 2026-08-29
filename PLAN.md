@@ -472,6 +472,79 @@ There were simply not enough frames in it.
   remaining variety win.
 
 
+## 1.9 THE VISUAL OVERHAUL — the only priority
+
+Owner, and the words matter: *"make the game look good. It's shit right now"*,
+*"everything needs an upscale"*, *"maybe even adding and removing old assets"*.
+
+Measured first, because three of the four things that look wrong are not what
+they appear to be.
+
+### What the frame actually measures
+
+| | cuchi | iadrang | mekong |
+|---|---|---|---|
+| whole-frame luminance range | 200 | 195 | 176 |
+| GROUND-BAND range | **74** | **70** | **92** |
+| mean saturation | 0.22 | 0.39 | 0.48 |
+
+**Soldier-to-ground contrast: 12 points out of 255.** US bodies average 99.3
+against ground at 102.5; VC 72.9 against 62.3. In a game about infantry you
+cannot see the infantry — they are the same value as the dirt they stand on.
+
+The whole-frame range looks healthy at ~200 and is a lie: it is the SKY doing
+all of it. The sky reaches 230 while the playfield lives in a 70-point band. The
+picture has a bright empty top half and a flat middle where the game is.
+
+### The order, by measured impact
+
+**1. FIGURE SEPARATION.** 12 points is the headline number. Three levers, all
+cheap: darken the uniform tints so men sit below the ground plane in value,
+strengthen the contact shadow so each man is anchored, and add a light rim on
+the sun side. Target 35+ points body-to-ground.
+
+**2. GROUND-BAND RANGE.** 70-92 points where the sky gets 200. The terrain
+passes exist and are being flattened by the haze wash that sits over them.
+Target 110+ without touching the sky.
+
+**3. RESOLUTION, honestly.** The atlas is `figH` 85.3 px drawn to `S3_TARGET_H`
+84 — a 1:1 source. The canvas backing store is 1534 px wide against a logical
+1280, so every soldier is upscaled ~1.18x on this display and more on a larger
+one. Props render at 512 and are drawn near 100, so they are fine; the SPRITES
+are the bottleneck. Raising the figure to 120 px costs 2x atlas memory
+(89 -> 178 MB) against a 130 cap, so it has to be paid for by cutting frames:
+`walk` 28 -> 16 and `runfire` 20 -> 12 buys the room. Do this AFTER 1 and 2,
+because contrast is worth more than pixels and costs nothing.
+
+**4. REMOVE THE WEAK OLD ASSETS.** Now that the prop outline is off, what is
+left of the inked kit is obvious. `_tree` vector lollipops still draw the
+mid-ground canopy; `drawJet` and `drawB52` are flat polygons; the round bush
+blobs in the tree band are three ellipses. These are the last things in the
+frame that are not lit geometry.
+
+**5. ADD.** A Huey exists now. The gaps that would carry the most: a proper
+canopy/treeline prop to replace the vector blobs, and ground detail so the
+playfield is not a bare plane.
+
+### Already done this pass
+
+**The prop outline was the single biggest fault and it is fixed.** Every prop
+was stroked with FOUR pixels of near-black at full alpha, while the sprite
+pipeline had already moved to a 1px soft edge — two art languages in one frame.
+Measured share of visible pixels that were dark outline:
+
+    bamboo_a  44.8% -> 1.9%      grass_a  45.1% -> 5.8%
+    dike_a    38.0% -> 0.0%      deadtree 28.2% -> 1.0%
+
+Nearly half of some props WAS the outline. **Rule: when an asset looks like a
+sticker, measure how much of it is the rim before touching the art.**
+
+And the foliage tone was re-tuned as a consequence: those fixups were calibrated
+while the rim covered ~45% of every frond, which held measured saturation down
+to 0.33 and made the palms look corrected. With the rim gone they measured
+0.66-0.68 against a 0.34 median — the most saturated things in the game by 2x,
+reading as bright plastic. Now inside the set at a 0.27 median.
+
 ## 2. Open, ranked
 
 **The asset audit, and the rule it produced.** Laying all 31 props side by side

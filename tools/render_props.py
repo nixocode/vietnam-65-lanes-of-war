@@ -346,6 +346,79 @@ def build_m113():
     _box(dark, L * 0.55, -0.50, 1.70, L * 0.72, 0.50, 1.84)       # driver hatch
 
 
+def build_huey():
+    """A UH-1 Iroquois, side on — the single most recognisable object of this war,
+    and until now the weakest thing in the game.
+
+    It was `drawHuey`: a filled ellipse, a stick tail, one line for the rotor and
+    two for the skids. A flat dark blob, with none of the shapes that make a Huey
+    a Huey, while everything around it had been rebuilt as lit geometry.
+
+    The ROTOR IS NOT HERE. It has to spin, so it stays procedural in render.js;
+    this is the airframe under it. What the silhouette needs, in order of how
+    much each one says: the tall slab cabin with its greenhouse glazing, the
+    long thin tail boom, the swept fin, and the skids standing the body off the
+    ground. Boxes suit it for the same reason they suited the M113 — a fuselage
+    is a closed volume, not a lattice.
+
+    Built nose-right (+X) to match the way the props are drawn and flipped.
+    """
+    olive = _pmat('h_olive', (0.052, 0.062, 0.040))
+    dark = _pmat('h_dark', (0.022, 0.026, 0.018))
+    # The glazing has to be DARK. First pass gave it a value close to the hull
+    # and the greenhouse vanished — the whole airframe read as one olive slab.
+    # Cockpit glass seen from outside is nearly black with a cold sky sheen, and
+    # that dark hole under the rotor is a large part of the silhouette.
+    glass = _pmat('h_glass', (0.012, 0.017, 0.022), rough=0.18)
+    lit = _pmat('h_lit', (0.075, 0.088, 0.058))
+    steel = _pmat('h_steel', (0.034, 0.036, 0.038))
+
+    W = 0.62                                  # half-width, side-on so it is shallow
+    # ---- cabin: the tall slab that carries the whole read
+    _box(olive, -1.30, -W, 1.02, 1.05, W, 2.36)
+    # Nose. First pass stepped it down over 0.62 m and it read as a flat front;
+    # a Huey's nose is long, low and rounded, and that profile is half of what
+    # distinguishes it from a generic helicopter. Twice the length, ten steps.
+    for i in range(10):
+        t0, t1 = i / 10.0, (i + 1) / 10.0
+        _box(olive, 1.05 + 1.24 * t0, -W + 0.10 * t0, 1.02 + 0.34 * t0 ** 1.6,
+             1.05 + 1.24 * t1, W - 0.10 * t0, 2.24 - 0.86 * t1 ** 1.35)
+    _box(dark, 1.72, -W + 0.14, 0.98, 2.16, W - 0.14, 1.26)      # chin bubble
+    # ---- greenhouse. The glazing is most of what says "helicopter" in profile
+    _box(glass, 1.06, -W - 0.03, 1.46, 1.94, W + 0.03, 2.16)     # windscreen, raked
+    _box(glass, 0.28, -W - 0.03, 1.66, 1.00, W + 0.03, 2.22)     # pilot door window
+    _box(dark, 1.00, -W - 0.04, 1.44, 1.08, W + 0.04, 2.24)      # door pillar
+    _box(dark, 1.02, -W - 0.04, 2.14, 1.98, W + 0.04, 2.22)      # cabin roof lip
+    # ---- cabin door, slid open, with the dark interior behind it
+    _box(dark, -1.10, -W - 0.03, 1.16, 0.14, W + 0.03, 2.14)     # opening
+    _box(olive, -1.16, -W - 0.05, 1.12, -1.02, W + 0.05, 2.20)   # door frame aft
+    _box(steel, -1.06, -W - 0.06, 2.16, 0.18, W + 0.06, 2.26)    # door rail
+    # ---- engine deck and mast: the hump that separates cabin from boom
+    _box(olive, -1.34, -W + 0.08, 2.36, 0.44, W - 0.08, 2.72)
+    _box(lit, -1.34, -W + 0.08, 2.66, 0.44, W - 0.08, 2.72)      # lit deck edge
+    _box(dark, -1.40, -W + 0.10, 2.50, -0.90, W - 0.10, 2.86)    # exhaust stack
+    _box(steel, -0.42, -0.16, 2.72, 0.02, 0.16, 3.14)            # rotor mast
+    _box(steel, -0.56, -0.26, 3.14, 0.16, 0.26, 3.30)            # hub
+    # ---- tail boom, tapering back
+    for i in range(6):
+        t0, t1 = i / 6.0, (i + 1) / 6.0
+        z = 1.94 - 0.10 * t0
+        _box(olive, -1.30 - 2.55 * t1, -W * (0.42 - 0.20 * t0), z - 0.30 + 0.10 * t0,
+             -1.30 - 2.55 * t0, W * (0.42 - 0.20 * t0), z + 0.16 - 0.06 * t0)
+    # ---- fin, swept forward at the base like the real one, plus the stabiliser
+    _box(olive, -4.42, -0.11, 1.70, -3.78, 0.11, 2.60)           # fin
+    _box(olive, -4.30, -0.11, 2.60, -3.88, 0.11, 3.02)           # fin cap
+    _box(olive, -3.70, -0.46, 1.80, -3.02, 0.46, 1.96)           # stabiliser
+    _box(steel, -4.46, -0.22, 2.06, -4.30, 0.22, 2.26)           # tail rotor hub
+    _box(dark, -4.52, -0.06, 1.52, -4.26, 0.06, 1.78)            # tail skid
+    # ---- skids: two struts a side and the tube they carry
+    for sy in (-W + 0.10, W - 0.22):
+        _box(steel, 0.30, sy, 0.16, 0.44, sy + 0.12, 1.06)       # forward strut
+        _box(steel, -0.86, sy, 0.16, -0.72, sy + 0.12, 1.06)     # aft strut
+        _box(steel, -1.15, sy - 0.05, 0.00, 1.05, sy + 0.17, 0.18)
+        _box(steel, 1.05, sy - 0.05, 0.04, 1.34, sy + 0.17, 0.26)  # toe, curved up
+
+
 # ---------------------------------------------------------------- foliage
 # The maps had four palm silhouettes and nothing else, tiled across every lane,
 # which reads as wallpaper the moment you look at the treeline. These are built
@@ -865,6 +938,7 @@ def build_cartviet():
 
 BUILT = {
     'm113':       (build_m113, 2.6),
+    'huey':       (build_huey, 4.4),   # UH-1 rotor diameter aside, 4.4 m to the hub
     'watchtower': (build_watchtower, 5.2),
     # foliage — real heights, so they scale against a 1.8 m soldier
     'bamboo_a':   (build_bamboo, 4.8),
