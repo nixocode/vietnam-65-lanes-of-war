@@ -44,14 +44,20 @@ GLB_NAME = {
     '21d44b5b-efef-4abd-96ad-fc59e4ad373b': 'palm_b',
     '4c17decd-3087-4afe-9611-cfd92cca47cd': 'palm_c',
     '5a6e6186-ab59-4c81-a5e1-9beb5e1bb8e9': 'sandbags_row',
-    '5c18a372-e0fb-490f-aa90-8bdd04d7e92f': 'sandbag_one',
+
     '66cd7d94-abba-471e-8d8b-c8ad30aa5c70': 'palm_d',
     '8d6e4780-251c-49f6-9a49-b28ea28a03f8': 'hut_b',
     '96654c1e-dbc8-4bbc-a1c0-0dfacd8e9d93': 'sandbag_wall',
     '99bbd0c0-b60d-4923-bfbf-a7849e26766f': 'hut_c',
     'd4bcb445-6ef3-4aef-b39c-3bacd95f1b29': 'village_row',
-    'd80aaa87-23d8-4e45-83a2-5ffd22c36356': 'rock',
+
     # 88fb0209 is a 26 m row of seedlings — a whole scene, not a prop
+    #
+    # `rock` and `sandbag_one` were dropped after a sweep for props referenced
+    # nowhere in js/ found both: each was rendered, toned, committed, and
+    # decoded at 512x512x4 = 1 MB on every load, and neither was ever drawn.
+    # Two megabytes of a budget with 11.7 free. Re-add the id here if a use
+    # appears — the GLBs are still in art/props.
 }
 SRC = arg('--src', os.path.join(ROOT, 'art', 'props'))
 OUT = arg('--out', os.path.join(ROOT, 'assets', 'props'))
@@ -650,27 +656,55 @@ def build_dike():
 
 
 def build_stonewall():
-    """A low village wall of mud brick, chipped and gapped."""
+    """A low village wall of laterite block, slumped and gapped.
+
+    This is the generic `wall` cover on every map, so it is on screen constantly.
+    It was randomising block WIDTHS and staggering courses already — and still
+    read as fired brick, because every block was the same HEIGHT sitting on a
+    perfectly level course with an even gap, and those horizontal lines are what
+    the eye actually reads. Neat coursing means a kiln and a bricklayer.
+
+    Laterite is cut wet, dries uneven and is laid by hand: courses sag, blocks
+    vary in depth as well as width, and the faces sit at slightly different
+    heights. So the jitter has to be in Z and Y too, not just X, and the course
+    line itself has to wander.
+    """
     brick = _pmat('sw_brick', (0.150, 0.126, 0.086))
     dark = _pmat('sw_dark', (0.104, 0.086, 0.058))
+    warm = _pmat('sw_warm', (0.168, 0.118, 0.072))
     cap = _pmat('sw_cap', (0.170, 0.146, 0.100))
     import random as _r
+    import math as _m
     _r.seed(53)
     W, rows = 1.55, 5
     for r in range(rows):
-        z0 = r * 0.17
-        z1 = z0 + 0.155
-        off = 0.10 if r % 2 else 0.0          # staggered courses
+        base = r * 0.17
+        off = 0.10 if r % 2 else 0.0
         x = -W
         while x < W:
-            bw = 0.20 + _r.random() * 0.10
-            if r == rows - 1 and _r.random() < 0.34:
-                x += bw + 0.02                # the top course is broken
+            bw = 0.14 + _r.random() * 0.26          # much wider spread than 0.20-0.30
+            if r == rows - 1 and _r.random() < 0.40:
+                x += bw + 0.02                      # the top course is broken
                 continue
-            m = dark if _r.random() < 0.3 else brick
-            _box(m, x + off, -0.17, z0, min(W, x + off + bw), 0.17, z1)
-            x += bw + 0.018
-    _box(cap, -W, -0.19, rows * 0.17, W * 0.55, 0.19, rows * 0.17 + 0.055)
+            # the course SAGS across the wall and each block sits a little proud
+            # or low of its neighbours — this is the part that stops it coursing
+            sag = _m.sin((x / W) * 2.1 + r) * 0.016
+            jz = (_r.random() - 0.5) * 0.020
+            z0 = base + sag + jz
+            z1 = z0 + 0.135 + _r.random() * 0.045   # and blocks differ in height
+            d = 0.13 + _r.random() * 0.055          # ...and in depth, so the face
+            rr = _r.random()                        #    is not one flat plane
+            m = dark if rr < 0.26 else (warm if rr < 0.46 else brick)
+            _box(m, x + off, -d, z0, min(W, x + off + bw), d, z1)
+            x += bw + 0.012 + _r.random() * 0.022
+    # a broken cap, not a straight coping
+    xc = -W
+    while xc < W * 0.62:
+        cw = 0.22 + _r.random() * 0.20
+        if _r.random() > 0.24:
+            _box(cap, xc, -0.185, rows * 0.17 + (_r.random() - 0.5) * 0.02,
+                 min(W * 0.62, xc + cw), 0.185, rows * 0.17 + 0.05)
+        xc += cw + 0.03
 
 
 
