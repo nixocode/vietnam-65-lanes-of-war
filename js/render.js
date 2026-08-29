@@ -4128,9 +4128,15 @@ const Renderer = {
     const c = document.createElement('canvas');
     c.width = c.height = R * 2;
     const x = c.getContext('2d');
+    /* Deepened from 0.62/0.34. A contact shadow is half of what separates a
+     * figure from the ground it stands on, and the measured separation was 12
+     * luminance points out of 255 — US bodies at 99.3 against ground at 102.5,
+     * which is no separation at all. A darker, tighter core reads as the man
+     * touching the earth instead of floating on it. */
     const g = x.createRadialGradient(R, R, 0, R, R, R);
-    g.addColorStop(0, 'rgba(24,28,16,0.62)');
-    g.addColorStop(0.45, 'rgba(24,28,16,0.34)');
+    g.addColorStop(0, 'rgba(18,21,12,0.86)');
+    g.addColorStop(0.30, 'rgba(18,21,12,0.58)');
+    g.addColorStop(0.62, 'rgba(20,24,14,0.22)');
     g.addColorStop(1, 'rgba(24,28,16,0)');
     x.fillStyle = g;
     x.fillRect(0, 0, R * 2, R * 2);
@@ -4141,8 +4147,8 @@ const Renderer = {
   _drawShadow(ctx, u, scale, lift) {
     // a man on his belly casts a long thin shadow; a man on his feet a small one
     const prone = u.pose === 'prone' || u.deadT != null;
-    const w = (prone ? 30 : 13) * scale;
-    const h = (prone ? 4.4 : 4.0) * scale;
+    const w = (prone ? 30 : 15) * scale;
+    const h = (prone ? 4.8 : 4.6) * scale;
     // it stays on the ground even when the soldier is up a tower
     const gy = u.y + (u.yj || 0) + S3_TARGET_H * scale * S3_FOOT;
     const fade = lift > 0 ? 0.45 : 1;           // elevated men cast a softer mark

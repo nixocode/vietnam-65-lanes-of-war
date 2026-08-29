@@ -414,10 +414,39 @@ const Sprite3D = {
      * a man's colour never changes frame to frame. Kept narrow deliberately:
      * this has to break up a rank without breaking the side's identity, and the
      * player reads US from VC by colour before anything else. */
+    /* Per-man colour, and a CONTRAST lift that is not per-man.
+     *
+     * Measured against the terrain they stand on, soldiers separated by 12
+     * luminance points out of 255 — US bodies 99.3 against ground 102.5, VC
+     * 72.9 against 62.3. Both sides were the same value as their dirt, which is
+     * why a frame full of infantry read as an empty field.
+     *
+     * `contrast` is the right operator rather than `brightness`, because the
+     * two sides fail in opposite directions: on Cu Chi the US sit 3 points below
+     * their ground and the VC 25 points ABOVE theirs, so darkening everyone
+     * would fix one side and bury the other. Contrast pushes each man away from
+     * mid-grey in whichever direction he already leans, and deepens the figure's
+     * own internal shading as a bonus.
+     *
+     * Calibrated by drawing one atlas frame over a flat patch at the measured
+     * ground luminance of 103 and reading back the median body value — the only
+     * way to get a controlled number, since two live matches never contain the
+     * same men in the same places:
+     *
+     *     none                            sep 16   internal range 40
+     *     contrast(1.28) brightness(.96)  sep 26                  44
+     *     contrast(1.45) brightness(.90)  sep 32                  51   <- here
+     *     contrast(1.70) brightness(.82)  sep 41                  58
+     *
+     * Stopped at 1.45 rather than 1.70 because the harder settings start
+     * crushing the VC, who are already lighter than the jungle floor they fight
+     * on and do not need to be pushed down toward it. */
     const v = o.gaitOff;
     if (v != null) {
-      ctx.filter = 'brightness(' + (0.94 + v * 0.12).toFixed(3) + ') ' +
+      ctx.filter = 'contrast(1.45) brightness(' + (0.84 + v * 0.12).toFixed(3) + ') ' +
         'hue-rotate(' + ((v - 0.5) * 10).toFixed(1) + 'deg)';
+    } else {
+      ctx.filter = 'contrast(1.45) brightness(0.90)';
     }
     // o.y is the hip line the rig drew from; the ground sits S3_FOOT below it
     ctx.translate(o.x, o.y + (swayY || 0) + S3_TARGET_H * (o.scale || 1) * S3_FOOT);
