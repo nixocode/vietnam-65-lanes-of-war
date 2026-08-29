@@ -757,38 +757,55 @@ def build_stallviet():
 
 
 def build_cartviet():
-    """A two-wheel wooden cart. Big spoked wheels, a woven cover, shafts down.
+    """A Vietnamese ox cart: two heavy wheels, a slatted bed, shafts for the ox.
 
-    Replaces a European handcart. The wheels are what carry it at game size, so
-    they are built as real rims and spokes rather than discs.
+    The previous version was a covered wagon — a twelve-segment rim on six thin
+    spokes, which at any size reads as a European carriage wheel, under a canvas
+    tilt arched on hoops, which reads as a Conestoga. Both were caught in a
+    Mekong frame, where that wheel was the largest circle in the picture and the
+    only thing in it that curved.
+
+    A delta cart is plainer: a heavy wooden wheel with four thick spokes and a
+    broad hub, an open slatted bed with a low rail, and two long shafts, because
+    an ox stands between them rather than pulling on a yoke behind.
+
+    NOTE the signature — _box(mat, x0, y0, z0, x1, y1, z1) is corner to corner,
+    NOT three (min, max) pairs. Reading it as pairs collapsed the bed and hung a
+    slat below the axle, and the cart rendered as a wheel with a stick in it.
     """
     wood = _pmat('cv_wood', (0.118, 0.086, 0.050))
     dark = _pmat('cv_dark', (0.062, 0.048, 0.032))
-    weave = _pmat('cv_weave', (0.155, 0.140, 0.092))
     import math as _m
-    _box(wood, -0.52, -0.30, 0.40, 0.52, 0.30, 0.52)          # bed
-    _box(wood, -0.52, -0.32, 0.52, 0.52, -0.26, 0.76)         # side boards
-    _box(wood, -0.52, 0.26, 0.52, 0.52, 0.32, 0.76)
-    # a woven cover arched over the bed
-    cov = _curve(-0.46, 0.76, 0.46, 0.76, bow=0.30, segs=8)
-    for i in range(len(cov) - 1):
-        _beam(weave, cov[i][0], cov[i][1], cov[i + 1][0], cov[i + 1][1],
-              t=0.026, y=0.0, yt=0.30)
-    for side in (-1, 1):                                       # two wheels
-        cx, cz, R = side * 0.30, 0.40, 0.40
-        for k in range(12):                                    # rim
-            a0 = (k / 12.0) * _m.pi * 2
-            a1 = ((k + 1) / 12.0) * _m.pi * 2
+    _box(wood, -0.54, -0.30, 0.46, 0.54, 0.30, 0.56)           # bed floor
+    for k in range(6):                                         # cross slats
+        x = -0.50 + k * 0.185
+        _box(dark, x, -0.30, 0.56, x + 0.05, 0.30, 0.585)
+    _box(wood, -0.54, -0.32, 0.56, 0.54, -0.26, 0.66)          # low side rails
+    _box(wood, -0.54, 0.26, 0.56, 0.54, 0.32, 0.66)
+    for sx in (-0.50, -0.10, 0.30):                            # rail stanchions
+        for side in (-1, 1):
+            _box(wood, sx, side * 0.29 - 0.022, 0.56,
+                 sx + 0.044, side * 0.29 + 0.022, 0.70)
+
+    for side in (-1, 1):
+        cx, cz, R = -0.08, 0.38, 0.32
+        for k in range(14):                                    # heavy rim
+            a0 = (k / 14.0) * _m.pi * 2
+            a1 = ((k + 1) / 14.0) * _m.pi * 2
             _beam(dark, cx + _m.cos(a0) * R, cz + _m.sin(a0) * R,
                   cx + _m.cos(a1) * R, cz + _m.sin(a1) * R,
-                  t=0.030, y=side * 0.32, yt=0.028)
-        for k in range(6):                                     # spokes
-            a = (k / 6.0) * _m.pi
-            _beam(wood, cx - _m.cos(a) * R * 0.92, cz - _m.sin(a) * R * 0.92,
-                  cx + _m.cos(a) * R * 0.92, cz + _m.sin(a) * R * 0.92,
-                  t=0.017, y=side * 0.32, yt=0.016)
-    _beam(wood, -0.50, 0.46, -0.96, 0.30, t=0.026, y=-0.16, yt=0.024)   # shafts
-    _beam(wood, -0.50, 0.46, -0.96, 0.30, t=0.026, y=0.16, yt=0.024)
+                  t=0.055, y=side * 0.33, yt=0.050)
+        for k in range(4):                                     # four thick spokes
+            a = (k / 4.0) * _m.pi
+            _beam(wood, cx - _m.cos(a) * R * 0.88, cz - _m.sin(a) * R * 0.88,
+                  cx + _m.cos(a) * R * 0.88, cz + _m.sin(a) * R * 0.88,
+                  t=0.044, y=side * 0.33, yt=0.042)
+        _box(dark, cx - 0.08, side * 0.33 - 0.055, cz - 0.08,
+             cx + 0.08, side * 0.33 + 0.055, cz + 0.08)        # broad hub
+    # shafts, long and near level — an ox stands between them
+    for side in (-1, 1):
+        _beam(wood, -0.52, 0.50, -1.30, 0.44, t=0.032, y=side * 0.17, yt=0.030)
+    _box(wood, -1.30, -0.20, 0.42, -1.24, 0.20, 0.47)          # yoke bar
 
 
 BUILT = {

@@ -32,13 +32,13 @@
   },
   {
    "name": "cart_v",
-   "hM": 0.965,
-   "wM": 1.698,
-   "groundY": 383.6,
-   "ppm": 264.58,
+   "hM": 0.734,
+   "wM": 1.842,
+   "groundY": 345.5,
+   "ppm": 243.76,
    "res": 512,
    "realH": 1.4,
-   "aspect": 1.7596
+   "aspect": 2.5095
   },
   {
    "name": "deadtree_a",
