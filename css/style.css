@@ -29,11 +29,6 @@ html, body {
   color: var(--paper);
 }
 
-#app {
-  width: 100%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
-}
-
 #stage {
   position: relative;
   aspect-ratio: 16 / 9;
@@ -63,8 +58,15 @@ html, body {
  * correct, so the fix is to fill the short axis and let the notch be covered
  * rather than to change the aspect.
  */
-#app { padding: env(safe-area-inset-top) env(safe-area-inset-right)
-               env(safe-area-inset-bottom) env(safe-area-inset-left); }
+#app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
 
 body.touch #stage { box-shadow: none; }
 
@@ -135,24 +137,6 @@ body.portrait #rotate-prompt { display: flex; }
     linear-gradient(rgba(10,12,7,.82), rgba(10,12,7,.92));
   z-index: 20;
 }
-.screen.translucent { background: rgba(10,12,7,.72); }
-
-.panel {
-  background: linear-gradient(160deg, #232a1a, #1a2013);
-  border: 1px solid #4a533a;
-  outline: 4px solid rgba(0,0,0,.35);
-  box-shadow: 0 12px 60px rgba(0,0,0,.7), inset 0 0 60px rgba(0,0,0,.35);
-  padding: 26px 34px;
-  max-height: 92%;
-  overflow-y: auto;
-  position: relative;
-}
-.panel::before {
-  content: '';
-  position: absolute; inset: 6px;
-  border: 1px dashed rgba(216,210,176,.22);
-  pointer-events: none;
-}
 .panel.wide { width: 78%; }
 .panel.narrow { width: 460px; text-align: center; }
 .panel.briefing { width: 640px; }
@@ -164,14 +148,6 @@ h1 {
   color: var(--paper);
   text-shadow: 0 4px 0 rgba(0,0,0,.55), 0 0 34px rgba(220,160,80,.25);
   line-height: 1;
-}
-h2 {
-  font-family: var(--font-head);
-  font-size: 30px;
-  letter-spacing: 5px;
-  color: var(--brass);
-  margin-bottom: 16px;
-  text-shadow: 0 2px 0 rgba(0,0,0,.5);
 }
 h3 {
   font-family: var(--font-head);
@@ -186,7 +162,6 @@ h3 {
 .emblem.vc { color: var(--vc-bright); }
 
 /* ---------- Main menu ---------- */
-#screen-menu { background: linear-gradient(rgba(8,10,6,.30), rgba(8,10,6,.66) 68%, rgba(8,10,6,.9)); }
 .menu-inner { text-align: center; margin-top: -30px; }
 .title-over {
   font-size: 13px; letter-spacing: 6px; color: var(--brass);
@@ -285,36 +260,10 @@ h3 {
 /* ---------- Campaign ---------- */
 .campaign-note { font-size: 12px; color: var(--paper-dim); margin-bottom: 16px; line-height: 1.6; }
 #mission-list { display: flex; flex-direction: column; gap: 8px; }
-.mission-row {
-  display: flex; align-items: center; gap: 16px;
-  background: rgba(0,0,0,.3);
-  border: 1px solid rgba(216,210,176,.2);
-  padding: 10px 16px; cursor: pointer;
-  font-family: var(--font-mono);
-  color: var(--paper);
-  text-align: left; width: 100%;
-}
-.mission-row:hover:not(.locked) { background: rgba(216,210,176,.08); border-color: var(--brass); }
 .mission-row.locked { opacity: .38; cursor: default; }
-.mission-row .m-num { font-family: var(--font-head); font-size: 24px; color: var(--brass); width: 34px; }
-.mission-row .m-name { font-family: var(--font-head); font-size: 17px; letter-spacing: 2px; }
-.mission-row .m-meta { font-size: 10px; color: var(--paper-dim); letter-spacing: 1px; margin-top: 2px; }
-.mission-row .m-side { margin-left: auto; font-size: 11px; letter-spacing: 2px; }
-.mission-row .m-side.us { color: var(--us-bright); }
-.mission-row .m-side.vc { color: var(--vc-bright); }
-.mission-row .m-check { color: var(--brass); font-size: 16px; width: 22px; }
 
 /* ---------- Briefing ---------- */
-.brief-stamp {
-  position: absolute; top: 18px; right: 22px;
-  font-family: var(--font-head); font-size: 13px; letter-spacing: 3px;
-  color: var(--danger); border: 2px solid var(--danger);
-  padding: 3px 10px; transform: rotate(6deg); opacity: .8;
-}
-.brief-meta { font-size: 11px; letter-spacing: 2px; color: var(--brass); margin-bottom: 14px; }
-.brief-body { font-size: 13px; line-height: 1.75; color: var(--paper); white-space: pre-wrap; min-height: 120px; }
 .brief-objectives { margin-top: 14px; font-size: 12px; line-height: 1.8; color: var(--us-bright); }
-.brief-objectives .obj-vc { color: var(--vc-bright); }
 
 /* ---------- Manual ---------- */
 .manual-cols { display: flex; gap: 30px; }
@@ -339,20 +288,9 @@ h3 {
 /* ---------- HUD ---------- */
 #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
 #hud button { pointer-events: auto; }
-
-#hud-top {
-  position: absolute; top: 0; left: 0; right: 0;
-  display: flex; justify-content: space-between; align-items: flex-start;
-  padding: 10px 14px;
-  background: linear-gradient(rgba(8,10,6,.55), transparent);
-}
 .morale-block { width: 300px; }
 .morale-block.right { text-align: right; }
-.morale-label { font-family: var(--font-head); font-size: 13px; letter-spacing: 2px; margin-bottom: 4px; text-shadow: 0 1px 2px #000; }
-.morale-bar { height: 12px; background: rgba(0,0,0,.6); border: 1px solid rgba(216,210,176,.4); }
 .morale-fill { height: 100%; transition: width .3s; }
-.morale-fill.us { background: linear-gradient(180deg, var(--us-bright), var(--us)); }
-.morale-fill.vc { background: linear-gradient(180deg, var(--vc-bright), var(--vc)); float: right; }
 
 #hud-center { text-align: center; padding-top: 2px; }
 #flag-pips { display: flex; gap: 8px; justify-content: center; }
@@ -362,7 +300,6 @@ h3 {
 }
 .flag-pip.us { background: var(--us); }
 .flag-pip.vc { background: var(--vc); }
-#objective-line { font-size: 11px; letter-spacing: 2px; color: var(--brass); margin-top: 8px; text-shadow: 0 1px 2px #000; }
 #minimap {
   display: block; margin: 6px auto 0;
   border: 1px solid rgba(216,210,176,.35);
@@ -374,23 +311,7 @@ h3 {
 }
 
 #hud-controls { position: absolute; top: 54px; right: 14px; display: flex; gap: 6px; }
-#hud-controls button {
-  font-family: var(--font-head); font-size: 12px; letter-spacing: 1px;
-  width: 40px; height: 30px;
-  background: rgba(20,23,15,.8); color: var(--paper);
-  border: 1px solid rgba(216,210,176,.4); cursor: pointer;
-}
-#hud-controls button:hover { border-color: var(--brass); color: var(--brass); }
 #hud-controls button.off { color: rgba(216,210,176,.35); text-decoration: line-through; }
-
-#banner {
-  position: absolute; top: 26%; left: 0; right: 0;
-  text-align: center;
-  font-family: var(--font-head); font-size: 46px; letter-spacing: 10px;
-  color: var(--paper); text-shadow: 0 3px 0 #000, 0 0 40px rgba(255,180,80,.35);
-  opacity: 0; transition: opacity .25s;
-  pointer-events: none;
-}
 #banner.show { opacity: 1; }
 #banner.danger { color: var(--danger); }
 
@@ -405,49 +326,14 @@ h3 {
 #ticker .tk-vc { color: var(--vc-bright); }
 #ticker .tk-sys { color: var(--brass); }
 
-#hud-bottom {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  display: flex; align-items: stretch; gap: 8px;
-  padding: 8px 12px;
-  background: linear-gradient(transparent, rgba(8,10,6,.78) 30%);
-  pointer-events: auto;
-}
-#cp-display {
-  display: flex; flex-direction: column; justify-content: center; align-items: center;
-  min-width: 76px;
-  background: rgba(20,23,15,.85);
-  border: 1px solid var(--brass);
-}
-#cp-value { font-family: var(--font-head); font-size: 30px; color: var(--brass); line-height: 1; }
-.cp-label { font-size: 9px; letter-spacing: 3px; color: var(--paper-dim); margin-top: 2px; }
-
 #unit-cards, #callin-cards { display: flex; gap: 6px; }
 #callin-divider { width: 1px; background: rgba(216,210,176,.3); margin: 4px 2px; }
-
-.card {
-  position: relative; width: 78px; height: 84px;
-  background: rgba(26,31,18,.92);
-  border: 1px solid rgba(216,210,176,.35);
-  cursor: pointer;
-  display: flex; flex-direction: column; align-items: center;
-  padding-top: 3px;
-  overflow: hidden;
-  transition: border-color .1s;
-}
-.card:hover { border-color: var(--paper); }
-.card.armed { border-color: var(--brass); box-shadow: 0 0 12px rgba(201,168,106,.5), inset 0 0 10px rgba(201,168,106,.25); }
 .card.unaffordable .card-cost { color: var(--danger); }
 .card canvas { width: 44px; height: 38px; }
-.card-name { font-family: var(--font-head); font-size: 9.5px; letter-spacing: .5px; color: var(--paper); margin-top: 1px; white-space: nowrap; }
 .card-cost { font-size: 11px; color: var(--brass); font-weight: bold; }
 .card-key {
   position: absolute; top: 2px; left: 4px;
   font-size: 9px; color: rgba(216,210,176,.55);
-}
-.card-men {
-  position: absolute; top: 2px; right: 4px;
-  font-size: 9px; color: rgba(216,210,176,.75);
-  font-weight: bold;
 }
 .card-cd {
   position: absolute; left: 0; right: 0; bottom: 0;
@@ -457,22 +343,6 @@ h3 {
 }
 .card.callin { background: rgba(31,26,18,.92); }
 body.side-vc .card.callin { background: rgba(38,24,18,.92); }
-
-#squad-panel {
-  position: absolute; bottom: 108px; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 6px;
-  background: rgba(12,14,9,.85); border: 1px solid rgba(201,168,106,.5);
-  padding: 5px 10px; border-radius: 2px;
-  font-family: var(--font-head); letter-spacing: 1px;
-  z-index: 6;
-}
-#squad-panel .sp-name { color: var(--brass); font-size: 12px; margin-right: 6px; }
-#squad-panel button {
-  background: rgba(60,66,46,.9); color: var(--paper);
-  border: 1px solid rgba(216,210,176,.35);
-  font-family: var(--font-head); font-size: 10.5px; letter-spacing: 1px;
-  padding: 4px 8px; cursor: pointer;
-}
 #squad-panel button:hover { border-color: var(--brass); color: var(--brass); }
 #squad-panel button:disabled { opacity: .45; cursor: default; }
 #squad-panel button i { font-style: normal; opacity: .55; font-size: 9px; margin-left: 3px; }
@@ -569,6 +439,10 @@ body.side-vc .card.callin { background: rgba(38,24,18,.92); }
 }
 
 .panel {
+  padding: 26px 34px;
+  max-height: 92%;
+  overflow-y: auto;
+  position: relative;
   background:
     radial-gradient(circle at 1.1% 3.2%, #b9a877 0 .34%, transparent .36%),
     radial-gradient(circle at 98.9% 3.2%, #b9a877 0 .34%, transparent .36%),
@@ -579,9 +453,20 @@ body.side-vc .card.callin { background: rgba(38,24,18,.92); }
   outline: 5px solid rgba(0,0,0,.45);
   box-shadow: 0 18px 70px rgba(0,0,0,.75), inset 0 0 90px rgba(0,0,0,.45);
 }
-.panel::before { border-color: rgba(201,168,106,.16); }
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1px dashed rgba(216,210,176,.22);
+  pointer-events: none;
+  border-color: rgba(201,168,106,.16);
+}
 
 h2 {
+  font-family: var(--font-head);
+  font-size: 30px;
+  letter-spacing: 5px;
+  margin-bottom: 16px;
   color: var(--brass);
   text-shadow: 0 2px 0 rgba(0,0,0,.6), 0 0 22px rgba(201,168,106,.18);
   border-bottom: 1px solid rgba(201,168,106,.22);
@@ -590,6 +475,14 @@ h2 {
 
 /* ---- mission list: olive plates with brass numerals ---- */
 .mission-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  color: var(--paper);
+  text-align: left;
+  width: 100%;
   background: linear-gradient(180deg, #3d4a2b 0%, #313d23 55%, #2a3420 100%);
   border: 1px solid #4f5d36;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 2px 6px rgba(0,0,0,.4);
@@ -605,13 +498,41 @@ h2 {
   border-color: var(--brass);
 }
 .mission-row:hover:not(.locked)::after { background: var(--brass); }
-.mission-row .m-check { color: var(--brass); width: 18px; }
-.mission-row .m-num { color: var(--brass); text-shadow: 0 2px 0 rgba(0,0,0,.5); }
-.mission-row .m-name { color: #ece5c6; }
-.mission-row .m-meta { color: rgba(216,210,176,.62); letter-spacing: 1.5px; }
-.mission-row .m-side { margin-left: auto; letter-spacing: 2px; font-size: 12px; }
-.mission-row .m-side.us { color: #d8d2b0; }
-.mission-row .m-side.vc { color: var(--vc-bright); }
+.mission-row .m-check {
+  font-size: 16px;
+  color: var(--brass);
+  width: 18px;
+}
+.mission-row .m-num {
+  font-family: var(--font-head);
+  font-size: 24px;
+  width: 34px;
+  color: var(--brass);
+  text-shadow: 0 2px 0 rgba(0,0,0,.5);
+}
+.mission-row .m-name {
+  font-family: var(--font-head);
+  font-size: 17px;
+  letter-spacing: 2px;
+  color: #ece5c6;
+}
+.mission-row .m-meta {
+  font-size: 10px;
+  margin-top: 2px;
+  color: rgba(216,210,176,.62);
+  letter-spacing: 1.5px;
+}
+.mission-row .m-side {
+  margin-left: auto;
+  letter-spacing: 2px;
+  font-size: 12px;
+}
+.mission-row .m-side.us {
+  color: #d8d2b0;
+}
+.mission-row .m-side.vc {
+  color: var(--vc-bright);
+}
 .mission-row.locked .m-side::after { content: ' 🔒'; }
 
 /* ---- plate buttons everywhere outside the title screen ---- */
@@ -654,6 +575,10 @@ h2 {
 
 /* ---- briefing ---- */
 .brief-stamp {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  font-size: 13px;
   color: var(--vc-bright);
   border: 2px solid var(--vc-bright);
   transform: rotate(-7deg);
@@ -662,10 +587,23 @@ h2 {
   font-family: var(--font-head);
   opacity: .85;
 }
-.brief-meta { color: var(--brass); letter-spacing: 2px; }
-.brief-body { color: #d9d3b4; line-height: 1.72; }
+.brief-meta {
+  font-size: 11px;
+  margin-bottom: 14px;
+  color: var(--brass);
+  letter-spacing: 2px;
+}
+.brief-body {
+  font-size: 13px;
+  white-space: pre-wrap;
+  min-height: 120px;
+  color: #d9d3b4;
+  line-height: 1.72;
+}
 .brief-objectives div { color: #cbe0a0; }
-.brief-objectives .obj-vc { color: var(--vc-bright); }
+.brief-objectives .obj-vc {
+  color: var(--vc-bright);
+}
 
 /* ---- setup screens ---- */
 .faction-card, .map-card, .diff-btn {
@@ -681,22 +619,18 @@ h2 {
 /* ============================================================
    IN-MATCH HUD — riveted field kit to match the concept art
    ============================================================ */
-#hud-bottom {
-  background:
-    linear-gradient(180deg, rgba(20,25,15,.62) 0%, rgba(14,18,10,.93) 42%, rgba(10,13,7,.97) 100%);
-  border-top: 2px solid rgba(201,168,106,.35);
-  box-shadow: 0 -6px 26px rgba(0,0,0,.55);
-  padding-top: 6px;
-}
-#cp-display {
-  background: linear-gradient(180deg, #3a4529, #262f1b);
-  border: 1px solid #5b6a3d;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 3px 8px rgba(0,0,0,.45);
-  border-radius: 3px;
-}
-#cp-value { color: var(--brass); text-shadow: 0 2px 0 rgba(0,0,0,.6); }
 
 .card {
+  position: relative;
+  width: 78px;
+  height: 84px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 3px;
+  overflow: hidden;
+  transition: border-color .1s;
   background:
     radial-gradient(circle at 6% 8%, rgba(201,168,106,.85) 0 5%, transparent 6%),
     radial-gradient(circle at 94% 8%, rgba(201,168,106,.85) 0 5%, transparent 6%),
@@ -705,44 +639,73 @@ h2 {
   box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 2px 6px rgba(0,0,0,.45);
   border-radius: 3px;
 }
-.card:hover { border-color: var(--brass); }
+.card:hover {
+  border-color: var(--brass);
+}
 .card.armed {
   border-color: var(--brass);
   box-shadow: 0 0 14px rgba(201,168,106,.55), inset 0 0 14px rgba(201,168,106,.22);
 }
-.card-name { color: #e6dfbe; }
-.card-men { color: var(--brass); }
-
-.morale-bar {
-  border: 1px solid rgba(201,168,106,.4);
-  background: rgba(0,0,0,.55);
-  box-shadow: inset 0 1px 4px rgba(0,0,0,.6);
-  height: 13px;
+.card-men {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: bold;
+  color: var(--brass);
 }
-.morale-fill.us { background: linear-gradient(180deg, #b9cf8f, #7d9455); }
-.morale-fill.vc { background: linear-gradient(180deg, #e8917a, #b3452f); }
-.morale-label { letter-spacing: 3px; color: #e6dfbe; }
-
-#objective-line { color: var(--brass); letter-spacing: 3px; }
+.morale-fill.us {
+  background: linear-gradient(180deg, #b9cf8f, #7d9455);
+}
+.morale-fill.vc {
+  float: right;
+  background: linear-gradient(180deg, #e8917a, #b3452f);
+}
 #banner {
+  position: absolute;
+  top: 26%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 46px;
+  letter-spacing: 10px;
+  color: var(--paper);
+  opacity: 0;
+  transition: opacity .25s;
+  pointer-events: none;
   font-family: var(--font-head);
   text-shadow: 0 3px 0 rgba(0,0,0,.6), 0 0 30px rgba(201,168,106,.35);
 }
 
-#hud-controls button {
-  background: linear-gradient(180deg, #3c4a2b, #2a3420);
-  border: 1px solid #55643a; color: #ddd6b4;
-  border-radius: 3px;
-}
-#hud-controls button:hover { border-color: var(--brass); color: var(--brass); }
-
 #squad-panel {
+  position: absolute;
+  bottom: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 2px;
+  font-family: var(--font-head);
+  letter-spacing: 1px;
+  z-index: 6;
   background: linear-gradient(180deg, rgba(30,38,22,.95), rgba(18,24,13,.96));
   border: 1px solid rgba(201,168,106,.5);
   box-shadow: 0 6px 20px rgba(0,0,0,.6);
 }
-#squad-panel .sp-name { color: var(--brass); }
+#squad-panel .sp-name {
+  font-size: 12px;
+  margin-right: 6px;
+  color: var(--brass);
+}
 #squad-panel button {
+  color: var(--paper);
+  font-family: var(--font-head);
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+  cursor: pointer;
   background: linear-gradient(180deg, #4a5834, #3a4728);
   border: 1px solid #66754a;
   border-radius: 2px;
@@ -814,9 +777,6 @@ h2 {
   font-family: var(--font-mono); color: var(--paper);
 }
 #unit-info.hidden { display: none; }
-#unit-info .ui-head { border-bottom: 1px solid rgba(201,168,106,.28); padding-bottom: 5px; margin-bottom: 6px; }
-#unit-info .ui-name { font-family: var(--font-head); font-size: 13px; letter-spacing: 1.5px; color: var(--brass); }
-#unit-info .ui-role { font-size: 9.5px; opacity: .66; margin-top: 2px; letter-spacing: .5px; }
 #unit-info .ui-stats div {
   display: flex; align-items: center; justify-content: space-between;
   font-size: 9px; letter-spacing: 1px; opacity: .82; margin: 3px 0;
@@ -827,10 +787,6 @@ h2 {
   background: rgba(255,255,255,.15); border-radius: .5px;
 }
 #unit-info .ui-stats i.on { background: var(--brass); }
-#unit-info .ui-trait {
-  margin-top: 6px; padding-top: 5px; font-size: 9.5px; line-height: 1.4;
-  border-top: 1px solid rgba(201,168,106,.22); opacity: .8; font-style: italic;
-}
 #unit-info .ui-cost {
   margin-top: 7px; text-align: right;
   font-family: var(--font-head); font-size: 12px; letter-spacing: 1px; color: var(--brass);
@@ -870,13 +826,19 @@ body.touch #unit-info { display: none !important; }
   clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px),
                      calc(100% - 7px) 100%, 0 100%, 0 7px);
 }
-#hud-controls button {
-  clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px),
-                     calc(100% - 5px) 100%, 0 100%, 0 5px);
-}
 
 /* the bottom plate: a rule, not a glow */
 #hud-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px 12px;
+  pointer-events: auto;
+  padding-top: 6px;
   border-top: 1px solid rgba(201, 168, 106, .5);
   box-shadow: 0 -1px 0 rgba(201, 168, 106, .14), 0 -10px 30px rgba(0, 0, 0, .6);
   background:
@@ -888,17 +850,25 @@ body.touch #unit-info { display: none !important; }
 /* command points — the one brass-plated thing on the bar, so the eye has an
    anchor. Everything else on the plate is deliberately quieter than this. */
 #cp-display {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-width: 76px;
   background: linear-gradient(180deg, #2a3119, #1a2010);
   border: 1px solid rgba(201, 168, 106, .55);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 2px 10px rgba(0, 0, 0, .5);
 }
 #cp-value {
+  font-size: 30px;
+  line-height: 1;
   font-family: var(--font-head);
   color: var(--brass);
   letter-spacing: 1px;
   text-shadow: 0 1px 0 rgba(0, 0, 0, .6);
 }
 .cp-label {
+  margin-top: 2px;
   letter-spacing: 3px;
   color: #8c9668;
   font-size: 9px;
@@ -906,6 +876,14 @@ body.touch #unit-info { display: none !important; }
 
 /* stencilled controls */
 #hud-controls button {
+  font-family: var(--font-head);
+  font-size: 12px;
+  letter-spacing: 1px;
+  width: 40px;
+  height: 30px;
+  cursor: pointer;
+  clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px),
+                     calc(100% - 5px) 100%, 0 100%, 0 5px);
   background: linear-gradient(180deg, #2a3119, #1a2010);
   border: 1px solid rgba(201, 168, 106, .34);
   color: #d8d2b0;
@@ -919,17 +897,44 @@ body.touch #unit-info { display: none !important; }
 
 /* the top band reads as a printed strip rather than a fade */
 #hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 14px;
   border-bottom: 1px solid rgba(201, 168, 106, .22);
   background: linear-gradient(180deg, rgba(20, 25, 15, .90) 0%,
                                       rgba(14, 18, 10, .78) 58%,
                                       rgba(14, 18, 10, 0) 100%);
 }
-.morale-label { letter-spacing: 3px; }
-#objective-line { letter-spacing: 3px; }
+.morale-label {
+  font-family: var(--font-head);
+  font-size: 13px;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 2px #000;
+  color: #e6dfbe;
+  letter-spacing: 3px;
+}
+#objective-line {
+  font-size: 11px;
+  margin-top: 8px;
+  text-shadow: 0 1px 2px #000;
+  color: var(--brass);
+  letter-spacing: 3px;
+}
 
 /* morale bars get ranging ticks — a bare bar reads as a health bar from any
    other game; the graduations are what make it an instrument */
-.morale-bar { position: relative; }
+.morale-bar {
+  border: 1px solid rgba(201,168,106,.4);
+  background: rgba(0,0,0,.55);
+  box-shadow: inset 0 1px 4px rgba(0,0,0,.6);
+  height: 13px;
+  position: relative;
+}
 .morale-bar::after {
   content: '';
   position: absolute; inset: 0;
@@ -945,24 +950,47 @@ body.touch #unit-info { display: none !important; }
   box-shadow: 0 10px 30px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .05);
 }
 #unit-info .ui-head {
+  padding-bottom: 5px;
+  margin-bottom: 6px;
   border-bottom: 1px solid rgba(201, 168, 106, .28);
   background: linear-gradient(180deg, rgba(201, 168, 106, .10), transparent);
 }
 #unit-info .ui-name {
+  font-size: 13px;
   font-family: var(--font-head);
   letter-spacing: 2px;
   color: #e6dfbe;
 }
-#unit-info .ui-role { letter-spacing: 2px; color: #8aa06b; }
+#unit-info .ui-role {
+  font-size: 9.5px;
+  opacity: .66;
+  margin-top: 2px;
+  letter-spacing: 2px;
+  color: #8aa06b;
+}
 /* the ability block, set in from the edge like a manual sidebar */
 #unit-info .ui-trait {
+  margin-top: 6px;
+  padding-top: 5px;
+  font-size: 9.5px;
+  line-height: 1.4;
+  border-top: 1px solid rgba(201,168,106,.22);
+  opacity: .8;
+  font-style: italic;
   border-left: 2px solid var(--brass);
   background: rgba(8, 11, 5, .55);
   padding-left: 9px;
 }
 
 /* cards keep their rivets; the name goes stencil */
-.card-name { font-family: var(--font-head); letter-spacing: .5px; }
+.card-name {
+  font-size: 9.5px;
+  margin-top: 1px;
+  white-space: nowrap;
+  color: #e6dfbe;
+  font-family: var(--font-head);
+  letter-spacing: .5px;
+}
 .card-key, .card-men { color: #8c9668; }
 
 

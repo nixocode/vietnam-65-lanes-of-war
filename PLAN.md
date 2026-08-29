@@ -526,8 +526,7 @@ as five rows; nothing short of a diff would have caught that, and I would have
 |---|---|---|
 | 1 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
 | 2 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
-| 3 | CSS duplicate cleanup | `#hud-controls button` is declared four times, `#hud-bottom` twice. |
-| 4 | A SECOND death clip | The per-man rate/lag/lean variation below is cheap and works, but it is one pose played at different speeds. A real second clip costs ~7 MB of a 11.7 MB headroom, so it is affordable — it just needs Blender time. |
+| 3 | A SECOND death clip | The per-man rate/lag/lean variation below is cheap and works, but it is one pose played at different speeds. A real second clip costs ~7 MB of a 11.7 MB headroom, so it is affordable — it just needs Blender time. |
 
 **Death variety is done without spending memory.** There is one death clip per
 unit and the atlas is at 89 MB of a 130 MB budget with props, so a second clip
