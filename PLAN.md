@@ -524,8 +524,31 @@ as five rows; nothing short of a diff would have caught that, and I would have
 
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
+| 1 | A real prone clip | Needs mocap or hand-posed arms. FIVE attempts have now failed; see below before starting a sixth. |
 | 2 | A SECOND death clip | The per-man rate/lag/lean variation is cheap and works, but it is one pose played at different speeds. BLOCKED the same way the prone clip is: the donor pack has 24 actions and exactly one `Death` (verified by dumping them), so a second is authoring, not mapping — which is precisely what failed three times for prone. Do not start it expecting a mapping job. |
+
+**The prone clip: two more failures, and what they rule out.** Attempts four and
+five were both aimed at the recorded cause — that pitching `Body` by 84 degrees
+tips the rifle 84 degrees with it, into the dirt.
+
+*Four — pitch `Abdomen` instead of `Body`.* The rig looks like it should allow
+this: arms and legs are SIBLINGS below Body, so pitching the spine at Abdomen
+carries chest, arms, head and weapon as one rigid unit while the legs are swung
+back separately. It jack-knifed. Bending at the waist while the legs are still
+vertical gives a man folded double, and swinging the legs afterwards curls them
+up rather than laying them out.
+
+*Five — keep the `Body` pitch, counter-rotate at `Chest`.* `Chest` is the common
+parent of both arms, so the reasoning was that it moves them rigidly and the
+weapon's Child-Of stays valid where rotating the shoulders individually had not.
+It does not. At -66 the rifle detached completely and floated below the hands.
+
+**So the constraint is sharper than "counter-rotating the shoulders fails": ANY
+change to the wrist's world transform beyond the pose the Child-Of inverse was
+captured at breaks the grip, including one applied through a common ancestor.**
+A sixth attempt has to re-bind the weapon after posing, or hand-pose the arms —
+it cannot be done by rotating bones above the wrist. The shipped workaround (the
+`aim` pose dropped toward the ground, see js/sprite3d.js) stays.
 
 **Weapons are built now, not borrowed.** `WEAPON_MESH` entries reading
 `BUILT:` are assembled in `_build_weapon` from boxes rather than lifted from the
