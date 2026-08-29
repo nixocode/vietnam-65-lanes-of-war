@@ -532,7 +532,7 @@ as five rows; nothing short of a diff would have caught that, and I would have
 
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | A real prone clip | Needs mocap or hand-posed arms. FIVE attempts have now failed; see below before starting a sixth. |
+| 1 | ~~A real prone clip~~ | SOLVED, by not building one — prone is now `dive` frame 1, real mocap of a man going to ground. The synthesised clip stays broken and stays out of the atlas. Two diagnoses came out of the last attempts and are recorded in `Sprite3D._sel`: the pitch axis was wrong, and `Chest` cannot be rotated. |
 | 2 | A SECOND death clip | The per-man rate/lag/lean variation is cheap and works, but it is one pose played at different speeds. BLOCKED the same way the prone clip is: the donor pack has 24 actions and exactly one `Death` (verified by dumping them), so a second is authoring, not mapping — which is precisely what failed three times for prone. Do not start it expecting a mapping job. |
 
 **The prone clip: two more failures, and what they rule out.** Attempts four and
@@ -557,6 +557,30 @@ captured at breaks the grip, including one applied through a common ancestor.**
 A sixth attempt has to re-bind the weapon after posing, or hand-pose the arms —
 it cannot be done by rotating bones above the wrist. The shipped workaround (the
 `aim` pose dropped toward the ground, see js/sprite3d.js) stays.
+
+**The prone clip: solved by looking for the pose instead of building it.**
+Seven attempts to synthesise it failed. Two of them produced findings worth
+keeping, both now in the comment at `Sprite3D._sel`:
+
+- **The pitch was about the wrong axis.** `pose_bone.matrix` is in ARMATURE
+  space, and this rig is Y-up there, so the X rotation the code used swung the
+  body through the camera's depth axis. The head did not disappear — it was
+  rotated to where an orthographic side camera projects it onto the pelvis. Same
+  cause as the barrel pointing at the dirt. About Z, the man lays out in the
+  view plane and the rifle comes out level.
+- **`Chest` can never be rotated; `Head` and the legs can.** The weapon's
+  Child-Of inverse is captured at the standing pose, and Chest is an ancestor of
+  `Wrist.R`. Bones that are not ancestors of the wrist are free.
+
+With both fixed the grip survives and the weapon is level, and the body STILL
+read as a man sitting up. The answer was that the pose already existed: `dive`
+is the donor's Roll, and its frame 1 is a man pitched forward and low with the
+rifle held level — gripped because it was RENDERED gripped rather than posed
+afterwards. Free, too: the clip is already in the atlas for stance transitions.
+
+**Rule: before synthesising a pose, look through the clips you already have for
+one frame of it.** The old workaround was the standing `aim` pose shoved 26px
+down the screen; this is an actual low posture, and the drop is now 9px.
 
 **The animation jank was never the frame rate.** The previous pass raised `walk`
 from 14 to 28 frames on the theory that low animation fps was the problem, and

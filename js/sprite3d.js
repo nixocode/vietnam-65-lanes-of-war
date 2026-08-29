@@ -135,32 +135,44 @@ const Sprite3D = {
       return [c, Math.min(f.length - 1, Math.floor(p * (f.length - 1) + 0.0001))];
     }
     if (o.pose === 'prone' && (o.transT || 0) <= 0) {
-      /* DOWN, not flat on his face.
+      /* DOWN BEHIND THE WEAPON — and it is a frame of `dive`, not a pose built
+       * for the job.
        *
-       * The rendered `prone` clip is broken and has been since it was made. It
-       * is synthesised by pitching the whole body 84 degrees about the pelvis,
-       * but the arms hang off the chest and the rifle rides the right wrist, so
-       * the tip-over carries the weapon into the ground behind him and folds the
-       * legs back through the torso. At game size it reads as a tangle of limbs
-       * with the barrel pointing at the dirt and no head to be seen — which is
-       * what "firing while prone looks awful" is describing.
+       * The rendered `prone` clip has never worked. It is synthesised by
+       * pitching the standing figure about the pelvis, and after seven attempts
+       * the failures are understood but not fixed:
        *
-       * Three attempts to fix it in Blender each made it worse. Counter-rotating
-       * the shoulders slid the rifle off the hands entirely, because the weapon
-       * is bound to the wrist by a Child-Of whose inverse was captured at the
-       * original pose. A shallower 58-degree pitch just produced a diagonal
-       * version of the same tangle. And the donor has no prone or crouch action
-       * to borrow — all 24 of its clips are upright.
+       *   - The pitch was about the WRONG AXIS. `pose_bone.matrix` is in
+       *     ARMATURE space, where this rig is Y-up, so the X rotation the code
+       *     used swung the body through the camera's depth axis. That is why
+       *     the head vanished — it was not hidden, it was rotated to where an
+       *     orthographic side camera projects it onto the pelvis — and why the
+       *     barrel pointed at the dirt. Rotating about Z instead lays the man
+       *     out in the view plane and the rifle comes out LEVEL.
+       *   - Counter-rotating `Chest` to lift the torso detaches the rifle,
+       *     every time. Chest is an ancestor of Wrist.R, and the weapon's
+       *     Child-Of inverse was captured at the standing pose. Bones that are
+       *     NOT ancestors of the wrist — Head, UpperLeg, LowerLeg — are safe.
+       *   - With the axis fixed and the chest left alone the grip survives and
+       *     the weapon is level, but the body still reads as a man sitting up
+       *     rather than lying down, and no combination of leg and head angles
+       *     tried has fixed that.
        *
-       * So: use the AIM pose, which is clean, and drop the man toward the
-       * ground (see PRONE_DROP in render). He reads as hunkered down behind his
-       * weapon rather than lying in it, using art that is known good. The sim is
-       * untouched — `prone` is still the protection state, it just looks like a
-       * man who has gone to ground instead of a heap.
-       */
-      const c = pick('aim', 'idle');
+       * So: use `dive` frame 1, which is real mocap of a man going to ground —
+       * pitched forward and low, legs trailing, rifle held level and forward,
+       * head up. The weapon is gripped because it was RENDERED gripped rather
+       * than posed into place afterwards, and it costs nothing: the clip is
+       * already in the atlas for the stance transition.
+       *
+       * This replaces an earlier workaround that used the `aim` pose dropped
+       * toward the ground — a STANDING man moved down the screen. This one is
+       * actually a low posture. `prone` itself stays out of the atlas entirely
+       * (see SKIP in tools/pack_sprites3d.py). */
+      const c = pick('dive', 'aim', 'idle');
+      if (c === 'dive' && C[c].length > 1) return [c, 1];
       if (c) {
-        // slow breathing, offset per man — a frozen frame reads as a bug
+        // fallback: the old aim-based hold, still with slow breathing so a
+        // frozen frame does not read as a bug
         const n = C[c].length;
         const t = (o.time || 0) * 0.5 + (o.gaitOff || 0);
         return [c, Math.floor(((t % 1) + 1) % 1 * n) % n];

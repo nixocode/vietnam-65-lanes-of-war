@@ -4191,7 +4191,12 @@ const Renderer = {
         const a = LANE_DEPTH[u.crossFrom], b = LANE_DEPTH[u.lane];
         scale = (a + (b - a) * u.crossK) * (u.sj || 1);
       }
-      const proneDrop = u.pose === 'prone' ? 26 * scale : 0;
+      /* The prone pose is now `dive` frame 1, which is ALREADY a low posture —
+       * a man pitched forward on his way to the ground — where the old one was
+       * the standing `aim` pose that had to be shoved 26px down the screen to
+       * pretend. Dropping this one that far buries him to the waist. 9px seats
+       * him without sinking him. See Sprite3D._sel. */
+      const proneDrop = u.pose === 'prone' ? 9 * scale : 0;
       /* RECOIL — a per-shot kick on the whole man.
        *
        * The vector rig has swapped recoil FRAMES off `muzzleT` since it was
