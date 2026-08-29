@@ -527,8 +527,7 @@ as five rows; nothing short of a diff would have caught that, and I would have
 | 1 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
 | 2 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
 | 3 | CSS duplicate cleanup | `#hud-controls button` is declared four times, `#hud-bottom` twice. |
-| 4 | Night contrast on Khe Sanh | Mid-value objects (the village masonry) sit noticeably lighter than everything around them once the night grade lands. The prop set itself measures unified — Lmean 48-96 across all 29, no outliers — so this is the grade, not the art. |
-| 5 | A SECOND death clip | The per-man rate/lag/lean variation below is cheap and works, but it is one pose played at different speeds. A real second clip costs ~7 MB of a 11.7 MB headroom, so it is affordable — it just needs Blender time. |
+| 4 | A SECOND death clip | The per-man rate/lag/lean variation below is cheap and works, but it is one pose played at different speeds. A real second clip costs ~7 MB of a 11.7 MB headroom, so it is affordable — it just needs Blender time. |
 
 **Death variety is done without spending memory.** There is one death clip per
 unit and the atlas is at 89 MB of a 130 MB budget with props, so a second clip

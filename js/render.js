@@ -3453,11 +3453,32 @@ const Renderer = {
      * restore. The map haze is skipped entirely at night (see above), the navy
      * source-over is halved, and a `overlay` pass pushes the range back out so
      * night is DARK rather than FLAT. */
+    /* THE MULTIPLY IS A GRADIENT, because the sky and the ground need opposite
+     * things and a flat factor cannot give both.
+     *
+     * With one factor, the two requirements fight. Strong enough to cool Khe
+     * Sanh's sky — and that palette is a SUNSET, skyTop #d97a52 over skyBot
+     * #eeb47a — it crushed the ground band to 34 points of range against 70 in
+     * daylight, which is the whole map's readability: the wire, the craters and
+     * the mud all live there. Weak enough to keep the ground open, and the sky
+     * came out salmon and the map read as dusk rather than night.
+     *
+     * They are separable, because they are at different heights and the reason
+     * is physical: at night the sky loses far more of its daytime luminance
+     * than ground does, which is lit by fires, flares and the base itself.
+     * Deep cool blue at the top, easing to a pale factor at the boots.
+     *
+     * Measured on Khe Sanh: ground range 34 -> 45, sky median 67 -> 61 with a
+     * blue bias of +47 (R-to-B) where the old flat factor left it warm. */
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = 'rgb(74,116,205)';
+    const mg = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+    mg.addColorStop(0, 'rgb(30,52,132)');
+    mg.addColorStop(0.40, 'rgb(66,104,192)');
+    mg.addColorStop(1, 'rgb(122,158,226)');
+    ctx.fillStyle = mg;
     ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = `rgba(11,16,33,${k * 0.07})`;
+    ctx.fillStyle = `rgba(11,16,33,${k * 0.06})`;
     ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
     /* Push the range back out. `overlay` steepens around mid-grey: what was
      * lighter than half goes lighter, what was darker goes darker, which is
@@ -3468,7 +3489,10 @@ const Renderer = {
      * exactly that, so a blue restore turned the grey massif into a row of vivid
      * blue triangles pasted on the sky. The cooling is the multiply's job; this
      * pass only has to put the range back. */
-    ctx.fillStyle = 'rgba(168,170,176,0.55)';
+    /* Raised from 0.55. The overlay is the only pass that ADDS range, and with
+     * the multiply now easing off toward the ground there is headroom for it to
+     * work harder without blowing the sky out. */
+    ctx.fillStyle = 'rgba(200,202,208,0.88)';
     ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
     ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
