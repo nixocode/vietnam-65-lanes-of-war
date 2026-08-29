@@ -317,10 +317,26 @@ def _mesh_from_boxes(name, boxes, mat):
 # Real weapon meshes, lifted from a Quaternius weapon pack (CC0). They beat the
 # box rifles they replace by a mile. The pack's own rig is incompatible, but the
 # guns are plain meshes — only the geometry is imported.
+# `BUILT:` means a mesh assembled here rather than lifted from the pack — see
+# _build_weapon. The pack has no M16 and no belt-fed GPMG, and the two nearest
+# stand-ins were the worst-reading weapons in the game: at 3x zoom the SMG is a
+# featureless slab with no carry handle, magazine or pistol grip, and
+# ShortCannon is a blank box deeper than the gunner's chest. Both are carried by
+# US units, and the rifleman is the commonest figure on screen.
+#
+# A rifle is the one subject where box geometry is honestly right — it IS flat
+# planes and straight tubes, which is the same argument that keeps the built
+# architecture props beside the donor meshes. Organic shapes are what need real
+# scans; a receiver does not.
 WEAPON_MESH = {
-    'm16': 'SMG',        # black furniture, closest in the pack to an M16
-    'ak':  'AK',
-    'm60': 'ShortCannon',
+    'm16': 'BUILT:m16',
+    # The pack's AK is a real mesh and was fine on its own — but once the M16
+    # and M60 beside it carried a carry handle, a magazine and a bipod, it was
+    # the flattest weapon left in the frame. Improving two of four made the
+    # other two look wrong, which is the same "assets from different worlds"
+    # fault at weapon scale, so the AK gets the same treatment.
+    'ak':  'BUILT:ak',
+    'm60': 'BUILT:m60',
     'svd': 'Sniper_2',   # wood stock and scope, for the marksman
     'm40': 'Sniper',
     'rpg': 'RocketLauncher',
@@ -379,7 +395,7 @@ def _load_weapons():
     added = set(bpy.data.objects) - before
     bpy.context.view_layer.update()
     dg = bpy.context.evaluated_depsgraph_get()
-    wanted = set(WEAPON_MESH.values())
+    wanted = set(v for v in WEAPON_MESH.values() if not v.startswith('BUILT:'))
     for o in added:
         if o.type != 'MESH' or o.name not in wanted:
             continue
@@ -414,6 +430,120 @@ def _load_weapons():
             bpy.data.objects.remove(o, do_unlink=True)
         except Exception:
             pass
+
+
+def _wpn_mats():
+    """Gunmetal and furniture, matching what the pack's guns are repainted to."""
+    out = []
+    for name, col, rough in (('bw_metal', (0.030, 0.032, 0.035, 1), 0.44),
+                             ('bw_wood',  (0.085, 0.046, 0.020, 1), 0.62),
+                             ('bw_black', (0.020, 0.021, 0.024, 1), 0.52)):
+        m = bpy.data.materials.get(name)
+        if m is None:
+            m = bpy.data.materials.new(name)
+            m.use_nodes = True
+            b = m.node_tree.nodes.get('Principled BSDF')
+            b.inputs['Base Color'].default_value = col
+            b.inputs['Roughness'].default_value = rough
+            if 'Metallic' in b.inputs:
+                b.inputs['Metallic'].default_value = 0.0
+        out.append(m)
+    return out
+
+
+def _build_weapon(kind):
+    """Assemble an M16A1 or an M60 from boxes.
+
+    Laid out exactly as _orient_weapon leaves a donor gun: bore down +X, muzzle
+    at the far end, magazine hanging below, thin axis across Y. Built in units
+    of overall LENGTH (X spans 0..1), because _rifle normalises the bounding box
+    to WEAPON_LEN and WEAPON_ASPECT afterwards — so only the proportions INSIDE
+    the box matter here, and the numbers below are read off the real weapons.
+
+    What has to survive down to an 84 px man is the silhouette, not detail: the
+    top line, whatever hangs below it, and the front end. For an M16 that is the
+    carry handle, the straight-line stock and the magazine; for an M60 it is the
+    bipod and the barrel. Everything here is in service of those.
+    """
+    import bmesh
+    bm = bmesh.new()
+    mats = _wpn_mats()
+    METAL, WOOD, BLACK = 0, 1, 2
+
+    def box(x0, x1, z0, z1, w, mat=METAL, shear=0.0):
+        """A slab from x0..x1, z0..z1, +-w/2 across. `shear` leans the top in X."""
+        verts = []
+        for zi, z in ((0, z0), (1, z1)):
+            for xi, x in ((0, x0), (1, x1)):
+                dx = shear * (1 if zi else 0)
+                for y in (-w / 2, w / 2):
+                    verts.append(bm.verts.new((x + dx, y, z)))
+        bm.verts.ensure_lookup_table()
+        v = verts
+        quads = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 2, 6, 4),
+                 (1, 5, 7, 3), (0, 4, 5, 1), (2, 3, 7, 6)]
+        for q in quads:
+            try:
+                f = bm.faces.new([v[i] for i in q])
+                f.material_index = mat
+            except ValueError:
+                pass
+
+    if kind == 'm16':
+        # straight-line stock — the M16's signature, the bore runs through it
+        box(0.00, 0.23, -0.050, 0.048, 0.052, BLACK)
+        box(0.02, 0.06, -0.062, -0.050, 0.050, BLACK)      # butt plate toe
+        box(0.23, 0.52, -0.048, 0.052, 0.048, BLACK)       # receiver
+        # THE CARRY HANDLE. The one feature that says M16 at any size.
+        box(0.27, 0.46, 0.052, 0.092, 0.026, BLACK)
+        box(0.27, 0.31, 0.092, 0.104, 0.026, BLACK)        # rear sight tower
+        box(0.25, 0.33, -0.150, -0.048, 0.044, BLACK, shear=0.030)   # pistol grip
+        box(0.33, 0.36, -0.075, -0.048, 0.050, BLACK)      # trigger guard bar
+        # magazine: nearly straight, canted a little forward
+        box(0.355, 0.435, -0.155, -0.048, 0.036, BLACK, shear=0.018)
+        box(0.52, 0.73, -0.052, 0.046, 0.054, BLACK)       # handguard
+        box(0.73, 1.00, -0.020, 0.020, 0.028, METAL)       # barrel
+        box(0.845, 0.885, 0.020, 0.078, 0.024, METAL)      # front sight post
+        box(0.955, 1.00, -0.030, 0.030, 0.036, METAL)      # flash hider
+    elif kind == 'ak':
+        box(0.00, 0.27, -0.052, 0.042, 0.052, WOOD, shear=0.016)     # stock
+        box(0.27, 0.53, -0.048, 0.050, 0.050, METAL)                 # receiver
+        box(0.30, 0.43, 0.050, 0.064, 0.044, METAL)                  # dust cover
+        box(0.30, 0.38, -0.155, -0.048, 0.042, WOOD, shear=0.030)    # pistol grip
+        box(0.38, 0.41, -0.078, -0.048, 0.048, METAL)                # trigger guard
+        # THE BANANA MAGAZINE. Two segments at increasing lean, because one
+        # straight box is an M16 magazine and the curve is the whole tell.
+        box(0.405, 0.495, -0.130, -0.048, 0.038, BLACK, shear=0.020)
+        box(0.425, 0.515, -0.200, -0.125, 0.036, BLACK, shear=0.034)
+        box(0.53, 0.71, -0.060, 0.046, 0.052, WOOD)                  # handguard
+        box(0.56, 0.71, 0.046, 0.074, 0.040, WOOD)                   # gas tube
+        box(0.71, 0.94, -0.022, 0.022, 0.030, METAL)                 # barrel
+        box(0.855, 0.895, 0.022, 0.080, 0.026, METAL)                # front sight
+        box(0.945, 1.00, -0.028, 0.028, 0.034, METAL)                # muzzle nut
+    else:
+        box(0.00, 0.21, -0.058, 0.050, 0.056, WOOD)        # buttstock
+        box(0.21, 0.53, -0.048, 0.058, 0.056, METAL)       # receiver
+        box(0.28, 0.47, 0.058, 0.094, 0.048, METAL)        # feed tray cover
+        box(0.22, 0.30, -0.160, -0.048, 0.044, BLACK, shear=0.026)   # pistol grip
+        box(0.30, 0.34, -0.078, -0.048, 0.050, METAL)      # trigger guard
+        box(0.37, 0.50, -0.130, -0.048, 0.062, METAL)      # ammo box on the feed
+        box(0.53, 0.93, -0.026, 0.026, 0.034, METAL)       # barrel
+        box(0.56, 0.65, 0.026, 0.076, 0.026, WOOD)         # barrel carry handle
+        # THE BIPOD. What tells an M60 from any other long gun in one glance.
+        # Set back from the muzzle: at 0.775 with a 0.055 splay the front foot
+        # reached past the flash hider, and since _rifle normalises the bounding
+        # box the BIPOD then defined the weapon's length — it rendered as a V
+        # floating off the end of the barrel with the muzzle lost inside it.
+        box(0.705, 0.730, -0.190, -0.026, 0.020, METAL, shear=-0.048)
+        box(0.705, 0.730, -0.190, -0.026, 0.020, METAL, shear=0.048)
+        box(0.93, 1.00, -0.024, 0.024, 0.030, METAL)       # flash hider
+
+    me = bpy.data.meshes.new('wpnmesh_built_' + kind)
+    bm.to_mesh(me)
+    bm.free()
+    for m in mats:
+        me.materials.append(m)
+    return me
 
 
 def _orient_weapon(me):
@@ -467,13 +597,18 @@ def _rifle(kind, scale):
     """A real weapon mesh, laid grip-at-origin with the muzzle down +X."""
     from mathutils import Matrix
     _load_weapons()
-    src = _WPN_CACHE.get(WEAPON_MESH.get(kind, 'SMG'))
-    if not src:
-        return None
-    me = src.copy()
-    if not me.vertices:
-        return None
-    _orient_weapon(me)
+    want_mesh = WEAPON_MESH.get(kind, 'SMG')
+    if want_mesh.startswith('BUILT:'):
+        # already laid out in _orient_weapon's convention, so it skips that step
+        me = _build_weapon(want_mesh.split(':', 1)[1])
+    else:
+        src = _WPN_CACHE.get(want_mesh)
+        if not src:
+            return None
+        me = src.copy()
+        if not me.vertices:
+            return None
+        _orient_weapon(me)
 
     # Length was always right; the cross-section was not. Scale each axis to its
     # own target rather than uniformly — see WEAPON_ASPECT for the measurements

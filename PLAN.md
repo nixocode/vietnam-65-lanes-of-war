@@ -524,9 +524,23 @@ as five rows; nothing short of a diff would have caught that, and I would have
 
 | # | Item | Why it is here |
 |---|---|---|
-| 1 | Real weapon meshes | Proportions fixed; still donor stand-ins. |
-| 2 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
-| 3 | A SECOND death clip | The per-man rate/lag/lean variation below is cheap and works, but it is one pose played at different speeds. A real second clip costs ~7 MB of a 11.7 MB headroom, so it is affordable — it just needs Blender time. |
+| 1 | A real prone clip | Needs mocap or hand-posed arms; three Blender attempts have failed. |
+| 2 | A SECOND death clip | The per-man rate/lag/lean variation is cheap and works, but it is one pose played at different speeds. BLOCKED the same way the prone clip is: the donor pack has 24 actions and exactly one `Death` (verified by dumping them), so a second is authoring, not mapping — which is precisely what failed three times for prone. Do not start it expecting a mapping job. |
+
+**Weapons are built now, not borrowed.** `WEAPON_MESH` entries reading
+`BUILT:` are assembled in `_build_weapon` from boxes rather than lifted from the
+Quaternius pack. The pack has no M16 and no belt-fed GPMG, and the two nearest
+stand-ins were the worst-reading weapons in the game — at 3x zoom the SMG was a
+featureless slab and ShortCannon a blank box deeper than the gunner's chest.
+
+A rifle is the one subject where box geometry is honestly right: it IS flat
+planes and straight tubes. Same argument that keeps the built architecture props
+beside the donor meshes; organic shapes are what need real scans.
+
+The AK followed for a reason worth remembering: it was a perfectly good donor
+mesh and looked fine until the M16 and M60 beside it grew a carry handle, a
+magazine and a bipod — then it was the flattest thing in the frame. **Improving
+part of a set makes the rest look wrong.** Budget the whole set or none of it.
 
 **Death variety is done without spending memory.** There is one death clip per
 unit and the atlas is at 89 MB of a 130 MB budget with props, so a second clip
