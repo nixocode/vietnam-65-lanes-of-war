@@ -31,7 +31,25 @@ const Assets = {
     for (const name in (man.anims || {})) {
       this.anims[name] = man.anims[name].filter(f => !VFX_SKIP[f]);
     }
-    for (const [name, m] of entries) {
+    /* DEFERRED FALLBACK ART.
+     *
+     * Everything in the manifest used to load at boot, and a large share of it
+     * is art the player will almost certainly never see: the 150 legacy vector
+     * soldier sheets exist only for browsers where the 3D atlases fail, and
+     * most inked terrain slices only draw when a prop is missing. Measured,
+     * that is 5.9 MB of a 22.3 MB boot spent on a path that should never run.
+     *
+     * Entries flagged `defer` are skipped at boot and fetched on FIRST USE
+     * instead — see img(). They stay in the manifest, so nothing is lost and
+     * the fallback still works; it just costs a frame the first time rather
+     * than costing every player several seconds up front.
+     *
+     * `total` counts only the eager set, so the loading bar still reaches 100%.
+     */
+    const eager = entries.filter(([, m]) => !m.defer);
+    this.total = eager.length;
+    if (!this.total) { this.done = true; onProgress && onProgress(1); return; }
+    for (const [name, m] of eager) {
       const img = new Image();
       img.onload = () => { this.images[name] = img; this._tick(onProgress); };
       img.onerror = () => this._tick(onProgress);
@@ -49,7 +67,24 @@ const Assets = {
     return (typeof ASSET_MANIFEST !== 'undefined') ? ASSET_MANIFEST : null;
   },
 
-  img(name) { return this.images[name] || null; },
+  /* A deferred entry starts loading the first time something asks for it, and
+   * returns null until it arrives. Every caller in the game already treats a
+   * null image as "fall back to the procedural draw", which is exactly the
+   * right behaviour for one frame. */
+  img(name) {
+    const hit = this.images[name];
+    if (hit) return hit;
+    if (!this._pending) this._pending = {};
+    if (this._pending[name]) return null;
+    const man = this.manifest();
+    const m = man && man.images && man.images[name];
+    if (!m || !m.defer) return null;
+    this._pending[name] = 1;
+    const img = new Image();
+    img.onload = () => { this.images[name] = img; };
+    img.src = m.src;
+    return null;
+  },
   animMeta(name) {
     const man = this.manifest();
     return (man && man.animMeta && man.animMeta[name]) || null;
