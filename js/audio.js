@@ -214,7 +214,9 @@ const Sound = {
    * layers thinned as it takes over. If a buffer has not decoded yet, or the
    * fetch failed, `shot` falls through to pure synthesis exactly as before, so
    * the game never depends on an asset that might not be there. */
-  SAMPLES: { m16: 'm16', ak: 'ak', mg: 'mg', sniper: 'bolt', marksman: 'bolt' },
+  // `bolt` is not reachable through `shot` — snipers go via sniperShot() —
+  // but it is listed so _loadSamples fetches it.
+  SAMPLES: { m16: 'm16', ak: 'ak', mg: 'mg', bolt: 'bolt' },
 
   _loadSamples() {
     if (this._sampReq || !this.ctx) return;
@@ -316,13 +318,37 @@ const Sound = {
     this._tone('sawtooth', 220, 0.34, 0.07 * att, 0.02, 90, pan);
   },
 
+  /* A SNIPER RIFLE, which this was not.
+   *
+   * Reported as sounding like a BB gun, and the reason was structural: this is
+   * a separate entry point from `shot`, so it never went through any of the
+   * work done there. It got no sample — the `bolt` recording was mapped in
+   * SAMPLES under keys that `shot` is never called with, so it was dead — no
+   * distance handling, and no reverb send, which left it the one dry sound in
+   * a game that now has a room.
+   *
+   * A .30 calibre bolt gun is not a quiet rifle, it is a LOUDER one with a
+   * longer tail: a hard crack, a deep body, and a roll that goes on well after
+   * an M16's has finished. It should be the most impressive report on the map,
+   * because a sniper firing is the event the player is meant to notice. */
   sniperShot(x) {
     if (!this.ok()) return;
-    const { pan, att } = this._spatial(x);
-    this._noise(0.014, 'highpass', 5000, 1, 0.12 * att, 0, pan);
-    this._noise(0.14, 'bandpass', 2400, 0.8, 0.4 * att, 0.005, pan);
-    this._noise(0.8, 'lowpass', 650, 0.5, 0.16 * att, 0.03, pan);
-    this._tone('sine', 88, 0.4, 0.13 * att, 0.005, 42, pan);
+    this._loadSamples();
+    const { pan, att, far } = this._spatial(x);
+    const lag = far * 0.13;
+    const j = rand(0.94, 1.06);
+    const played = this._playSample('bolt', 0.95 * att * (1 - far * 0.4), pan, lag,
+                                    0.22 + far * 1.2, j * (1 - far * 0.05));
+    const sk = played ? 0.4 : 1.25;      // louder than a rifle even without it
+    const H = (f) => this._hi(f, far);
+    this._noise(0.014, 'highpass', H(5000), 1, sk * 0.13 * att * (1 - far), lag, pan, 0.12);
+    this._noise(0.14, 'bandpass', H(2400), 0.8, sk * 0.34 * att, lag + 0.005, pan,
+                0.5 + far * 1.2);
+    this._tone('sine', 88 * j, 0.4, sk * 0.14 * att, lag + 0.005, 42, pan, 0.5);
+    // the roll away, which is most of what says "big rifle" at any distance
+    this._noise(0.95 + far * 0.5, 'lowpass', 650, 0.5, sk * 0.17 * att, lag + 0.03, pan,
+                1.5 + far * 1.4);
+    this._noise(1.7, 'lowpass', 300, 0.4, sk * 0.07 * att, lag + 0.16, pan, 2.2);
   },
 
   explosion(size = 1, x) {

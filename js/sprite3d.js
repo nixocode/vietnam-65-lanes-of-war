@@ -134,16 +134,29 @@ const Sprite3D = {
       const p = Math.min(1, Math.max(0, (o.deadT || 0) - (o.dieLag || 0)) / dur);
       return [c, Math.min(f.length - 1, Math.floor(p * (f.length - 1) + 0.0001))];
     }
-    /* KNEELING — the middle stance the game never had.
+    /* KNEELING — and it is `dive` frame 0, not a posed clip.
      *
-     * Men had exactly two postures, standing and prone, so a firefight was
-     * either a parade or everyone flat. Measured over a match, 80% of
-     * man-frames were MOVING and only 8.9% prone: almost every man in contact
-     * was upright in the open. A kneel is what infantry actually do behind low
-     * cover, and it is the pose that makes a firing line read as fighting
-     * rather than marching. */
+     * A kneel WAS synthesised in Blender, and it was bad: the rear shin came
+     * out pointing back and UP with the foot in the air, the forward leg folded
+     * rather than planted, and widening the leg angles only splayed the man
+     * into the splits. Reported, accurately, as not looking coordinated.
+     *
+     * The pose already existed. `dive` is the donor's Roll, and its frame 0 is
+     * the crouch that precedes the roll: rear knee down with the shin flat
+     * along the ground, forward foot planted under a vertical shin, torso
+     * upright, head up. That is a firing kneel, and it is real mocap, so the
+     * weapon is gripped because it was RENDERED gripped.
+     *
+     * This is the second time looking through existing clips has beaten posing
+     * one — prone is `dive` frame 1 for the same reason. And the two together
+     * are coherent: frame 0 kneeling, frame 1 prone, so the stance transition
+     * that runs 0 -> 1 IS the man going from one to the other.
+     *
+     * The synthesised `kneel` clip is gone from the atlas entirely, which also
+     * hands back 6 frames x 12 units of memory. */
     if (o.pose === 'kneel' && (o.transT || 0) <= 0) {
-      const c = pick('kneel', 'aim', 'idle');
+      const c = pick('dive', 'aim', 'idle');
+      if (c === 'dive' && C[c].length) return [c, 0];
       if (c) {
         const n = C[c].length;
         const t = (o.time || 0) * 0.55 + (o.gaitOff || 0);
@@ -212,10 +225,19 @@ const Sprite3D = {
        * heading for, is what read as soldiers spinning in firefights. The vector
        * fallback in render.js had the direction term all along; the sprite path
        * never got it. transDir: +1 dropping, -1 rising. */
+      /* ONLY THE FIRST TWO FRAMES. `dive` is the donor's Roll clip, and beyond
+       * frame 1 it is exactly that — a full barrel roll, legs over head. This
+       * played the whole nine frames across 0.28 s, so every man going down or
+       * getting up threw a fast somersault. Reported as "a weird roll from
+       * prone that's really fast and bad", and correct.
+       *
+       * Frame 0 is the crouch and frame 1 is the man low behind his weapon,
+       * which is the prone pose itself (see the prone branch above). So the
+       * transition is 0 -> 1 and back, and the roll is never reached. */
       const p = 1 - Math.min(1, (o.transT || 0) / STANCE_TRANS);
       const q = (o.transDir || 1) > 0 ? p : 1 - p;
-      const n = C.dive.length;
-      return ['dive', Math.min(n - 1, Math.max(0, Math.floor(q * n)))];
+      const last = Math.min(1, C.dive.length - 1);
+      return ['dive', Math.max(0, Math.min(last, Math.round(q * last)))];
     }
     if ((o.hitT || 0) > 0) {
       // two flinches, chosen per soldier, so a squad taking fire is not one loop
@@ -340,7 +362,7 @@ const Sprite3D = {
    * breathing rather than as a second exposure.
    *
    * Deliberately NOT run, runfire, walk, death, dive or throw. */
-  SMOOTH: { idle: 1, idle2: 1, aim: 1, kneel: 1 },
+  SMOOTH: { idle: 1, idle2: 1, aim: 1 },
 
   /* ---------------- drawing ---------------- */
 

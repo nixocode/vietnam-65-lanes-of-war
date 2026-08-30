@@ -114,8 +114,7 @@ os.makedirs(OUTDIR, exist_ok=True)
 #   MB = 0.0581 * frames_per_unit * 12
 CLIP_FRAMES = {'idle': 6, 'aim': 6, 'fire': 7, 'run': 24,
                'runfire': 20, 'walk': 28, 'death': 12, 'hit': 4, 'prone': 4,
-               'idle2': 6, 'throw': 9, 'dive': 9, 'melee': 8, 'hit2': 4,
-               'kneel': 6}
+               'idle2': 6, 'throw': 9, 'dive': 9, 'melee': 8, 'hit2': 4}
 LOOPING = {'idle', 'idle2', 'run', 'runfire', 'walk', 'prone'}
 
 # Clips where the donor is NOT holding a gun — Idle_Gun drops the arm to the
@@ -1119,74 +1118,19 @@ def _prone_pose(arm, frozen, breath):
     _pitch(arm, 'UpperLeg.R', -4)
 
 
-def _kneel_pose(arm, frozen, breath):
-    """Down on one knee behind the weapon.
-
-    This is the pose prone should have been and was not, and it works for a
-    reason worth stating: a kneel needs NO counter-rotation anywhere. Prone
-    failed seven times because lifting the torso back up meant rotating `Chest`,
-    which is an ancestor of Wrist.R, and the weapon's Child-Of inverse was
-    captured standing — so the rifle detached every single time.
-
-    A kneel is a pelvis DROP plus bent legs. Translating `Body` moves the whole
-    upper body, arms and weapon together, so the grip is untouched; the legs are
-    not ancestors of the wrist, so they are free. The only rotation applied to
-    the torso is a small forward lean of `Body` itself, which again carries the
-    arms with it rather than against them.
-
-    Rotations are about Z: `pose_bone.matrix` is in ARMATURE space and this rig
-    is Y-up there, so Z is the axis that pitches a figure in the camera's view
-    plane. Getting that wrong is what put prone's barrel in the dirt.
-    """
-    for b in arm.pose.bones:
-        if b.name in frozen:
-            b.matrix_basis = frozen[b.name].copy()
-    bpy.context.view_layer.update()
-
-    pelvis = arm.pose.bones['Body'].matrix.translation.copy()
-    # forward lean, carrying arms and weapon with it
-    _pitch(arm, 'Body', 9 + breath * 0.4, pelvis)
-    # # THE DROP, and the units that made two attempts render an empty frame.
-    # #
-    # The armature is scaled 100x, so ARMATURE-SPACE units are centimetres
-    # against the world's metres: a 1.8 m man is 0.018 units tall. The first
-    # two attempts translated the pelvis by 0.42 "metres" and moved him
-    # forty-two metres out of shot, which is why the frames came back blank.
-    #
-    # And +Y is DOWN in this space, not up — measured, the Head sits at
-    # y -0.0155 against the Body at -0.0094, so the head is the more negative
-    # of the two. Lowering the hips means INCREASING y.
-    #
-    # There are also no IK constraints on this rig at all; the legs are pure
-    # FK. So posing them directly is correct, and the earlier worry about
-    # fighting a solver was unfounded — that failure was this same units bug. 
-    pb = arm.pose.bones['Body']
-    m = pb.matrix.copy()
-    m.translation.y += 0.0042
-    pb.matrix = m
-    bpy.context.view_layer.update()
-
-    # forward leg folds under, rear leg takes the knee
-    _pitch(arm, 'UpperLeg.L', float(arg('--k-ul', '-70')))
-    _pitch(arm, 'LowerLeg.L', float(arg('--k-ll', '90')))
-    _pitch(arm, 'UpperLeg.R', float(arg('--k-ur', '40')))
-    _pitch(arm, 'LowerLeg.R', float(arg('--k-lr', '-110')))
-    _pitch(arm, 'Foot.R', float(arg('--k-fr', '30')))
-
-
-def kneel_bind(arm, sc, base_action):
-    """Freeze a base pose for the kneel and settle it onto the ground."""
-    if base_action:
-        if not arm.animation_data:
-            arm.animation_data_create()
-        arm.animation_data.action = base_action
-        sc.frame_set(int(base_action.frame_range[0]))
-    bpy.context.view_layer.update()
-    frozen = {b.name: b.matrix_basis.copy() for b in arm.pose.bones}
-    if arm.animation_data:
-        arm.animation_data.action = None
-    _kneel_pose(arm, frozen, 0.0)
-    return frozen
+# The posed kneel lived here and is deliberately gone.
+#
+# It rendered, and it looked wrong: rear shin back and UP with the foot in the
+# air, forward leg folded rather than planted, and opening the leg angles only
+# splayed the figure into the splits. `dive` frame 0 — the crouch before the
+# donor's roll — is a better kneel than anything posed here, exactly as `dive`
+# frame 1 turned out to be a better prone. See the note in Sprite3D._sel.
+#
+# What the attempt DID establish, and what the next person posing this rig needs
+# to know, is recorded on _prone_pose and in that same note: the armature is
+# scaled 100x so armature-space units are centimetres, +Y is down in that space,
+# there are no IK constraints anywhere, and `Chest` can never be rotated because
+# it is an ancestor of the wrist the weapon is bound to.
 
 
 def prone_bind(arm, sc, base_action):
@@ -1315,16 +1259,6 @@ def main():
             index['clips'][name] = prev.get(name, [])
             continue
         index['clips'][name] = render_clip(name, action, sc)
-
-    if not ONLY or 'kneel' in ONLY:
-        arm = arm_of()
-        kfrozen = kneel_bind(arm, sc, clips.get('aim') or clips.get('idle'))
-        index['clips']['kneel'] = render_clip(
-            'kneel', None, sc,
-            pose_fn=lambda p: _kneel_pose(arm, kfrozen,
-                                          2.0 * math.sin(p * 2 * math.pi)))
-    elif prev.get('kneel'):
-        index['clips']['kneel'] = prev['kneel']
 
     if not ONLY or 'prone' in ONLY:
         arm = arm_of()

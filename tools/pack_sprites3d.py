@@ -47,7 +47,10 @@ CROP_Y = 14                    # covers rows 14-125: 4 spare above, 3 below
 #           rides the wrist, so pitching the body drives the barrel into the
 #           ground); js/sprite3d.js routes prone men to the `aim` pose instead.
 # 12 frames of 125 per unit, about 8 MB across the set.
-SKIP = {'melee', 'prone'}
+# `kneel` joins these: it was rendered, judged bad, and replaced at runtime by
+# `dive` frame 0 which is a better kneel than the posed one. Keeping it out
+# hands back 6 frames x 12 units.
+SKIP = {'melee', 'prone', 'kneel'}
 
 # Fallback only. The render writes its actual camera into index.json, and that
 # is what gets used — the two must never be able to drift apart.
