@@ -524,9 +524,23 @@ const Sprite3D = {
     const st = this._anim(o, clip, fi);
     const dirV = st.dirV != null ? st.dirV : (o.dir || 1);
     // a man holding a sight picture is never perfectly still
-    const sway = (clip === 'aim' || clip === 'prone')
-      ? Math.sin((o.time || 0) * 2.1 + (o.gaitOff || 0) * 6.3) * 0.9 * (o.scale || 1)
-      : 0;
+    /* BREATHING, keyed off the POSE rather than the clip name.
+     *
+     * This tested `clip === 'aim' || clip === 'prone'`, which stopped being
+     * true the moment kneeling and prone became frames of `dive`. Measured, a
+     * kneeling or prone man then held ONE frame for 180 consecutive ticks with
+     * zero sway: a statue, in the two postures a man spends longest holding
+     * and where there is no locomotion to disguise it.
+     *
+     * Those two also get a slower, deeper breath than a standing man. A rifle
+     * on a bipod or braced on a knee visibly rises and falls; a man on his feet
+     * absorbs it. */
+    const held = o.pose === 'prone' || o.pose === 'kneel';
+    const sway = held
+      ? Math.sin((o.time || 0) * 1.35 + (o.gaitOff || 0) * 6.3) * 1.35 * (o.scale || 1)
+      : (clip === 'aim' || clip === 'prone')
+        ? Math.sin((o.time || 0) * 2.1 + (o.gaitOff || 0) * 6.3) * 0.9 * (o.scale || 1)
+        : 0;
     if (st.t < 1 && st.prev && U.meta.clips[st.prev]) {
       // outgoing pose stays at FULL alpha underneath and the incoming one fades
       // in over it, so total coverage never dips and the man cannot go see-through

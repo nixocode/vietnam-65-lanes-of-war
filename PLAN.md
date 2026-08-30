@@ -472,6 +472,43 @@ There were simply not enough frames in it.
   remaining variety win.
 
 
+## 1.8 Asset and animation verification — all clear
+
+Audited after the overhaul rather than assumed. 30 props, 12 units: no prop
+referenced but missing, no bad prop metadata, no unit missing a clip the
+renderer can ask for, and no muzzle-point holes in any firing clip.
+
+Per-clip cadence, measured as the renderer actually plays it:
+
+    run    31.0 fps   holds 1-2      walk   17.5 fps   holds 1-4
+    death  14.7 fps   holds 4-5      aim     8.4 fps   holds 6-8 (sub-frame blended)
+
+**One real gap found and fixed: kneeling and prone men were statues.** The
+breathing sway tested `clip === 'aim' || clip === 'prone'`, which stopped being
+true the moment both poses became frames of `dive`. Measured, a held man showed
+ONE frame for 180 consecutive ticks with zero movement — in the two postures a
+man holds longest, where no locomotion disguises it. Keyed off the POSE now, and
+with a slower deeper breath than a standing man, because a rifle braced on a
+knee or a bipod visibly rises and falls. 726 and 923 pixels of movement over
+half a breath, against 0.
+
+**Performance is not a problem, and the instrument said it was.** A fresh-load
+bench reported p95 242.9 ms, and a hand-rolled loop reported 32.5% of frames
+over 16.7 ms with p90 at 331 ms. Both were the readback: per-frame
+`getImageData` de-accelerates the canvas, which rule 7 already records and which
+has now misled this project three times. Timed without the flush, the honest
+figures are:
+
+    render JS   p50 0.5-0.6 ms   p95 0.8-0.9 ms
+    sim JS      p50 0.2 ms       p95 0.4 ms
+
+1.2-1.3 ms combined against a 16.7 ms budget. `_buildLane` costs 5-15 ms for all
+lanes and runs 0.1 times a second in play, so the ground detail did not make
+baking a per-frame cost.
+
+**Rule 6 confirmed again:** srcMpx read 13.63 on every map when the five were
+staged in one page load, and 9.96 on a fresh load. Staging inflates it by ~37%.
+
 ## 1.9 THE VISUAL OVERHAUL — the only priority
 
 Owner, and the words matter: *"make the game look good. It's shit right now"*,
