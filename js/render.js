@@ -4309,7 +4309,8 @@ const Renderer = {
        * the standing `aim` pose that had to be shoved 26px down the screen to
        * pretend. Dropping this one that far buries him to the waist. 9px seats
        * him without sinking him. See Sprite3D._sel. */
-      const proneDrop = u.pose === 'prone' ? 9 * scale : 0;
+      const proneDrop = u.pose === 'prone' ? 9 * scale
+        : u.pose === 'kneel' ? 3 * scale : 0;
       /* RECOIL — a per-shot kick on the whole man.
        *
        * The vector rig has swapped recoil FRAMES off `muzzleT` since it was

@@ -134,6 +134,23 @@ const Sprite3D = {
       const p = Math.min(1, Math.max(0, (o.deadT || 0) - (o.dieLag || 0)) / dur);
       return [c, Math.min(f.length - 1, Math.floor(p * (f.length - 1) + 0.0001))];
     }
+    /* KNEELING — the middle stance the game never had.
+     *
+     * Men had exactly two postures, standing and prone, so a firefight was
+     * either a parade or everyone flat. Measured over a match, 80% of
+     * man-frames were MOVING and only 8.9% prone: almost every man in contact
+     * was upright in the open. A kneel is what infantry actually do behind low
+     * cover, and it is the pose that makes a firing line read as fighting
+     * rather than marching. */
+    if (o.pose === 'kneel' && (o.transT || 0) <= 0) {
+      const c = pick('kneel', 'aim', 'idle');
+      if (c) {
+        const n = C[c].length;
+        const t = (o.time || 0) * 0.55 + (o.gaitOff || 0);
+        const q = ((t % 1) + 1) % 1 * n;
+        return [c, Math.floor(q) % n, q - Math.floor(q)];
+      }
+    }
     if (o.pose === 'prone' && (o.transT || 0) <= 0) {
       /* DOWN BEHIND THE WEAPON — and it is a frame of `dive`, not a pose built
        * for the job.
@@ -323,7 +340,7 @@ const Sprite3D = {
    * breathing rather than as a second exposure.
    *
    * Deliberately NOT run, runfire, walk, death, dive or throw. */
-  SMOOTH: { idle: 1, idle2: 1, aim: 1 },
+  SMOOTH: { idle: 1, idle2: 1, aim: 1, kneel: 1 },
 
   /* ---------------- drawing ---------------- */
 

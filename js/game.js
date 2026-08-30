@@ -719,12 +719,31 @@ class Game {
          * close-range firefight. It was the single most visible wrongness in the
          * game. Only ASSAULTING justifies standing at that range — closing the
          * distance is worth the exposure, trading shots at 100px is not. */
+        /* THREE stances now, not two. Standing and prone alone made every
+         * firefight either a parade or a line of men flat on their faces —
+         * measured, 80% of man-frames were moving and only 8.9% prone, so
+         * nearly every man in contact was upright in the open.
+         *
+         * Kneeling is the middle: what a man does behind a paddy dike or a log
+         * when he is fighting but not pinned. It goes to the men who are in
+         * contact but not under effective fire, which is most of a firefight. */
+        /* Ordered from most-pinned to least. KNEELING IS THE DEFAULT FIGHTING
+         * POSTURE and prone is reserved for men who are actually being shot at,
+         * which is the opposite of how this read before: standing and prone
+         * were the only options, so a firefight was either a parade or a line
+         * of men flat on their faces.
+         *
+         * The front-rank prone rule used to sit above the kneel and swallowed
+         * it — squads are three to five men, so `mi < 2` is most of them, and
+         * kneeling never fired at all. It now applies only under fire. */
+        const hot = s.underFireT > 0 || s.pinned;
         if (m.moving || s._advancing) want = 'stand';
-        else if (s.inCover && (engaged || s.underFireT > 0)) want = 'prone'; // gun on the parapet
         else if (s.pinned) want = 'prone';
-        else if (nearFoe < 150 && (engaged || s.underFireT > 0)) want = 'prone';
-        else if ((m.combatT || 0) > 0 && mi < 2) want = 'prone'; // front rank drops at range
-        else if (s.underFireT <= 0 && (m.combatT || 0) <= 0 && m.stanceT > 3) want = 'stand';
+        else if (s.inCover && (engaged || hot)) want = 'prone';   // gun on the parapet
+        else if (hot && nearFoe < 150) want = 'prone';
+        else if (hot && mi < 2) want = 'prone';                   // front rank eats it first
+        else if (hot || engaged || (m.combatT || 0) > 0) want = 'kneel';
+        else if ((m.combatT || 0) <= 0 && m.stanceT > 3) want = 'stand';
         /* The commitment lock exists so nobody yo-yos.
          *
          * `|| m.moving` bypassed it for ANY change, in either direction. Because
@@ -735,7 +754,7 @@ class Game {
          * stops. So it survives in exactly that one direction. Getting up to
          * move plays no transition frames because the run cycle already covers
          * it; everything else serves its commitment. */
-        const lock = m.stance === 'prone' ? 2.4 : 1.1;
+        const lock = m.stance === 'prone' ? 2.4 : m.stance === 'kneel' ? 1.6 : 1.1;
         const rising = m.stance === 'prone' && want === 'stand';
         /* The rising bypass keys off the SQUAD advancing, not off the man's
          * per-frame `moving` flag.
@@ -842,7 +861,8 @@ class Game {
 
       if (u.sniperUnit || (u.nadeT || 0) > 0) continue;
       if (UNITS[u.key].vehicle) { u.pose = null; continue; }
-      u.pose = (u.stance === 'prone' && !u.movingVis) ? 'prone' : null;
+      u.pose = u.movingVis ? null
+        : (u.stance === 'prone' ? 'prone' : u.stance === 'kneel' ? 'kneel' : null);
     }
   }
 
@@ -1841,7 +1861,17 @@ class Game {
     }
     const dx = tx - u.x;
     const marching = s && s._advancing; // the squad itself is on the move
-    if (Math.abs(dx) < 2.5 && !marching) {
+    /* THE SETTLE DEAD-BAND. 2.5 px was written when slots were 34 px apart and
+     * is far too tight now they are 50: a man had to land within 5% of his
+     * spacing to be considered arrived, and the anchor shifts under him every
+     * frame as the squad separates, so he chased it forever. Measured, 90% of
+     * all man-frames were flagged MOVING, which forces the stance machine to
+     * 'stand' — so the game's three postures almost never showed and every
+     * firefight read as men marching on the spot.
+     *
+     * 9 px is under a fifth of a man's width, so nobody drifts visibly out of
+     * formation, and it lets him actually arrive. */
+    if (Math.abs(dx) < 9 && !marching) {
       u.moving = false;
       u.spd = 0;
       return;

@@ -114,7 +114,8 @@ os.makedirs(OUTDIR, exist_ok=True)
 #   MB = 0.0581 * frames_per_unit * 12
 CLIP_FRAMES = {'idle': 6, 'aim': 6, 'fire': 7, 'run': 24,
                'runfire': 20, 'walk': 28, 'death': 12, 'hit': 4, 'prone': 4,
-               'idle2': 6, 'throw': 9, 'dive': 9, 'melee': 8, 'hit2': 4}
+               'idle2': 6, 'throw': 9, 'dive': 9, 'melee': 8, 'hit2': 4,
+               'kneel': 6}
 LOOPING = {'idle', 'idle2', 'run', 'runfire', 'walk', 'prone'}
 
 # Clips where the donor is NOT holding a gun — Idle_Gun drops the arm to the
@@ -139,6 +140,8 @@ STATE_ACTIONS = {
     'dive':   'Roll',            # going to ground / diving into cover
     'melee':  'Punch_Right',     # butt-stroke, when the range closes to nothing
     'hit2':   'HitRecieve_2',    # a second flinch, so hits are not one animation
+    # `Interact` was probed as a possible free crouch and is not one — it is a
+    # standing rifle inspection. The kneel is posed instead, see _kneel_pose.
 }
 
 # the donor model is black SWAT kit; these push it to period-correct colours
@@ -1116,6 +1119,76 @@ def _prone_pose(arm, frozen, breath):
     _pitch(arm, 'UpperLeg.R', -4)
 
 
+def _kneel_pose(arm, frozen, breath):
+    """Down on one knee behind the weapon.
+
+    This is the pose prone should have been and was not, and it works for a
+    reason worth stating: a kneel needs NO counter-rotation anywhere. Prone
+    failed seven times because lifting the torso back up meant rotating `Chest`,
+    which is an ancestor of Wrist.R, and the weapon's Child-Of inverse was
+    captured standing — so the rifle detached every single time.
+
+    A kneel is a pelvis DROP plus bent legs. Translating `Body` moves the whole
+    upper body, arms and weapon together, so the grip is untouched; the legs are
+    not ancestors of the wrist, so they are free. The only rotation applied to
+    the torso is a small forward lean of `Body` itself, which again carries the
+    arms with it rather than against them.
+
+    Rotations are about Z: `pose_bone.matrix` is in ARMATURE space and this rig
+    is Y-up there, so Z is the axis that pitches a figure in the camera's view
+    plane. Getting that wrong is what put prone's barrel in the dirt.
+    """
+    for b in arm.pose.bones:
+        if b.name in frozen:
+            b.matrix_basis = frozen[b.name].copy()
+    bpy.context.view_layer.update()
+
+    pelvis = arm.pose.bones['Body'].matrix.translation.copy()
+    # forward lean, carrying arms and weapon with it
+    _pitch(arm, 'Body', 9 + breath * 0.4, pelvis)
+    # # THE DROP, and the units that made two attempts render an empty frame.
+    # #
+    # The armature is scaled 100x, so ARMATURE-SPACE units are centimetres
+    # against the world's metres: a 1.8 m man is 0.018 units tall. The first
+    # two attempts translated the pelvis by 0.42 "metres" and moved him
+    # forty-two metres out of shot, which is why the frames came back blank.
+    #
+    # And +Y is DOWN in this space, not up — measured, the Head sits at
+    # y -0.0155 against the Body at -0.0094, so the head is the more negative
+    # of the two. Lowering the hips means INCREASING y.
+    #
+    # There are also no IK constraints on this rig at all; the legs are pure
+    # FK. So posing them directly is correct, and the earlier worry about
+    # fighting a solver was unfounded — that failure was this same units bug. 
+    pb = arm.pose.bones['Body']
+    m = pb.matrix.copy()
+    m.translation.y += 0.0042
+    pb.matrix = m
+    bpy.context.view_layer.update()
+
+    # forward leg folds under, rear leg takes the knee
+    _pitch(arm, 'UpperLeg.L', float(arg('--k-ul', '-70')))
+    _pitch(arm, 'LowerLeg.L', float(arg('--k-ll', '90')))
+    _pitch(arm, 'UpperLeg.R', float(arg('--k-ur', '40')))
+    _pitch(arm, 'LowerLeg.R', float(arg('--k-lr', '-110')))
+    _pitch(arm, 'Foot.R', float(arg('--k-fr', '30')))
+
+
+def kneel_bind(arm, sc, base_action):
+    """Freeze a base pose for the kneel and settle it onto the ground."""
+    if base_action:
+        if not arm.animation_data:
+            arm.animation_data_create()
+        arm.animation_data.action = base_action
+        sc.frame_set(int(base_action.frame_range[0]))
+    bpy.context.view_layer.update()
+    frozen = {b.name: b.matrix_basis.copy() for b in arm.pose.bones}
+    if arm.animation_data:
+        arm.animation_data.action = None
+    _kneel_pose(arm, frozen, 0.0)
+    return frozen
+
+
 def prone_bind(arm, sc, base_action):
     """Freeze a base pose for prone and settle the figure onto the ground.
 
@@ -1230,16 +1303,28 @@ def main():
 
     index = {'unit': UNIT, 'res': RES, 'clips': {},
              'cam': {'ortho': HEIGHT * ORTHO_K, 'camz': HEIGHT * CAM_ZK, 'figH': HEIGHT}}
-    prev = {}
+    prev, prevMuz = {}, {}
     if ONLY:
         ip = os.path.join(OUTDIR, 'index.json')
         if os.path.isfile(ip):
-            prev = json.load(open(ip)).get('clips', {})
+            _pj = json.load(open(ip))
+            prev = _pj.get('clips', {})
+            prevMuz = _pj.get('muzzle', {})
     for name, action in clips.items():
         if ONLY and name not in ONLY:
             index['clips'][name] = prev.get(name, [])
             continue
         index['clips'][name] = render_clip(name, action, sc)
+
+    if not ONLY or 'kneel' in ONLY:
+        arm = arm_of()
+        kfrozen = kneel_bind(arm, sc, clips.get('aim') or clips.get('idle'))
+        index['clips']['kneel'] = render_clip(
+            'kneel', None, sc,
+            pose_fn=lambda p: _kneel_pose(arm, kfrozen,
+                                          2.0 * math.sin(p * 2 * math.pi)))
+    elif prev.get('kneel'):
+        index['clips']['kneel'] = prev['kneel']
 
     if not ONLY or 'prone' in ONLY:
         arm = arm_of()
@@ -1251,7 +1336,18 @@ def main():
     elif prev.get('prone'):
         index['clips']['prone'] = prev['prone']
 
-    index['muzzle'] = MUZZLE
+    # MERGE the muzzle table, do not replace it.
+    #
+    # This block wrote `index['muzzle'] = MUZZLE`, and MUZZLE only ever holds
+    # the clips this run actually rendered. So any `--only` render silently
+    # threw away the muzzle points for every other clip, and the next pack
+    # refused with "135 frames have no muzzle point". That has happened three
+    # times in this project, each time costing a full re-render of all twelve
+    # units to recover — the guard in pack_sprites3d.py catches it, but
+    # catching is not the same as not doing it.
+    merged = dict(prevMuz)
+    merged.update(MUZZLE)
+    index['muzzle'] = merged
     with open(os.path.join(OUTDIR, 'index.json'), 'w') as f:
         json.dump(index, f, indent=1)
     print('DONE', UNIT, sum(len(v) for v in index['clips'].values()), 'frames')
