@@ -235,9 +235,14 @@ const Sprite3D = {
        * which is the prone pose itself (see the prone branch above). So the
        * transition is 0 -> 1 and back, and the roll is never reached. */
       const p = 1 - Math.min(1, (o.transT || 0) / STANCE_TRANS);
-      const q = (o.transDir || 1) > 0 ? p : 1 - p;
       const last = Math.min(1, C.dive.length - 1);
-      return ['dive', Math.max(0, Math.min(last, Math.round(q * last)))];
+      // FROM -> TO, so any pair of stances works. See the note in game.js where
+      // transA/transB are set; the old single `transDir` could only express
+      // stand<->prone and played a kneel as a rise out of lying down.
+      const a = o.transA != null ? o.transA : ((o.transDir || 1) > 0 ? 0 : last);
+      const b = o.transB != null ? o.transB : ((o.transDir || 1) > 0 ? last : 0);
+      const f = a + (b - a) * p;
+      return ['dive', Math.max(0, Math.min(last, Math.round(f)))];
     }
     if ((o.hitT || 0) > 0) {
       // two flinches, chosen per soldier, so a squad taking fire is not one loop

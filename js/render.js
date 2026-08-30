@@ -4444,6 +4444,7 @@ const Renderer = {
         muzzleT: u.muzzleT || 0,
         reload: (u.fireT || 0) > 0.55,
         transT: u.transT || 0, transDir: u.transDir || 1,
+        transA: u.transA, transB: u.transB,
         ref: u, time,
       });
       if (u.deadT == null) {

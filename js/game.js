@@ -773,10 +773,26 @@ class Game {
          * to get on its feet at once. A lone man's slot-shuffle is not that. */
         if (want !== m.stance &&
             (m.stanceT >= lock || (rising && s._advancing && m.stanceT >= 0.35))) {
+          const prev = m.stance;
           m.stance = want;
           m.stanceT = 0;
-          if (!m.moving) { // play the drop/rise transition frames
-            m.transDir = want === 'prone' ? 1 : -1;
+          if (!m.moving) {
+            /* The transition runs between the two stances it actually joins.
+             *
+             * `transDir = want === 'prone' ? 1 : -1` was written when there were
+             * only two stances, and adding the kneel broke it: standing up into
+             * a KNEEL is not 'prone', so it took the -1 branch and played the
+             * dive clip backwards from frame 1 — which IS the prone pose. A man
+             * rising from his feet to one knee flashed through lying down.
+             *
+             * Stored as the FROM and TO frames instead, so any pair works.
+             * `dive` frame 0 is the crouch/kneel and frame 1 is prone, so both
+             * standing and kneeling start at 0; a stand<->kneel change holds
+             * frame 0 throughout and the cross-fade out of the standing clip
+             * does the work, which is what it should have been doing anyway. */
+            m.transA = (prev === 'prone') ? 1 : 0;
+            m.transB = (want === 'prone') ? 1 : 0;
+            m.transDir = m.transB >= m.transA ? 1 : -1;   // kept for the vector rig
             m.transT = STANCE_TRANS;
           }
         }
