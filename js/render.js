@@ -1675,11 +1675,23 @@ const Renderer = {
       for (let x = WORLD_W; x >= 0; x -= 12) ctx.lineTo(x, groundY(map, lane, x) + strip);
       ctx.closePath();
       ctx.clip();
+      /* Deepened. Measured, the GROUND band spans 62 luminance points while the
+       * sky takes 200 — the picture has a bright empty top half and a flat
+       * middle where the game actually happens. Ablating the passes that sit
+       * over the terrain found no single culprit worth more than 7 points, so
+       * the flatness is the ground's own: it is a fill with quiet texture on
+       * it, and quiet texture cannot carry a whole band.
+       *
+       * This ramp is the cheapest place to put the range back, because it is
+       * already the thing giving the lane its front-to-back form. Darker where
+       * the lane meets the vegetation behind it, and a stronger catch of light
+       * at the near edge. */
       const gs = ctx.createLinearGradient(0, lo, 0, hi + strip);
-      gs.addColorStop(0, 'rgba(10,14,7,0.60)');
-      gs.addColorStop(0.34, 'rgba(10,14,7,0.24)');
-      gs.addColorStop(0.74, 'rgba(10,14,7,0.04)');
-      gs.addColorStop(1, 'rgba(255,240,200,0.06)');
+      gs.addColorStop(0, 'rgba(8,11,6,0.78)');
+      gs.addColorStop(0.28, 'rgba(9,12,6,0.40)');
+      gs.addColorStop(0.62, 'rgba(10,14,7,0.12)');
+      gs.addColorStop(0.88, 'rgba(255,244,208,0.05)');
+      gs.addColorStop(1, 'rgba(255,240,200,0.11)');
       ctx.fillStyle = gs;
       ctx.fillRect(0, lo, WORLD_W, (hi + strip) - lo);
       ctx.restore();
