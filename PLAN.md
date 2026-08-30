@@ -636,7 +636,7 @@ as five rows; nothing short of a diff would have caught that, and I would have
 
 | # | Item | Why it is here |
 |---|---|---|
-| A | Animations | PARTLY DONE — see below. Clip churn and the two slow loops are fixed and measured. What is NOT yet addressed: `walk` still plays at 7.4-12.8 fps, and the run/walk threshold is the largest remaining churn source (~90 switches a match). Walk is only 1.5% of screen time, which is why it went second. |
+| A | Animations | DONE. Clip churn, the two slow loops, and the cadence mismatch are all fixed and measured — walk now plays at 17.3 fps flat across every unit (was 7.3-12.7 with a 1.74x spread) and the walk-to-run jump is 1.87x (was 4.5x). Held poses breathe. The entry above previously said walk was still 7.4-12.8 fps; that was stale. |
 | B | The guns | DONE for now. Five of six are built (M16, M60, AK, M40, RPG); the SVD stays a donor because it already carries a scope and reads. Checked at TRUE game size, not just zoomed. If the owner still wants more, the remaining lever is the M60's bipod and the AK magazine, which are 1-2 px at 84 px and only read at 2x+. |
 | C | ~~The VC play with the US HUD~~ | DONE. `body.side-vc` carried exactly one rule, so the whole field-manual treatment stayed US. Now 120 of 204 HUD elements differ by side. |
 
