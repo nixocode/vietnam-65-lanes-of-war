@@ -789,7 +789,9 @@ class Game {
    * same spot.
    */
   _separate(dt) {
-    const GAP = 26;              // clear ground between two formations
+    // Raised with the slot spacing: two squads 26px apart still interleaved
+    // their outer men once each formation got wider.
+    const GAP = 46;              // clear ground between two formations
     const RATE = 2.4;
     const byLane = new Map();
     for (const s of this.squads) {
@@ -1824,12 +1826,18 @@ class Game {
       // its own, and a prone man is ~55px long. At the old 12px a fire team in
       // cover collapsed into a single unreadable blob.
       const prone = u.pose === 'prone';
-      const want = prone ? 42 : 26;
-      const floor = prone ? 32 : 20;   // a prone man is ~55px long, not ~26
+      const want = prone ? 52 : 38;
+      const floor = prone ? 40 : 28;   // a prone man is ~55px long, not ~26
       const spread = Math.max(floor, Math.min(want, s.cover.w / Math.max(2, alive.length)));
       tx = s.cover.x - s.dir * (idx - (alive.length - 1) / 2) * spread;
     } else {
-      tx = s.x - u.dir * u.slot * 34; // room between men — silhouettes stay readable
+      /* 34 was not enough room. A man is 84px tall and his levelled rifle is
+       * about 40px wide on its own, so at 34px spacing every soldier overlapped
+       * the next one's weapon — measured 10th-percentile gap between adjacent
+       * men in a lane was 14px, and a zoomed contact showed a ten-man squad as
+       * a single stack of bodies rather than a firing line. A firefight cannot
+       * read if you cannot count the men in it. */
+      tx = s.x - u.dir * u.slot * 50;
     }
     const dx = tx - u.x;
     const marching = s && s._advancing; // the squad itself is on the move

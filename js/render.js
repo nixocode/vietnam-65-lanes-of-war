@@ -2420,8 +2420,18 @@ const Renderer = {
       }
     }
 
-    // trees (density scaled to the wider world)
-    const density = map.treeDensity * 26 * (WORLD_W / 1280);
+    /* Trees, scaled to the wider world — and THINNED, because each one now
+     * carries far more mass than the vector blob it replaced.
+     *
+     * The old `_tree` was a small ring of ellipses; `canopy_a` is a full crown
+     * a hundred to two hundred pixels across. Drawing the same 52 of them per
+     * lane on Cu Chi turned the playfield into a wall of foliage with the
+     * firefight hidden behind it — a fight the player cannot see is worse than
+     * a plain field. Two thirds the count, and the NEAR lane thinner still,
+     * since that is the one standing between the camera and the battle. */
+    const treeK = (typeof Props !== 'undefined' && Props.ready
+      && Props.has('canopy_a')) ? (lane === LANE_N - 1 ? 0.42 : 0.66) : 1;
+    const density = map.treeDensity * 26 * (WORLD_W / 1280) * treeK;
     for (let i = 0; i < density; i++) {
       const x = 150 + rng() * (WORLD_W - 300);
       const nearFlag = Math.abs(x - map.flags[lane] * WORLD_W) < 46;
@@ -2521,8 +2531,11 @@ const Renderer = {
        * sized to the band it has to occupy — roughly one and a half to three
        * times a man — rather than to its own botany. */
       const th = (104 + rng() * 84) * dep;
+      // the near lane's canopy is scenery BEHIND the fight, so it is pushed
+      // back in value rather than competing with the men standing in front
+      const tAlpha = lane === LANE_N - 1 ? 0.86 : 0.96;
       if (!drawVeg(ctx, kind, 0, x, groundY(map, lane, x) + 2, th,
-                   { flip: rng() < 0.5, alpha: 0.96 })) {
+                   { flip: rng() < 0.5, alpha: tAlpha })) {
         this._tree(ctx, map, rng, x, groundY(map, lane, x) + 2, dep);
       } else if (rng() < 0.55) {
         this._baseLitter(ctx, rng, x, groundY(map, lane, x) + 2, th * 0.5, map, lane);
