@@ -2385,6 +2385,107 @@ const Renderer = {
       }
     }
 
+    /* GROUND DETAIL — objects, not another wash.
+     *
+     * The playfield measured 62 luminance points of range against 200 for the
+     * sky, and deepening the value ramp bought two. That is the lesson: the
+     * ground was not flat because it was badly lit, it was flat because there
+     * was NOTHING ON IT. Light modulates whatever is there, and a bare plane
+     * modulated is still a bare plane.
+     *
+     * So this puts things on the earth that catch light and cast shade at their
+     * own scale — stones, twigs, dry scuff, and the ruts and footfalls of an
+     * army that has been walking over it. All baked into the lane layer, so a
+     * few hundred marks cost nothing per frame.
+     *
+     * Sized and spaced off the lane's own depth so the near lane reads coarser
+     * than the far one, which is what actually creates the sense of a receding
+     * surface rather than a painted backdrop. */
+    {
+      const dep = LANE_DEPTH[lane];
+      const soil = map.pal.soil || this._tint(p.laneBody[lane], 26, 14, 2);
+      const lit = this._tint(p.laneTop[lane], 30, 26, 12);
+      const dark = this._shade(p.laneBody[lane], -26);
+
+      // TRACKS: paired ruts along the lane where men and vehicles have passed.
+      // Long, low-contrast and roughly parallel to the ground line — they read
+      // as use, and they give the eye something running across the frame.
+      ctx.globalAlpha = 0.16;
+      for (let k = 0; k < 3; k++) {
+        const off = (6 + k * 9) * dep;
+        ctx.strokeStyle = k % 2 ? dark : soil;
+        ctx.lineWidth = (1.6 + rng() * 1.4) * dep;
+        let on = rng() < 0.5;
+        for (let x = 40; x < WORLD_W - 40; x += 26 + rng() * 40) {
+          const run = 40 + rng() * 150;
+          if (on) {
+            ctx.beginPath();
+            ctx.moveTo(x, groundY(map, lane, x) + off);
+            for (let q = x; q < x + run; q += 22)
+              ctx.lineTo(q, groundY(map, lane, q) + off + Math.sin(q * 0.02 + k) * 1.6 * dep);
+            ctx.stroke();
+          }
+          on = !on || rng() < 0.62;
+          x += run;
+        }
+      }
+
+      // SCUFF: irregular patches of drier, paler earth where the turf is worn
+      // through. Given real edges rather than soft blobs, because a soft blob
+      // is another wash and washes are what failed.
+      for (let i = 0; i < 34 * (WORLD_W / 1280); i++) {
+        const x = 30 + rng() * (WORLD_W - 60);
+        const gy = groundY(map, lane, x) + (3 + rng() * 26) * dep;
+        const w = (7 + rng() * 26) * dep, h = w * (0.22 + rng() * 0.2);
+        ctx.globalAlpha = 0.10 + rng() * 0.16;
+        ctx.fillStyle = rng() < 0.62 ? soil : lit;
+        ctx.beginPath();
+        const n = 7;
+        for (let q = 0; q <= n; q++) {
+          const a = (q / n) * 6.283;
+          const rr = 0.62 + rng() * 0.5;
+          const px = x + Math.cos(a) * w * rr, py = gy + Math.sin(a) * h * rr;
+          q ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        }
+        ctx.closePath(); ctx.fill();
+      }
+
+      // STONES AND DEBRIS: small, hard-edged, each with a shadow. These are the
+      // only things in the band with a true dark next to a true light, which is
+      // what gives the surface its grain.
+      for (let i = 0; i < 46 * (WORLD_W / 1280); i++) {
+        const x = 24 + rng() * (WORLD_W - 48);
+        const gy = groundY(map, lane, x) + (2 + rng() * 30) * dep;
+        const r = (0.9 + rng() * 2.4) * dep;
+        ctx.globalAlpha = 0.34;
+        ctx.fillStyle = 'rgb(16,18,12)';
+        ctx.beginPath();
+        ctx.ellipse(x + r * 0.5, gy + r * 0.42, r * 1.15, r * 0.42, 0, 0, 7);
+        ctx.fill();
+        ctx.globalAlpha = 0.62 + rng() * 0.3;
+        ctx.fillStyle = rng() < 0.5 ? lit : soil;
+        ctx.beginPath();
+        ctx.ellipse(x, gy, r, r * 0.72, rng(), 0, 7);
+        ctx.fill();
+      }
+
+      // TWIGS: a few dozen thin dark strokes, laid flat. Cheap, and they break
+      // the last of the emptiness at the scale a boot occupies.
+      ctx.globalAlpha = 0.3;
+      ctx.strokeStyle = dark;
+      for (let i = 0; i < 30 * (WORLD_W / 1280); i++) {
+        const x = 24 + rng() * (WORLD_W - 48);
+        const gy = groundY(map, lane, x) + (4 + rng() * 28) * dep;
+        const L = (3 + rng() * 9) * dep, a = (rng() - 0.5) * 1.1;
+        ctx.lineWidth = (0.6 + rng() * 0.7) * dep;
+        ctx.beginPath();
+        ctx.moveTo(x, gy);
+        ctx.lineTo(x + Math.cos(a) * L, gy + Math.sin(a) * L * 0.32);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
     // grass tufts
     ctx.strokeStyle = p.laneTop[lane];
     ctx.lineWidth = 1.2;
