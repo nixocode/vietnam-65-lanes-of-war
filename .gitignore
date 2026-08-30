@@ -40,3 +40,15 @@ node_modules/
 # and it would otherwise be served from the live site for no reason.
 design/hud/*.html
 !design/hud/*.dc.html
+
+# ---- Credentials. Never commit. --------------------------------------------
+# .env.local was TRACKED and reached the public repo in the very first commit,
+# carrying a Vercel OIDC token. That token had already expired (2026-07-07) by
+# the time it was found, so there was no live exposure — but it was published,
+# and the only reason it did no harm is that it aged out. Anything matching
+# these patterns stays out of git.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
