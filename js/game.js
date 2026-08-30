@@ -1887,7 +1887,33 @@ class Game {
      *
      * 9 px is under a fifth of a man's width, so nobody drifts visibly out of
      * formation, and it lets him actually arrive. */
-    if (Math.abs(dx) < 9 && !marching) {
+    /* THE SETTLE DEAD-BAND IS BACK AT 2.5, and the story is worth keeping.
+     *
+     * It was raised to 9 on the theory that men were chasing a slot they could
+     * never reach and so stayed permanently flagged `moving`, which forces the
+     * stance machine to 'stand'. A single before/after run showed moving
+     * dropping 90.3% -> 70.7% and it was committed on that basis.
+     *
+     * It is not true. A/B on twelve matched runs — six seeds across two maps —
+     * says the dead-band does nothing at all:
+     *
+     *     base 2.5   moving 80.7%   fighting posture 9.3%
+     *     base 9     moving 80.4%   fighting posture 8.1%
+     *     base 16    moving 79.5%   fighting posture 8.6%
+     *
+     * All inside the noise, and a wider band that also suppressed adjustment
+     * while in contact added nothing on top. So the change is reverted rather
+     * than left in place looking load-bearing.
+     *
+     * Kneeling appearing at all was real, and it came from the stance PRIORITY
+     * reorder — the front-rank prone rule used to sit above the kneel and
+     * swallow it — not from this number.
+     *
+     * Men are moving ~80% of the time because squads genuinely cross a lot of
+     * ground before they meet. That is a pacing question about how far a squad
+     * advances before it halts, and it will not be solved by a threshold here.
+     */
+    if (Math.abs(dx) < 2.5 && !marching) {
       u.moving = false;
       u.spd = 0;
       return;
