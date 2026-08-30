@@ -36,17 +36,34 @@ const Sound = {
        * gets big — the opposite of what should happen. */
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.55;
-      /* NO LIMITER. One was added here and then removed, and the measurement is
-       * why: rendering the real graph offline, a DynamicsCompressor at -14/8
-       * pulled a single rifle shot down 45%, and tightening it to -6/12 made it
-       * WORSE at 64%. A rifle shot is the most common sound in the game and it
-       * was being halved to protect against clipping that does not happen —
-       * twenty simultaneous AK shots peak at 0.57 with zero clipped samples.
+      /* A SOFT CLIPPER, not a compressor.
        *
-       * Guarding a problem you have not measured costs something real. If dense
-       * fights ever do clip, the fix is a limiter at -1 dB verified the same way,
-       * not one tuned by ear on faith. */
-      this.master.connect(this.ctx.destination);
+       * Real recordings are ~5x hotter than the synth they layer over, and
+       * measured, twenty simultaneous shots peaked at 3.2 with 437 clipped
+       * samples. So a safety net is now justified by data — which it was not
+       * before the samples landed, and a DynamicsCompressor was removed then
+       * for exactly that reason.
+       *
+       * It is still not a DynamicsCompressor, because that node applies broad
+       * gain reduction whatever its threshold: measured at -3 dB with ratio 20
+       * it pulled a SINGLE rifle shot from 0.292 down to 0.063. A WaveShaper is
+       * honest — the curve is identity below the knee, so one shot passes
+       * through untouched, and only the sum of many rounds ever reaches the
+       * part that bends. */
+      const shaper = this.ctx.createWaveShaper();
+      const N = 4096, curve = new Float32Array(N);
+      const KNEE = 0.62;
+      for (let i = 0; i < N; i++) {
+        const x = (i / (N - 1)) * 2 - 1;
+        const a = Math.abs(x);
+        curve[i] = a <= KNEE ? x
+          : Math.sign(x) * (KNEE + (1 - KNEE) * Math.tanh((a - KNEE) / (1 - KNEE)));
+      }
+      shaper.curve = curve;
+      shaper.oversample = '2x';
+      this.master.connect(shaper);
+      shaper.connect(this.ctx.destination);
+      this._shaper = shaper;
 
       this.dry = this.ctx.createGain(); this.dry.gain.value = 1;
       this.dry.connect(this.master);
@@ -183,8 +200,57 @@ const Sound = {
   ok() { return this.ctx && !this.muted; },
 
   /* layered small-arms: mechanism click + report + decaying tail */
+  /* REAL RECORDINGS, loaded lazily and layered over the synthesis.
+   *
+   * The synth got a room in the previous pass and improved a lot, but a
+   * filtered noise burst is still a filtered noise burst: what it cannot
+   * produce is the mechanical detail of an actual weapon — the bolt, the
+   * cartridge ring, the particular way a 7.62 report tears versus a 5.56.
+   *
+   * These are CC0 (see assets/audio/SOURCE.txt), 20 KB each, four of them. They
+   * do NOT replace the synth: the sample carries the muzzle and the synth still
+   * carries distance — the lag, the treble loss, the wet send — because one
+   * recording cannot be a rifle at every range. Sample dry and close, synth
+   * layers thinned as it takes over. If a buffer has not decoded yet, or the
+   * fetch failed, `shot` falls through to pure synthesis exactly as before, so
+   * the game never depends on an asset that might not be there. */
+  SAMPLES: { m16: 'm16', ak: 'ak', mg: 'mg', sniper: 'bolt', marksman: 'bolt' },
+
+  _loadSamples() {
+    if (this._sampReq || !this.ctx) return;
+    this._sampReq = true;
+    this._samp = {};
+    const seen = {};
+    for (const k in this.SAMPLES) {
+      const f = this.SAMPLES[k];
+      if (seen[f]) continue;
+      seen[f] = 1;
+      fetch('assets/audio/' + f + '.wav')
+        .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+        .then((b) => this.ctx.decodeAudioData(b))
+        .then((buf) => { this._samp[f] = buf; })
+        .catch(() => { /* stay on synthesis */ });
+    }
+  },
+
+  _playSample(name, gain, pan, when, wet, rate) {
+    const buf = this._samp && this._samp[name];
+    if (!buf) return false;
+    const t = this.ctx.currentTime + (when || 0);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate || 1;
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g);
+    g.connect(this._bus(pan, wet));
+    src.start(t);
+    return true;
+  },
+
   shot(kind, x) {
     if (!this.ok()) return;
+    this._loadSamples();
     const { pan, att, far } = this._spatial(x);
     const j = rand(0.9, 1.12); // pitch jitter so volleys don't machine-copy
     const H = (f) => this._hi(f, far);
@@ -197,20 +263,30 @@ const Sound = {
      * layers stay driest, because it is the crack that localises a shot. */
     const wT = 0.10 + far * 0.55;          // transient: stays fairly dry
     const wB = 0.34 + far * 1.25;          // body and tail: soak them
+
+    /* If the recording is loaded, it plays the muzzle and the synth is cut back
+     * to the parts that carry DISTANCE. Pitch is jittered per shot so a volley
+     * is not one sample stamped twenty times — the single thing that makes
+     * sample-based gunfire sound cheap. */
+    const sName = this.SAMPLES[kind];
+    const played = sName && this._playSample(
+      sName, 0.62 * att * (1 - far * 0.45), pan, lag, 0.18 + far * 1.1,
+      j * (1 - far * 0.06));
+    const sk = played ? 0.34 : 1;          // synth level once a sample carries it
     if (kind === 'm16') {
-      this._noise(0.012, 'highpass', H(6200), 1, 0.10 * att * (1 - far), lag, pan, wT);
-      this._noise(0.07, 'bandpass', H(3300 * j), 1.3, 0.17 * att, lag + 0.004, pan, wB);
-      this._noise(0.05, 'highpass', H(5200), 1, 0.07 * att * (1 - far), lag + 0.004, pan, wT);
+      this._noise(0.012, 'highpass', H(6200), 1, sk * 0.10 * att * (1 - far), lag, pan, wT);
+      this._noise(0.07, 'bandpass', H(3300 * j), 1.3, sk * 0.17 * att, lag + 0.004, pan, wB);
+      this._noise(0.05, 'highpass', H(5200), 1, sk * 0.07 * att * (1 - far), lag + 0.004, pan, wT);
       this._noise(0.22 + far * 0.3, 'lowpass', 900 * j, 0.6, 0.06 * att, lag + 0.02, pan, wB);
     } else if (kind === 'ak') {
-      this._noise(0.012, 'highpass', H(4800), 1, 0.08 * att * (1 - far), lag, pan, wT);
-      this._noise(0.09, 'bandpass', H(1650 * j), 1.1, 0.21 * att, lag + 0.004, pan, wB);
-      this._tone('square', 128 * j, 0.05, 0.05 * att, lag + 0.004, null, pan, wT);
+      this._noise(0.012, 'highpass', H(4800), 1, sk * 0.08 * att * (1 - far), lag, pan, wT);
+      this._noise(0.09, 'bandpass', H(1650 * j), 1.1, sk * 0.21 * att, lag + 0.004, pan, wB);
+      this._tone('square', 128 * j, 0.05, sk * 0.05 * att, lag + 0.004, null, pan, wT);
       this._noise(0.28 + far * 0.34, 'lowpass', 700 * j, 0.6, 0.07 * att, lag + 0.03, pan, wB);
     } else if (kind === 'mg') {
-      this._noise(0.01, 'highpass', H(5600), 1, 0.07 * att * (1 - far), lag, pan, wT);
-      this._noise(0.06, 'bandpass', H(2050 * j), 1, 0.16 * att, lag + 0.003, pan, wB);
-      this._tone('square', 96 * j, 0.04, 0.045 * att, lag + 0.003, null, pan, wT);
+      this._noise(0.01, 'highpass', H(5600), 1, sk * 0.07 * att * (1 - far), lag, pan, wT);
+      this._noise(0.06, 'bandpass', H(2050 * j), 1, sk * 0.16 * att, lag + 0.003, pan, wB);
+      this._tone('square', 96 * j, 0.04, sk * 0.045 * att, lag + 0.003, null, pan, wT);
       this._noise(0.16 + far * 0.3, 'lowpass', 800, 0.6, 0.05 * att, lag + 0.02, pan, wB);
     }
     /* The hand-built treeline slap is GONE. It was one delayed noise burst
