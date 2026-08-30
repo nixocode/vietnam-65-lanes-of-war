@@ -31,6 +31,16 @@
    "aspect": 2.4319
   },
   {
+   "name": "canopy_a",
+   "hM": 6.567,
+   "wM": 6.209,
+   "groundY": 480.6,
+   "ppm": 68.39,
+   "res": 512,
+   "realH": 8.5,
+   "aspect": 0.9455
+  },
+  {
    "name": "cart_v",
    "hM": 0.734,
    "wM": 1.842,
@@ -199,6 +209,16 @@
    "res": 512,
    "realH": 0.55,
    "aspect": 2.5234
+  },
+  {
+   "name": "scrub_a",
+   "hM": 3.285,
+   "wM": 3.386,
+   "groundY": 473.8,
+   "ppm": 132.62,
+   "res": 512,
+   "realH": 4.2,
+   "aspect": 1.0307
   },
   {
    "name": "shrine_a",

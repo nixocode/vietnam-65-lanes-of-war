@@ -483,6 +483,120 @@ def build_bamboo():
                        y=y + (j - 1) * 0.05, yt=0.013)
 
 
+def build_junglecanopy():
+    """A broadleaf jungle tree — the mid-ground mass every map is made of.
+
+    Until now that band was `Renderer._tree`, a vector function that builds a
+    canopy from a ring of ellipse lobes in three value passes. It is careful
+    code and it still reads as a bush on a stick, because a ring of ellipses is
+    a ring of ellipses: the crown has no interior, no branch structure holding
+    it up, and the same round outline every time.
+
+    A real canopy reads from three things this gets right instead: a trunk that
+    LEANS and tapers, branches that fan from one point high on it and carry the
+    foliage out to their ends, and leaf mass in separated clumps with sky
+    between them. The gaps are what stop it being a blob.
+    """
+    import math as _m
+    import random as _r
+    _r.seed(41)
+    bark = _pmat('jc_bark', (0.052, 0.042, 0.030))
+    dark = _pmat('jc_dark', (0.026, 0.038, 0.020))
+    leaf = _pmat('jc_leaf', (0.048, 0.070, 0.030))
+    lit = _pmat('jc_lit', (0.078, 0.104, 0.044))
+
+    H = 6.4
+    lean = 0.42
+    segs = 9
+    pts = _curve(0.0, 0.0, lean, H * 0.62, bow=-0.16, segs=segs)
+    for i in range(segs):
+        t = i / float(segs)
+        _beam(bark, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1],
+              t=0.22 - 0.15 * t, y=0.0, yt=0.19 - 0.13 * t)
+    # buttress roots — a lowland tree flares where it meets the ground
+    for a in (-1, 1, -0.4):
+        _poly(bark, [(0.0, 0.0), (a * 0.58, 0.0), (a * 0.16, 0.72)],
+              y=a * 0.10, yt=0.10)
+
+    # branches fan from the top of the trunk, each carrying a clump at its end
+    top = pts[-1]
+    clumps = []
+    for i in range(7):
+        a = -1.28 + i * 0.42 + (_r.random() - 0.5) * 0.22
+        L = 1.5 + _r.random() * 1.5
+        bx = top[0] + _m.sin(a) * L
+        bz = top[1] + _m.cos(a) * L * 0.82
+        bp = _curve(top[0], top[1], bx, bz, bow=0.12 * (1 if i % 2 else -1), segs=3)
+        for k in range(3):
+            _beam(bark, bp[k][0], bp[k][1], bp[k + 1][0], bp[k + 1][1],
+                  t=0.11 - 0.026 * k, y=(i - 3) * 0.10, yt=0.10 - 0.022 * k)
+        clumps.append((bx, bz, (i - 3) * 0.10))
+    clumps.append((top[0], top[1] + 1.15, 0.0))
+
+    # leaf mass: separated clumps of real leaves, three depths so the crown has
+    # an inside. The lit material only on the upper leaves, so the sun has a side
+    for ci, (cx, cz, cy) in enumerate(clumps):
+        # MANY SMALL leaves, not a few big ones. The first pass used 16 leaves
+        # at 0.34-0.64 m and read as a storybook tree: at that size each leaf is
+        # a recognisable paddle and the crown is a collage of them. Canopy is a
+        # TEXTURE — the eye should read mass and gaps, not individual leaves.
+        for j in range(34):
+            a = _r.random() * 6.283
+            rr = _r.random() ** 0.6
+            lx = cx + _m.cos(a) * 0.92 * rr
+            lz = cz + _m.sin(a) * 0.66 * rr
+            up = lz > cz
+            m = lit if (up and j % 3 == 0) else (leaf if j % 4 else dark)
+            L = 0.20 + _r.random() * 0.22
+            ang = a * 0.35 + (_r.random() - 0.5) * 1.3
+            _leafpoly(m, lx, lz, lx + _m.sin(ang) * L, lz + _m.cos(ang) * L * 0.6,
+                      bow=(_r.random() - 0.5) * 0.10, wmax=L * 0.34, segs=4,
+                      y=cy + (j % 7 - 3) * 0.10, yt=0.012)
+
+
+def build_scrubtree():
+    """A smaller, wind-shaped tree for the open maps, where a full jungle canopy
+    would be wrong. Same construction, half the height, crown pushed downwind so
+    a scatter of them does not read as one shape repeated."""
+    import math as _m
+    import random as _r
+    _r.seed(57)
+    bark = _pmat('st_bark', (0.056, 0.046, 0.032))
+    dark = _pmat('st_dark', (0.030, 0.040, 0.022))
+    leaf = _pmat('st_leaf', (0.056, 0.074, 0.032))
+    lit = _pmat('st_lit', (0.086, 0.106, 0.048))
+    H = 3.4
+    pts = _curve(0.0, 0.0, 0.55, H * 0.54, bow=-0.22, segs=6)
+    for i in range(6):
+        t = i / 6.0
+        _beam(bark, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1],
+              t=0.19 - 0.11 * t, y=0.0, yt=0.17 - 0.10 * t)
+    top = pts[-1]
+    clumps = []
+    for i in range(5):
+        a = -0.95 + i * 0.50 + (_r.random() - 0.5) * 0.2
+        L = 0.9 + _r.random() * 0.95
+        bx = top[0] + _m.sin(a) * L + 0.18
+        bz = top[1] + _m.cos(a) * L * 0.7
+        bp = _curve(top[0], top[1], bx, bz, bow=0.10, segs=2)
+        for k in range(2):
+            _beam(bark, bp[k][0], bp[k][1], bp[k + 1][0], bp[k + 1][1],
+                  t=0.075 - 0.02 * k, y=(i - 2) * 0.09, yt=0.07 - 0.018 * k)
+        clumps.append((bx, bz, (i - 2) * 0.09))
+    for cx, cz, cy in clumps:
+        for j in range(24):
+            a = _r.random() * 6.283
+            rr = _r.random() ** 0.65
+            lx = cx + _m.cos(a) * 0.62 * rr
+            lz = cz + _m.sin(a) * 0.44 * rr
+            m = lit if (lz > cz and j % 3 == 0) else (leaf if j % 4 else dark)
+            L = 0.15 + _r.random() * 0.15
+            ang = a * 0.3 + (_r.random() - 0.5) * 1.2
+            _leafpoly(m, lx, lz, lx + _m.sin(ang) * L, lz + _m.cos(ang) * L * 0.6,
+                      bow=(_r.random() - 0.5) * 0.08, wmax=L * 0.34, segs=4,
+                      y=cy + (j % 6 - 2.5) * 0.08, yt=0.010)
+
+
 def build_deadtree():
     """A shell-stripped trunk. Reads instantly as a fought-over place.
 
@@ -942,6 +1056,8 @@ BUILT = {
     'watchtower': (build_watchtower, 5.2),
     # foliage — real heights, so they scale against a 1.8 m soldier
     'bamboo_a':   (build_bamboo, 4.8),
+    'canopy_a':   (build_junglecanopy, 8.5),   # the mid-ground mass, was a vector blob
+    'scrub_a':    (build_scrubtree, 4.2),
     'deadtree_a': (build_deadtree, 4.5),
     'banana_a':   (build_banana, 2.7),
     'grass_a':    (build_grass, 1.8),

@@ -102,6 +102,8 @@ const VEG = {
   grass:  ['grass_a'],
   palm:   ['palm_a', 'palm_b', 'palm_c', 'palm_d'],
   banana: ['banana_a'],
+  canopy: ['canopy_a'],
+  scrub:  ['scrub_a'],
 };
 
 function drawVeg(ctx, kind, i, x, gy, h, opts = {}) {
@@ -2492,10 +2494,39 @@ const Renderer = {
           if (ok) continue;
         }
       }
-      // The painted palm and banana slices that used to mix in here are gone:
-      // they were inked line art dropped among flat-shaded props, which is the
-      // clash this pass exists to remove. Their share went to `chance` above.
-      this._tree(ctx, map, rng, x, groundY(map, lane, x) + 2, LANE_DEPTH[lane]);
+      /* The painted palm and banana slices that used to mix in here are gone:
+       * they were inked line art dropped among flat-shaded props.
+       *
+       * `_tree` is the last of that family — a vector canopy built from a ring
+       * of ellipse lobes in three value passes. Careful code, and it still
+       * reads as a bush on a stick, because a ring of ellipses has no branch
+       * structure holding it up and no interior. `canopy_a` and `scrub_a` are
+       * real trees with a leaning tapered trunk, branches fanning from one
+       * point, and leaf mass in separated clumps — the GAPS are what stop a
+       * crown being a blob.
+       *
+       * Kept as the fallback for maps whose tree kind has no prop yet and for
+       * the first frames before the prop set finishes loading. */
+      const dep = LANE_DEPTH[lane];
+      const kind = map.trees === 'grass' || map.trees === 'shattered' ? 'scrub' : 'canopy';
+      /* Sized in PIXELS, not from the prop's authored height.
+       *
+       * `vegH` maps a prop's real metres onto the 84px-per-1.8m soldier scale,
+       * which is right for ground cover and wrong here: canopy_a is authored at
+       * a truthful 8.5 m, so vegH asks for ~400 px and one tree fills the frame
+       * top to bottom. The first render of this buried the entire map under a
+       * forest and the sky disappeared.
+       *
+       * A lane tree is a mid-ground object standing BEHIND the fight, so it is
+       * sized to the band it has to occupy — roughly one and a half to three
+       * times a man — rather than to its own botany. */
+      const th = (104 + rng() * 84) * dep;
+      if (!drawVeg(ctx, kind, 0, x, groundY(map, lane, x) + 2, th,
+                   { flip: rng() < 0.5, alpha: 0.96 })) {
+        this._tree(ctx, map, rng, x, groundY(map, lane, x) + 2, dep);
+      } else if (rng() < 0.55) {
+        this._baseLitter(ctx, rng, x, groundY(map, lane, x) + 2, th * 0.5, map, lane);
+      }
     }
 
     // painted ground vegetation baked into the lane
