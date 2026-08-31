@@ -9,6 +9,15 @@
         "8931"
       ],
       "port": 8931
+    },
+    {
+      "name": "vietnam65-mobile",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "../Vietnam 1965 Mobile/tools/devserver.py",
+        "8932"
+      ],
+      "port": 8932
     }
   ]
 }
