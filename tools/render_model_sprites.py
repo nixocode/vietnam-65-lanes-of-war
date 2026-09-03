@@ -171,6 +171,8 @@ STATE_ACTIONS = {
 MODEL_FOR = {
     'rifleman':  'soldier',     'arvn':     'casual',
     'm60':       'adventurer',  'engineer': 'swat',
+    # the grenadier is a plain rifleman body; the WEAPON is the whole point
+    'grenadier': 'soldier',
     # sniper gets `worker`, the one donor in art/models nothing used. It shared
     # `soldier` with the rifleman, so the two most common US figures on screen
     # were the same body — and a sniper reading as "just another rifleman" is
@@ -203,6 +205,7 @@ SKIN_TONE = {'Skin': (0.300, 0.186, 0.108), 'Skin_Darker': (0.232, 0.142, 0.082)
 
 # units that share another unit's faction colours
 PAL_ALIAS = {'m60': 'rifleman', 'engineer': 'rifleman', 'recon': 'rifleman',
+             'grenadier': 'rifleman',
              'sniper': 'rifleman', 'rpd': 'nva', 'sapper': 'guerrilla',
              'marksman': 'guerrilla', 'rpgman': 'nva'}
 
@@ -268,6 +271,8 @@ GEAR = {
     'nva':       ('ak', 'pith'),
     'm60':       ('m60', 'm1'),
     'engineer':  ('m16', 'm1'),
+    # the M79 mesh has existed since the weapon was added; nothing carried it
+    'grenadier': ('m79', 'm1'),
     'recon':     ('m16', 'boonie'),
     'sniper':    ('m40', 'boonie'),
     'rpd':       ('m60', 'pith'),
