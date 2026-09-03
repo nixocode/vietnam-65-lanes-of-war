@@ -58,7 +58,8 @@ FIG_H, ORTHO, CAM_Z = 1.8, 1.8 * 1.5, 1.8 * 0.52
 
 # clip playback order is fixed so a frame index means the same thing everywhere
 CLIP_ORDER = ['idle', 'idle2', 'walk', 'run', 'runfire', 'aim', 'fire',
-              'hit', 'hit2', 'death', 'prone', 'throw', 'dive', 'melee']
+              'hit', 'hit2', 'death', 'prone', 'throw', 'dive', 'melee',
+              'fallback', 'rest']
 
 
 # THE DESKTOP FRAME BUDGET.
@@ -79,7 +80,8 @@ CLIP_ORDER = ['idle', 'idle2', 'walk', 'run', 'runfire', 'aim', 'fire',
 # idle2, aim, hit, hit2 — all short already, and all read as poses rather than
 # motion, where dropping a frame is visible.
 
-DESKTOP_FRAMES = {'walk': 16, 'run': 14, 'runfire': 12, 'death': 10, 'throw': 8}
+DESKTOP_FRAMES = {'walk': 16, 'run': 14, 'runfire': 12, 'death': 10, 'throw': 8,
+                  'fallback': 12}
 
 # Clips that must keep their FIRST n frames rather than an even spread.
 #
