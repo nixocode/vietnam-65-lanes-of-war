@@ -183,7 +183,16 @@ window.Capture = {
        * stated as DECODED, which is the number that was measured — an "18 MB"
        * cap taken from the on-disk PNG size would have been met while the game
        * held five times that in RAM. */
-      caps: { srcMpx: 13, decodedMB: 130, particles: 220 },
+      /* decodedMB 200, not 130.
+       *
+       * 130 was chosen with phones in mind and the desktop tree inherited it,
+       * which is how the desktop art set came to be at 126.3 of 130 with no
+       * room for another prop. Desktops have the memory; the mobile tree keeps
+       * its own discipline (props at 256, frames subsampled harder) and is not
+       * governed by this number. Raised on the owner's call, and only after the
+       * atlas frame budget reclaimed 22 MB — the cap moved because the desktop
+       * can afford it, not to paper over waste. */
+      caps: { srcMpx: 13, decodedMB: 200, particles: 220 },
     };
   },
 };

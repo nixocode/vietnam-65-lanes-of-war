@@ -61,6 +61,51 @@ CLIP_ORDER = ['idle', 'idle2', 'walk', 'run', 'runfire', 'aim', 'fire',
               'hit', 'hit2', 'death', 'prone', 'throw', 'dive', 'melee']
 
 
+# THE DESKTOP FRAME BUDGET.
+# 
+# The desktop atlases carried every frame the renderer produced — 135 a unit,
+# twelve units, 93.6 MB decoded, which was three quarters of the entire memory
+# budget and the reason nothing else could be added. Half of it was three
+# clips: walk 28, run 24, runfire 20.
+# 
+# The mobile build has run walk at TWELVE frames since it forked and nobody has
+# ever remarked on its gait; at 84px on screen a walk cycle is carried by its
+# extremes, not by its in-betweens. This is deliberately more generous than
+# mobile rather than equal to it — the desktop has the memory and can afford
+# the smoother cycle — but 28 was never a decision, it was just whatever the
+# renderer emitted.
+# 
+# Untouched: dive (it IS kneel and prone, see sprite3d._sel), fire, idle,
+# idle2, aim, hit, hit2 — all short already, and all read as poses rather than
+# motion, where dropping a frame is visible.
+
+DESKTOP_FRAMES = {'walk': 16, 'run': 14, 'runfire': 12, 'death': 10, 'throw': 8}
+
+# Clips that must keep their FIRST n frames rather than an even spread.
+#
+# `dive` is the reason this exists: the game selects only frames 0 (kneel) and
+# 1 (prone) from it, and an even sample would return frames deep in the donor's
+# barrel roll. It is not subsampled here, but the guard belongs with the helper.
+HEAD_ONLY = {'dive'}
+
+
+def _subsample(frames, want, clip=None):
+    """Evenly spaced pick that always keeps the first frame.
+
+    A looping clip must keep frame 0 as its phase origin, and an even stride
+    keeps the motion's extremes rather than clustering on one part of the cycle.
+    """
+    n = len(frames)
+    if want is None or want >= n:
+        return frames
+    if clip in HEAD_ONLY:
+        return frames[:want]
+    if want <= 1:
+        return [frames[0]]
+    step = (n - 1) / float(want - 1)
+    return [frames[int(round(i * step))] for i in range(want)]
+
+
 def pack(unit):
     d = os.path.join(SRC, unit)
     ij = os.path.join(d, 'index.json')
@@ -77,6 +122,7 @@ def pack(unit):
         frames = idx['clips'].get(c)
         if not frames:
             continue
+        frames = _subsample(frames, DESKTOP_FRAMES.get(c), c)
         clips[c] = list(range(len(names), len(names) + len(frames)))
         names += frames
 
