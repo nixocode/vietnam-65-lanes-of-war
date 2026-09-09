@@ -749,9 +749,35 @@ const Renderer = {
     const sorted = h.slice(-45).sort((a, b) => a - b);
     const med = sorted[sorted.length >> 1];
     const before = this.renderScale;
-    if (med > 21 && this.renderScale > 0.62) this.renderScale -= 0.12;
-    else if (med < 13.2 && this.renderScale < 1) this.renderScale += 0.06;
-    this.renderScale = clamp(this.renderScale, 0.62, 1);
+    /* THE TARGET IS 60, AND IT USED TO BE 47.
+     *
+     * This stepped down only while the median frame was over 21ms. 21ms IS
+     * 47fps — so the moment a device reached 47 the scaler declared victory and
+     * stopped, and no amount of headroom below that ever bought the player 60.
+     * Simulated against a device costing 25ms a frame at full resolution, it
+     * settled at scale 0.88 / 19.4ms and sat there: 51fps, permanently, with
+     * plenty of resolution it could have traded.
+     *
+     * SLOW is now just above the 16.67ms budget rather than a third over it.
+     * FAST stays where it was, so the two keep a wide hysteresis band and the
+     * resolution does not pump between steps.
+     *
+     * The FLOOR was 0.62, which is not enough to rescue a genuinely slow
+     * device: at 60ms a frame it bottomed out at 23.1ms (43fps) and at 100ms it
+     * bottomed out at 38.4ms (26fps), in both cases still clamped. 0.42 is soft
+     * — 538px across on a 1280 design — but a soft 60 beats a sharp 26, and a
+     * machine that never asks for it never sees it.
+     *
+     * The step scales with how far off we are, so a device that is badly over
+     * budget converges in one or two moves instead of four seconds of slideshow
+     * while the scaler inches down in 0.12s. */
+    const SLOW = 17.5, FAST = 13.2, FLOOR = 0.42;
+    if (med > SLOW && this.renderScale > FLOOR) {
+      this.renderScale -= med > SLOW * 2 ? 0.24 : 0.12;
+    } else if (med < FAST && this.renderScale < 1) {
+      this.renderScale += 0.06;
+    }
+    this.renderScale = clamp(this.renderScale, FLOOR, 1);
     if (Math.abs(this.renderScale - before) > 0.001) {
       this._rsHold = 1.1;          // settle before judging again
       this.fitDPR();
