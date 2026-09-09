@@ -43,14 +43,19 @@ CROP_Y = 14                    # covers rows 14-125: 4 spare above, 3 below
 # Rendered for every unit and never drawn.
 #   melee — appears only as a key in the URGENT table in js/sprite3d.js; no code
 #           path ever selects it.
-#   prone — the source clip is broken (arms hang off the chest and the rifle
-#           rides the wrist, so pitching the body drives the barrel into the
-#           ground); js/sprite3d.js routes prone men to the `aim` pose instead.
-# 12 frames of 125 per unit, about 8 MB across the set.
-# `kneel` joins these: it was rendered, judged bad, and replaced at runtime by
-# `dive` frame 0 which is a better kneel than the posed one. Keeping it out
-# hands back 6 frames x 12 units.
-SKIP = {'melee', 'prone', 'kneel'}
+# `prone` and `kneel` USED to be here, and are not any more.
+#
+# They were skipped because the only versions that existed were hand-posed and
+# broken, so the game borrowed frames of `dive` for both. That borrowing was the
+# whole posture system: `kneel` and `prone` resolved to the SAME frame — dive 0
+# — and differed only by the renderer drawing one of them lower. One of the two
+# was, for a long time, dive frame 1, which is a man mid-somersault, and that is
+# what the owner kept reporting as barrel-rolling in firefights.
+#
+# Both are now REAL rendered clips, retargeted from the `Duck` action in
+# weapons.glb — a seventh donor rig nobody had opened, holding a completely
+# different set of fourteen animations. See FOREIGN in render_model_sprites.py.
+SKIP = {'melee'}
 
 # Fallback only. The render writes its actual camera into index.json, and that
 # is what gets used — the two must never be able to drift apart.
@@ -58,8 +63,8 @@ FIG_H, ORTHO, CAM_Z = 1.8, 1.8 * 1.5, 1.8 * 0.52
 
 # clip playback order is fixed so a frame index means the same thing everywhere
 CLIP_ORDER = ['idle', 'idle2', 'walk', 'run', 'runfire', 'aim', 'fire',
-              'hit', 'hit2', 'death', 'prone', 'throw', 'dive', 'melee',
-              'fallback', 'rest']
+              'hit', 'hit2', 'death', 'prone', 'kneel', 'throw', 'dive',
+              'melee', 'fallback', 'rest']
 
 
 # THE DESKTOP FRAME BUDGET.
