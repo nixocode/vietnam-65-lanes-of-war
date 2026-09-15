@@ -29,6 +29,7 @@ const SOLDIER_COLORS = {
   sniper:   { coat: '#46523a', pants: '#3d4830', hat: '#4a5538', skin: '#c9a37d' },
   guerrilla:{ coat: '#38362f', pants: '#302e28', hat: '#c2a36a', skin: '#c19a70' },
   nva:      { coat: '#6f6748', pants: '#5f583e', hat: '#655e3e', skin: '#c19a70' },
+  rpgman:   { coat: '#6f6748', pants: '#5f583e', hat: '#655e3e', skin: '#b28963' },
   rpd:      { coat: '#6f6748', pants: '#5f583e', hat: '#655e3e', skin: '#b28963' },
   sapper:   { coat: '#38362f', pants: '#302e28', hat: '#8a2f22', skin: '#c19a70' },
   marksman: { coat: '#45423a', pants: '#38362e', hat: '#b5975e', skin: '#c19a70' },
@@ -459,7 +460,16 @@ function muzzlePoint(u) {
 
 /* original canvas-primitive soldier — the guaranteed fallback */
 function drawSoldierVector(ctx, key, o) {
-  const C = SOLDIER_COLORS[key], u = UNITS[key];
+  /* Defaults, so an unlisted unit can never crash the renderer. This path is
+   * only reached before a unit's atlas has loaded, which on desktop never
+   * happened and on mobile happens for a frame or two every match. */
+  /* DESKTOP HAD NEITHER THIS GUARD NOR `rpgman`'s COLOURS — both were fixed in
+   * the mobile tree only, and the note above is wrong about desktop: the card
+   * icons call this directly, before portraits load, whatever the atlas state.
+   * A VC player's card bar on a slow load threw "reading 'pants'" at the RPG
+   * Team. Found by cross-referencing every table against its consumers. */
+  const C = SOLDIER_COLORS[key] || SOLDIER_COLORS.rifleman;
+  const u = UNITS[key] || {};
   const s = (o.scale || 1) * (u.small ? 0.92 : 1);
   ctx.save();
   ctx.translate(o.x, o.y);
