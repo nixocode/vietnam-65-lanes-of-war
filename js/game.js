@@ -23,6 +23,9 @@ function rankOf(xp) {
 const INCOME = { us: 3.1, vc: 3.5 }; // squads cost more than v1 units — keep waves breathing
 const FLAG_INCOME = 0.5;
 const FLAG_DRAIN = 0.22;
+// how far forward of its objective a siege/assault DEFENDER will come — see
+// _defenceLimit. About two cover positions: an outpost line, not a sortie.
+const DEFENCE_PUSH = 220;
 const MORALE_LOSS = { us: 0.24, vc: 0.15 }; // per CP of unit lost — US is casualty-sensitive
 const MAX_TRAPS = 10;
 
@@ -1164,6 +1167,17 @@ class Game {
        * rather than an army quietly walking into nothing. */
       s.x = clamp(s.x, -20, WORLD_W + 20);
 
+      /* A siege/assault defender stops at its own line — see _defenceLimit.
+       * Held rather than merely clamped, so the squad settles into a position
+       * it is standing on instead of grinding forward into an invisible wall
+       * every frame, which would be movement chatter and, downstream of that,
+       * stance churn. */
+      const dlim = this._defenceLimit(s.side, s.lane);
+      if (dlim != null && (s.x - dlim) * s.dir > 0) {
+        s.x = dlim;
+        if (!s.hold) { s.hold = true; s.holdX = dlim; s.order = 'hold'; s.ceding = false; }
+      }
+
       // GROUND IS NEVER GIVEN UP by accident. Losing the point man used to drag
       // the squad's anchor rearward, which read as troops wandering backwards
       // under fire. Only an explicit FALL BACK or MOVE order may cede ground.
@@ -2009,7 +2023,26 @@ class Game {
 
     for (const side of ['us', 'vc']) {
       let inc = INCOME[side];
-      inc += this.flags.filter(f => f.owner === side).length * FLAG_INCOME;
+      /* IN AN ATTACK MISSION THE OBJECTIVES PAY THE ATTACKER, AND ONLY THEM.
+       *
+       * The defender starts holding every flag, so on Khe Sanh and Hill 937 the
+       * defence collected 1.0 CP/s of objective income from frame one for
+       * ground it had not had to take. Traced with the attacker's whole match
+       * on the table: the Hill 937 defender rode that to the 250 CP cap while
+       * the attacker ran on 5-33, outnumbering it 21 to 12 by t=180 — a
+       * compounding lead that no amount of play on the attacker's side could
+       * answer, because the only way to cut the income was to take a flag and
+       * the only way to take a flag was troops it could not afford.
+       *
+       * It is the same principle the flag DRAIN already settled: not yet having
+       * taken the ground you came to take is the starting condition, not a
+       * failure — and by the same token it is not an achievement to be paid
+       * for. The flags in these two missions are what the attacker is buying
+       * with its casualties; they pay whoever has actually taken them. */
+      const attackMode = this.mode === 'siege' || this.mode === 'assault';
+      if (!(attackMode && this.map.preOwner === side)) {
+        inc += this.flags.filter(f => f.owner === side).length * FLAG_INCOME;
+      }
       if (this.map.incomeMult && this.map.incomeMult[side]) inc *= this.map.incomeMult[side];
       inc *= side === this.player ? this.diff.playerIncome : this.diff.aiIncome;
       this.cp[side] = Math.min(CP_CAP, this.cp[side] + inc * dt);
@@ -2737,8 +2770,12 @@ class Game {
         }
       }
 
-      // breakthrough
-      if (u.deadT == null) {
+      // breakthrough — but a siege/assault defender has no line to break
+      // through, only one to hold. See _defenceLimit; this is the backstop for
+      // a man who slips past it rather than the mechanism.
+      const defends = (this.mode === 'siege' || this.mode === 'assault') &&
+                      this.map.preOwner === u.side;
+      if (u.deadT == null && !defends) {
         const goal = u.side === 'us' ? WORLD_W - 42 : 42;
         if ((u.side === 'us' && u.x >= goal) || (u.side === 'vc' && u.x <= goal)) {
           const dmg = (u.cpShare || UNITS[u.key].cost) * (UNITS[u.key].sapper ? 0.9 : 0.45);
@@ -3362,6 +3399,40 @@ class Game {
         if (f.cap === 0) f.capSide = null;
       }
     }
+  }
+
+  /* WHAT A DEFENDER IS FOR — and what it took to find out.
+   *
+   * Khe Sanh and Hamburger Hill were lost 0 times out of 24 across both test
+   * profiles, and the reason was not casualties and not the flag bleed that was
+   * fixed last week. Attributed over the whole match, on both maps, ONE HUNDRED
+   * PERCENT of the attacker's morale went to BREAKTHROUGH: twenty-nine to
+   * thirty-six defenders walked the entire length of the map and off the
+   * attacker's back edge, 2.3 to 10.8 morale each, emptying a full bar between
+   * t=70 and t=155 of a 640s siege and a 780s assault.
+   *
+   * It is the same bug as the flag bleed wearing different clothes: a rule
+   * written for the standing fight, applied to a mode it makes no sense in. A
+   * besieged garrison does not win Khe Sanh by marching out of the wire and off
+   * the far edge of the valley. Defenders dug into the crest of Hill 937 do not
+   * win it by running downhill past the assault and leaving.
+   *
+   * So in siege and assault the defender HOLDS. They may come forward of the
+   * objective — a defence has outposts, and a line that never leaves its hole
+   * is a static target — but not past it, and never across the map. The
+   * attacker's job becomes crossing ground against a prepared position, which
+   * is the thing both briefings promise, and the timer that decides these two
+   * missions finally gets the chance to run.
+   *
+   * The push is deliberately generous: the flags sit a third of the way in from
+   * the defender's own base, so this still leaves the attacker most of the map
+   * to cross. */
+  _defenceLimit(side, lane) {
+    if (this.mode !== 'siege' && this.mode !== 'assault') return null;
+    if (this.map.preOwner !== side) return null;
+    const f = this.flags.find(fl => fl.lane === lane);
+    if (!f) return null;
+    return f.x + (side === 'us' ? 1 : -1) * DEFENCE_PUSH;
   }
 
   /* ---------- AI ---------- */
