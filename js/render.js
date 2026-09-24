@@ -3428,6 +3428,7 @@ const Renderer = {
       ctx.fillStyle = hz;
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
     }
+    this._bloom(ctx);
     /* Colour grade. Warm lift in the highlights, cool weight in the shadows —
      * the cheapest way to make a frame read as one photograph rather than a set
      * of separately-drawn layers. Two blends, no per-pixel work. */
@@ -4245,6 +4246,7 @@ const Renderer = {
     ctx.fillStyle = map.pal.haze;
     ctx.fillRect(Camera.x - 4, 0, CANVAS_W + 8, CANVAS_H);
     ctx.globalAlpha = prev;
+
   },
 
   /* Rank chevrons over a squad. Veterancy is worth nothing to the player if it
@@ -4891,6 +4893,61 @@ const Renderer = {
   /* Soft contact shadow. Nothing sells "standing on the ground" like a shadow —
    * without one a sprite reads as a sticker pasted over the terrain. Cached as a
    * one-off blob because a radial gradient per unit per frame is pure waste. */
+  /* BLOOM — light that spills.
+   *
+   * The frame had a colour grade, a haze and a vignette and no bloom, and bloom
+   * is the one post pass that separates flat vector art from something that
+   * reads as photographed. Nothing in the scene glows: a muzzle flash is a
+   * shape, a tracer is a line, the sun is a disc with a painted halo. Real
+   * optics spread bright light into what surrounds it, and the eye reads that
+   * spread as brightness the palette cannot otherwise reach — a canvas cannot
+   * draw anything brighter than #fff, so the only way to say "this is LIGHT" is
+   * to let it bleed.
+   *
+   * Cheap, and deliberately so. The frame goes into a 256px buffer, gets
+   * multiplied by itself twice — v^3, which crushes the mid-tones and leaves
+   * the highlights standing, and is the thresholding step done with a blend
+   * rather than per-pixel work — then comes back blurred and additive. Three
+   * small blits and one full-screen add; no getImageData anywhere, so nothing
+   * de-accelerates the canvas.
+   *
+   * It is the first thing dropped when the frame budget is tight: the adaptive
+   * scaler already knows when the device is struggling, and a device that has
+   * been pushed below 0.72 resolution has no business spending anything on
+   * glow. */
+  BLOOM: 0.55,   // higher than it looks: v^5 has already thrown most of the frame away
+
+  _bloom(ctx) {
+    if (this.bloomOff || this.renderScale < 0.72) return;
+    const src = ctx.canvas;
+    if (!src.width || !src.height) return;
+    const bw = 256, bh = Math.max(1, Math.round(bw * CANVAS_H / CANVAS_W));
+    let b = this._bloomBuf;
+    if (!b) { b = this._bloomBuf = document.createElement('canvas'); b.width = bw; b.height = bh; }
+    const bx = b.getContext('2d');
+    bx.globalCompositeOperation = 'source-over';
+    bx.clearRect(0, 0, bw, bh);
+    bx.drawImage(src, 0, 0, src.width, src.height, 0, 0, bw, bh);
+    /* v^5, not v^3. At the cube the sky itself still passed — it is already
+     * bright — so adding 42% of a blurred sky back blew the highlights out and
+     * lifted the whole frame's mid-tones by 6 L*, which is a milky veil rather
+     * than light. The fifth power is selective enough that only things that
+     * really are light — the sun, a muzzle flash, fire, tracer — survive it. */
+    bx.globalCompositeOperation = 'multiply';
+    bx.drawImage(b, 0, 0);
+    bx.drawImage(b, 0, 0);
+    bx.drawImage(b, 0, 0);
+    bx.drawImage(b, 0, 0);
+    bx.globalCompositeOperation = 'source-over';
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = this.BLOOM;
+    ctx.filter = 'blur(7px)';
+    ctx.drawImage(b, 0, 0, bw, bh, 0, 0, CANVAS_W, CANVAS_H);
+    ctx.filter = 'none';
+    ctx.restore();
+  },
+
   _shadowBlob() {
     if (this._shadow) return this._shadow;
     const R = 64;
