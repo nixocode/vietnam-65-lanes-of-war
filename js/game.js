@@ -26,6 +26,40 @@ const FLAG_DRAIN = 0.22;
 // how far forward of its objective a siege/assault DEFENDER will come — see
 // _defenceLimit. About two cover positions: an outpost line, not a sortie.
 const DEFENCE_PUSH = 220;
+
+/* AN ATTACK IS NOT A STANDING FIGHT, AND WAS BALANCED AS THOUGH IT WERE.
+ *
+ * With the breakthrough bleed and the defender's free objective income fixed,
+ * Khe Sanh and Hamburger Hill were still lost 0 times in 24 — the attacker now
+ * simply died of ordinary casualties at 185-301s of a 640s and a 780s timer.
+ * Swept across 12 fixed seeds per cell, the two missions turned out to fail for
+ * DIFFERENT reasons, which is why one knob could not fix both:
+ *
+ *   Khe Sanh  — a force problem. The garrison reinforces as fast as the
+ *               besiegers and never has to cross ground, so it simply
+ *               outnumbers them; thinning its income moved it 0/12 -> 6/12
+ *               while making the fight SHORTER and cheaper (losses 79 -> 65).
+ *   Hill 937  — a resolve problem. The crest is pre-garrisoned, so cutting
+ *               reinforcement barely helps (0/12 -> 1/12); what the assault
+ *               runs out of is will, at a third of its own clock.
+ *
+ * Hence two constants, one for each failure:
+ *
+ * RESOLVE — an operation launched to take an objective is planned around
+ * casualties in a way a meeting engagement is not. The briefings say the timer
+ * is the attacker's pressure ("nine minutes of darkness", "if the timer expires
+ * the assault is called off"), and a pressure that never once decides the
+ * mission is not pressure. This is what lets the attacker live to meet it.
+ *
+ * DEFENDER_INCOME — a fixed garrison is exactly the thing that cannot
+ * reinforce freely; that is what being besieged, or dug in on a crest, means.
+ * The attacker is the side choosing to commit.
+ *
+ * THE VALUES ARE FITTED, and say so. They were picked off a 2-D sweep for the
+ * shape "both missions winnable, Hill 937 the hardest in the game": at 0.60 /
+ * 0.75 the game's own AI playing the attacker takes Khe Sanh 8/12 and Hill 937
+ * 4/12. Somebody may well want them harder or easier — they are one line each. */
+const ATTACK = { RESOLVE: 0.60, DEFENDER_INCOME: 0.75 };
 const MORALE_LOSS = { us: 0.24, vc: 0.15 }; // per CP of unit lost — US is casualty-sensitive
 const MAX_TRAPS = 10;
 
@@ -2040,9 +2074,10 @@ class Game {
        * for. The flags in these two missions are what the attacker is buying
        * with its casualties; they pay whoever has actually taken them. */
       const attackMode = this.mode === 'siege' || this.mode === 'assault';
-      if (!(attackMode && this.map.preOwner === side)) {
-        inc += this.flags.filter(f => f.owner === side).length * FLAG_INCOME;
-      }
+      const defends = attackMode && this.map.preOwner === side;
+      if (!defends) inc += this.flags.filter(f => f.owner === side).length * FLAG_INCOME;
+      // a fixed garrison does not reinforce like a field army — see ATTACK
+      if (defends) inc *= ATTACK.DEFENDER_INCOME;
       if (this.map.incomeMult && this.map.incomeMult[side]) inc *= this.map.incomeMult[side];
       inc *= side === this.player ? this.diff.playerIncome : this.diff.aiIncome;
       this.cp[side] = Math.min(CP_CAP, this.cp[side] + inc * dt);
@@ -2118,9 +2153,28 @@ class Game {
     let winner = null, reason = '';
     if (this.morale.us <= 0) { winner = 'vc'; reason = 'US morale broken — the operation is called off.'; }
     else if (this.morale.vc <= 0) { winner = 'us'; reason = 'VC/NVA morale broken — they melt back into the jungle.'; }
-    else if (this.mode === 'assault' && this.flags.every(f => f.owner === 'us')) {
-      winner = 'us'; reason = 'All objectives taken. The crest is yours — at a price.';
-    } else if (this.timeLimit && this.time >= this.timeLimit) {
+    /* TAKING EVERY OBJECTIVE WINS AN ATTACK MISSION — for whoever is attacking.
+     *
+     * This clause was written as `mode === 'assault' && every flag is 'us'`.
+     * The hardcoded side is the tell: it is true of Hill 937, where the
+     * attacker happens to be the US, and of nothing else. Khe Sanh is the same
+     * shape with the sides reversed — a besieging VC attacker against a US
+     * garrison holding both flags — so the clause could never fire there, and
+     * the attacker's ONLY route to a win was breaking the garrison's morale by
+     * killing enough of it. Measured over 24 matches it never came close: the
+     * VC killed 18 US a match and left the defender's bar at 71-77.
+     *
+     * A besieging army that holds every position in the base has overrun the
+     * base. That is what breaking a siege IS from the attacker's side, and it
+     * is the same sentence the assault already got. */
+    const attacker = this._attacker();
+    if (!winner && attacker && this.flags.length && this.flags.every(f => f.owner === attacker)) {
+      winner = attacker;
+      reason = this.mode === 'siege'
+        ? 'The wire is breached and the base is overrun. The siege is over.'
+        : 'All objectives taken. The crest is yours — at a price.';
+    }
+    if (!winner && this.timeLimit && this.time >= this.timeLimit) {
       if (this.mode === 'siege') { winner = 'us'; reason = 'The weather lifted and the relief column arrived. The siege is broken.'; }
       else { winner = 'vc'; reason = 'The assault is called off. The hill remains in enemy hands.'; }
     }
@@ -2575,7 +2629,10 @@ class Game {
       t.wounded = true; // drags himself a few meters before he stops
     }
     const medK = (typeof Perks !== 'undefined' && Perks.on(this, t.side, 'medics')) ? 0.72 : 1;
-    this.morale[t.side] -= (t.cpShare || UNITS[t.key].cost) * MORALE_LOSS[t.side] * medK;
+    // an attack is planned around casualties — see ATTACK.RESOLVE
+    const resolveK = t.side === this._attacker() ? ATTACK.RESOLVE : 1;
+    this.morale[t.side] -=
+      (t.cpShare || UNITS[t.key].cost) * MORALE_LOSS[t.side] * medK * resolveK;
     this.stats[t.side].losses++;
     const ks = killer ? (killer.side || killer) : other(t.side);
     if (ks !== t.side) this.stats[ks].kills++;
@@ -3427,6 +3484,12 @@ class Game {
    * The push is deliberately generous: the flags sit a third of the way in from
    * the defender's own base, so this still leaves the attacker most of the map
    * to cross. */
+  /* Who is attacking in this mode, or null in a standing fight. */
+  _attacker() {
+    return (this.mode === 'siege' || this.mode === 'assault')
+      ? other(this.map.preOwner) : null;
+  }
+
   _defenceLimit(side, lane) {
     if (this.mode !== 'siege' && this.mode !== 'assault') return null;
     if (this.map.preOwner !== side) return null;
