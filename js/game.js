@@ -183,6 +183,23 @@ function buildSettlement(map, s, structures) {
 
 class Game {
   constructor(cfg) {
+    /* THE SIM DRAWS FROM ITS OWN STREAM, and it is seedable.
+     *
+     * Every balance question asked of this game used to be unanswerable:
+     * LZ X-Ray read 1/4, 2/4 and 4/4 player wins across three measurements of
+     * the SAME code, because 88 draws per match came straight off
+     * `Math.random()`. Two A/B conclusions were noise before that was caught.
+     *
+     * Now the whole simulation runs off `this._rng`, so a seed reproduces a
+     * match exactly and a balance change can be measured against a fixed set
+     * of matches instead of against the weather. fx.js, render.js and audio.js
+     * deliberately keep drawing from `Math.random()`: their randomness is
+     * cosmetic, it must stay varied between runs, and if it shared this stream
+     * a browser frame would consume draws a headless run does not and the two
+     * would diverge. */
+    this.seed = (cfg.seed != null ? cfg.seed : Math.random() * 4294967296) >>> 0;
+    this._rng = seeded(this.seed);
+
     this.map = normaliseMap(MAPS[cfg.mapId]);
     this.player = cfg.playerSide;
     this.enemy = other(this.player);
@@ -241,8 +258,8 @@ class Game {
     this._addWindows();
 
     // ambient life
-    this.birdT = rand(4, 10);
-    this.patrolT = rand(30, 60);
+    this.birdT = this.rand(4, 10);
+    this.patrolT = this.rand(30, 60);
     const arng = seeded(this.map.seed + 99);
     this.smokeSrc = [];
     for (let i = 0; i < 2; i++) {
@@ -325,6 +342,12 @@ class Game {
     return BASE_X[side];
   }
 
+  /* The sim's own rand/randi, same signatures as the free functions in
+   * data.js (randi is INCLUSIVE at both ends) — only the stream differs. */
+  rnd() { return this._rng(); }
+  rand(a, b) { return a + this._rng() * (b - a); }
+  randi(a, b) { return Math.floor(this.rand(a, b + 1)); }
+
   _makeUnit(side, key, lane, x) {
     const d = UNITS[key];
     return {
@@ -332,10 +355,10 @@ class Game {
       y: groundY(this.map, lane, x),
       dir: side === 'us' ? 1 : -1,
       hp: d.hp, maxHp: d.hp,
-      sj: rand(0.94, 1.06), // slight build variation
+      sj: this.rand(0.94, 1.06), // slight build variation
       // gait identity: without these a squad walks in perfect lockstep, which is
       // the thing that reads as "robots" rather than men
-      gaitOff: Math.random(), gaitK: rand(0.93, 1.07),
+      gaitOff: this.rnd(), gaitK: this.rand(0.93, 1.07),
       /* Death identity, for the same reason and at no memory cost.
        *
        * There is ONE death clip per unit and no room for a second — the atlas
@@ -352,15 +375,15 @@ class Game {
        * squad whose dieK came out 1.06/1.03/1.04, which spread the fall by one
        * frame in twelve and was invisible. The spread has to survive a bad
        * draw, not just look right in expectation. */
-      dieK: rand(0.6, 1.55),         // collapse rate
-      dieLag: rand(0, 0.2),          // he does not drop the instant he is hit
-      dieLean: rand(-0.22, 0.22),    // and does not land square
+      dieK: this.rand(0.6, 1.55),         // collapse rate
+      dieLag: this.rand(0, 0.2),          // he does not drop the instant he is hit
+      dieLean: this.rand(-0.22, 0.22),    // and does not land square
       // a hair of depth inside the lane, so men who share an x do not become one
       // flat stack of identical silhouettes
-      yj: rand(-2.5, 2.5),
+      yj: this.rand(-2.5, 2.5),
       burstN: 0, wounded: false,
-      phase: Math.random() * 6, moving: false, pose: null,
-      deadT: null, muzzleT: 0, fireT: rand(0, 0.5),
+      phase: this.rnd() * 6, moving: false, pose: null,
+      deadT: null, muzzleT: 0, fireT: this.rand(0, 0.5),
       hitT: 0, combatT: 0, shots: 0, gibbed: false, baked: false,
       suppressT: 0, slowT: 0, revealT: 0, spotT: 0, emergeT: 0,
       aiming: false, aimT: 0, aimTime: d.aim || 0, aimTarget: null,
@@ -894,9 +917,9 @@ class Game {
         // right rule. A hard 150 here just meant the dust switched OFF in
         // exactly the heavy firefights it exists to describe.
         if (s.dustCd <= 0) {
-          s.dustCd = rand(0.10, 0.22);
+          s.dustCd = this.rand(0.10, 0.22);
           const ax = this.squadAnchor(s);
-          this.fx.suppressDust(ax + s.dir * rand(10, 44), groundY(this.map, s.lane, ax),
+          this.fx.suppressDust(ax + s.dir * this.rand(10, 44), groundY(this.map, s.lane, ax),
             -s.dir, LANE_DEPTH[s.lane]);
         }
       }
@@ -1473,7 +1496,7 @@ class Game {
       s.rangedFuse = COVER.RANGE_WARN;
       // the ranging round: lands short, hurts little, and is the player's cue
       const c = s.cover;
-      const x = c.x - s.dir * (52 + rand(0, 26));
+      const x = c.x - s.dir * (52 + this.rand(0, 26));
       const y = groundY(this.map, s.lane, x);
       Sound.shellWhistle(0);
       this.fx.explosion(x, y, 34, { shake: 1.1 });
@@ -1492,12 +1515,12 @@ class Game {
 
     s.rangedFuse -= dt;
     if (s.rangedFuse > 0) return;
-    s.rangedFuse = COVER.RANGE_RATE + rand(-0.5, 0.9);
+    s.rangedFuse = COVER.RANGE_RATE + this.rand(-0.5, 0.9);
     s.rangedShots = (s.rangedShots || 0) + 1;
     const c = s.cover;
     // rounds walk in: the first is loose, the rest are on the position
     const spread = Math.max(6, 30 - 9 * s.rangedShots);
-    const x = c.x + rand(-spread, spread);
+    const x = c.x + this.rand(-spread, spread);
     const y = groundY(this.map, s.lane, x);
     const foe = this.foeOf(s.side);
     Sound.shellWhistle(0);
@@ -1730,7 +1753,7 @@ class Game {
     this.strikes.push({
       type: 'm79', side: s.side, lane: s.lane, x: target, age: 0,
       dur: M79.flight + 0.8,
-      impacts: [{ t: M79.flight, x: target + rand(-12, 12),
+      impacts: [{ t: M79.flight, x: target + this.rand(-12, 12),
                   r: M79.blast, dmg: M79.dmg, done: false }],
     });
     return true;
@@ -1758,7 +1781,7 @@ class Game {
       m.nadeT = 0.9 + n * 0.25; // staggered wind-ups
       m.nadeDur = m.nadeT;
       m.nadeThrown = false;
-      m.nadeTarget = target + rand(-18, 18);
+      m.nadeTarget = target + this.rand(-18, 18);
     }
     if (s.side === this.player) this.emit(`GRENADES OUT — LANE ${s.lane + 1}`, s.side);
     return n > 0;
@@ -1838,7 +1861,7 @@ class Game {
     return {
       isHole: true, side: 'vc', lane, x,
       y: groundY(this.map, lane, x) - 5,
-      hp: 60, maxHp: 60, cd: rand(1, 2.5), revealT: 0, discovered: false,
+      hp: 60, maxHp: 60, cd: this.rand(1, 2.5), revealT: 0, discovered: false,
       dirToTarget: -1, deadT: null, defuse: 0,
     };
   }
@@ -1919,7 +1942,7 @@ class Game {
       case 'arty': {
         const impacts = [];
         for (let i = 0; i < 6; i++) {
-          impacts.push({ t: 2.6 + i * 0.38 + rand(0, 0.2), x: clamp(x + rand(-115, 115), 20, WORLD_W - 20), dmg: 42, r: 78, done: false });
+          impacts.push({ t: 2.6 + i * 0.38 + this.rand(0, 0.2), x: clamp(x + this.rand(-115, 115), 20, WORLD_W - 20), dmg: 42, r: 78, done: false });
         }
         this.strikes.push({ type: 'arty', side, lane, x, age: 0, dur: 6, impacts });
         Sound.radio(); Sound.shellWhistle(1.8);
@@ -1946,7 +1969,7 @@ class Game {
       case 'arclight': {
         const impacts = [];
         for (let i = 0; i < 12; i++) {
-          impacts.push({ t: 3.5 + i * 0.22, x: clamp(x - 330 + i * 60 + rand(-20, 20), 20, WORLD_W - 20), dmg: 60, r: 96, done: false });
+          impacts.push({ t: 3.5 + i * 0.22, x: clamp(x - 330 + i * 60 + this.rand(-20, 20), 20, WORLD_W - 20), dmg: 60, r: 96, done: false });
         }
         this.strikes.push({ type: 'arclight', side, lane, x, age: 0, dur: 8, impacts });
         Sound.radio(); Sound.bomberRumble(5);
@@ -2154,7 +2177,7 @@ class Game {
       let score = -dist;
       // riflemen distribute fire across a bunched group instead of queueing
       // on the point man — every acquire re-rolls, so bursts walk the line
-      if (!d.sniper) score += rand(0, 150);
+      if (!d.sniper) score += this.rand(0, 150);
       /* ...unless the player has called for concentrated fire. Big enough to
        * beat the spread roll and any distance term inside a unit's range, but
        * NOT absolute: a man still will not shoot through a wall or past his
@@ -2190,19 +2213,19 @@ class Game {
     if (suppressive) {
       u.fireT = 1 / d.rof; // the gun talks without pause
     } else if (d.burst) {
-      if (!u.burstN || u.burstN <= 0) u.burstN = randi(d.burst[0], d.burst[1]);
+      if (!u.burstN || u.burstN <= 0) u.burstN = this.randi(d.burst[0], d.burst[1]);
       u.burstN--;
       const ammo = (typeof Perks !== 'undefined' && Perks.on(this, u.side, 'ammo')) ? 0.78 : 1;
       const ending = u.burstN <= 0;
       u.fireT = ending
-        ? rand(d.pause[0], d.pause[1]) * (closeQuarters ? 0.7 : 1) * ammo * dry
+        ? this.rand(d.pause[0], d.pause[1]) * (closeQuarters ? 0.7 : 1) * ammo * dry
         : 1 / d.rof;
       /* The breath between bursts is where the weapon gets worked. It was
        * silent, so a firefight was a stream of shots with nobody reloading in
        * it. A belt gun shifts its feed; everyone else changes a magazine. */
       if (ending && Camera.sees(u.x, 80)) {
-        if (d.mg) { if (Math.random() < 0.5) Sound.belt(u.x); }
-        else if (Math.random() < 0.35) Sound.reload(u.x);
+        if (d.mg) { if (this.rnd() < 0.5) Sound.belt(u.x); }
+        else if (this.rnd() < 0.35) Sound.reload(u.x);
       }
     } else {
       u.fireT = (1 / d.rof) * dry;
@@ -2218,7 +2241,7 @@ class Game {
     const mx = mp.x, my = mp.y;
     this.fx.muzzle(mx, my, u.dir, scale, !!d.mg);
     this.fx.casing(u.x + u.dir * 2 * scale, my + 3, u.dir, scale);
-    if (u.shots % 4 === 0) this.fx.addDecal(u.lane, u.x - u.dir * 3 + rand(-4, 4), 'casing', 1);
+    if (u.shots % 4 === 0) this.fx.addDecal(u.lane, u.x - u.dir * 3 + this.rand(-4, 4), 'casing', 1);
     if (d.at) {
       Sound.rocket(mx);
       /* BACKBLAST. A B-40 is a recoilless launcher: everything the rocket does
@@ -2238,7 +2261,7 @@ class Game {
     /* The weapon decides, not the side. This used to be `us ? m16 : ak`, so
      * twelve unit types shared three gunshots and a firefight was one loop. */
     else Sound.shot(d.snd || (d.mg ? 'mg' : u.side === 'us' ? 'm16' : 'ak'), mx);
-    if (Math.random() < 0.08) this.tryBirds(u.x);
+    if (this.rnd() < 0.08) this.tryBirds(u.x);
 
     const wasHidden = this.isConcealed(u);
     if (u.side === 'vc' && UNITS[u.key].conceal) u.revealT = 6.0;
@@ -2285,14 +2308,14 @@ class Game {
     const near = dugIn ? 0.52 : 0.34;
     const coverMult = 1 - rawProt * (near + 0.46 * (1 - closeK));
     const vet = u.squad ? RANKS[u.squad.rank || 0].acc : 1;
-    const hit = Math.random() <
+    const hit = this.rnd() <
       d.acc * vet * (1 + 0.7 * closeK) * (suppressed ? 0.7 : 1) * coverMult;
 
-    if (Math.random() < 0.3) this.fx.smokePuffSmall(mx, my);
+    if (this.rnd() < 0.3) this.fx.smokePuffSmall(mx, my);
     if (hit) {
       const ty = t.y - (t.isHole ? 0 : 14 * LANE_DEPTH[t.lane]);
       // roughly one round in four is a tracer, as a belt is actually loaded
-      this.fx.tracer(mx, my, t.x + rand(-4, 4), ty + rand(-4, 4),
+      this.fx.tracer(mx, my, t.x + this.rand(-4, 4), ty + this.rand(-4, 4),
         u.side === 'us' ? '#ffd98a' : '#ffb08a', 'spark', ((u.shots || 0) % 4) === 0);
       const eu = elevAt(this.map, u.lane, u.x), ef = elevAt(this.map, t.lane, t.x);
       let dmg = d.dmg * (1 + 0.35 * clamp(eu - ef, -0.9, 0.9));
@@ -2330,51 +2353,51 @@ class Game {
     } else {
       // rounds go long or drop short — visibly
       const dist = (t.x - u.x) * u.dir;
-      const missAt = Math.max(30, dist + rand(-60, 150));
+      const missAt = Math.max(30, dist + this.rand(-60, 150));
       const ex = u.x + u.dir * missAt;
       const short = missAt < dist - 6;
       const gy = groundY(this.map, u.lane, ex);
-      const ey = short ? gy : gy - rand(2, 26 * scale);
-      this.fx.tracer(mx, my, ex + rand(-4, 4), ey,
+      const ey = short ? gy : gy - this.rand(2, 26 * scale);
+      this.fx.tracer(mx, my, ex + this.rand(-4, 4), ey,
         u.side === 'us' ? '#ffd98a' : '#ffb08a',
-        (short || Math.random() < 0.45) ? 'dirt' : null,
+        (short || this.rnd() < 0.45) ? 'dirt' : null,
         ((u.shots || 0) % 4) === 0);
       // impact debris by what is actually there: timber splinters off a building,
       // sparks off an emplacement, water out of a paddy, dirt everywhere else
-      if (short || Math.random() < 0.5) {
+      if (short || this.rnd() < 0.5) {
         const hitSt = this.structures.find(st2 => st2.lane === u.lane &&
           st2.state !== 2 && Math.abs(st2.x - ex) < st2.w * 0.7);
         if (hitSt) {
           if (hitSt.kind === 'tower' || hitSt.kind === 'mgnest') {
             this.fx.sparks(ex, ey);
-            if (Math.random() < 0.5) Sound.ricochet(ex);
-            else if (Math.random() < 0.5) Sound.impact('metal', ex);
+            if (this.rnd() < 0.5) Sound.ricochet(ex);
+            else if (this.rnd() < 0.5) Sound.impact('metal', ex);
           } else {
             this.fx.splinters(ex, ey, scale);
-            if (Math.random() < 0.2) Sound.ricochet(ex);
-            else if (Math.random() < 0.45) Sound.impact('wood', ex);
+            if (this.rnd() < 0.2) Sound.ricochet(ex);
+            else if (this.rnd() < 0.45) Sound.impact('wood', ex);
           }
-        } else if (this.map.trees === 'palm' && Math.random() < 0.35) {
+        } else if (this.map.trees === 'palm' && this.rnd() < 0.35) {
           this.fx.waterPlume(ex, gy);
-          if (Math.random() < 0.5) Sound.impact('water', ex);
+          if (this.rnd() < 0.5) Sound.impact('water', ex);
         } else {
           // a belt-fed gun throws visibly more earth than a rifle — an M60 burst
           // and a single rifle shot used to land identically
           this.fx.dirtKick(ex, gy, scale, !!d.mg || !!suppressive);
           /* Dirt is by far the most common impact, so it is the one most able
            * to turn the mix to mud — a quarter of them, not all. */
-          if (Math.random() < 0.25) Sound.impact('dirt', ex);
+          if (this.rnd() < 0.25) Sound.impact('dirt', ex);
         }
       }
       // cracking rounds keep heads down even when they miss
-      if (!t.isHole && Math.abs(ex - t.x) < 46 && Math.random() < 0.6) {
+      if (!t.isHole && Math.abs(ex - t.x) < 46 && this.rnd() < 0.6) {
         /* Draw the suppression the sim is already applying. Everything below
          * this line has always happened — accuracy halved, advances stopped,
          * stance driven to prone — and the only thing on screen saying so was
          * the word PINNED in 8px type. The dust walks in from the firing side. */
         this.fx.suppressDust(ex, groundY(this.map, t.lane, ex),
           Math.sign(u.x - t.x) || 1, LANE_DEPTH[t.lane]);
-        t.suppressT = Math.max(t.suppressT || 0, rand(0.4, 0.9));
+        t.suppressT = Math.max(t.suppressT || 0, this.rand(0.4, 0.9));
         if (t.squad) {
           t.squad.pin += (d.suppress ? 0.1 : 0.045) * (suppressive ? 2 : 1) *
             RANKS[t.squad.rank || 0].steady;
@@ -2445,7 +2468,7 @@ class Game {
     t.clangCd = 0.16;
     const sc = LANE_DEPTH[t.lane];
     const dir = killer && killer.x != null ? Math.sign(killer.x - t.x) || 1 : 1;
-    const hx = t.x + dir * 14 * sc, hy = t.y - rand(14, 30) * sc;
+    const hx = t.x + dir * 14 * sc, hy = t.y - this.rand(14, 30) * sc;
     this.fx.sparks(hx, hy);
     /* The SOUND is thinner than the sparks, on its own clock.
      *
@@ -2515,7 +2538,7 @@ class Game {
       const scale = LANE_DEPTH[t.lane];
       this.fx.gibs(t.x, t.y, scale, t.y + 2);
       this.fx.bakeCorpse(t, { gibbed: true });
-    } else if (Math.random() < 0.3) {
+    } else if (this.rnd() < 0.3) {
       t.wounded = true; // drags himself a few meters before he stops
     }
     const medK = (typeof Perks !== 'undefined' && Perks.on(this, t.side, 'medics')) ? 0.72 : 1;
@@ -2550,7 +2573,7 @@ class Game {
         if (u.wounded && u.deadT > 0.25 && u.deadT < 2.3) {
           u.x -= u.dir * 7 * dt; // crawls back the way he came
           u.y = groundY(map, u.lane, u.x);
-          if (Math.random() < dt * 2.4) this.fx.addDecal(u.lane, u.x + rand(-2, 2), 'drip', 1);
+          if (this.rnd() < dt * 2.4) this.fx.addDecal(u.lane, u.x + this.rand(-2, 2), 'drip', 1);
         }
         const bakeAt = u.wounded ? 2.4 : 0.9;
         if (u.deadT > bakeAt && !u.baked) {
@@ -2616,7 +2639,7 @@ class Game {
         if (target) {
           u.moving = false;
           target.obj.defuse += dt;
-          if (Math.random() < dt * 6) this.fx.dirtKick(target.obj.x, groundY(map, u.lane, target.obj.x));
+          if (this.rnd() < dt * 6) this.fx.dirtKick(target.obj.x, groundY(map, u.lane, target.obj.x));
           if (target.obj.defuse >= target.need) {
             this._removeWork(target.obj);
             this.fx.floater(target.obj.x, u.y - 30, 'CLEARED', '#b5c98f');
@@ -2959,7 +2982,7 @@ class Game {
         this.fx.tracer(mx, my, t.x, t.y - (t.isHole ? 2 : 14), '#fff0c8');
         if (t.isHole) this._damage(t, 80, u);
         else {
-          this._damage(t, 999, u, { gib: Math.random() < 0.35 });
+          this._damage(t, 999, u, { gib: this.rnd() < 0.35 });
           this.fx.blood(t.x, t.y, 1.4);
           this.fx.addDecal(t.lane, t.x, 'blood', 5);
           if (t.sniperUnit && t.duelFlag) {
@@ -3171,7 +3194,7 @@ class Game {
       const f = this.fires[i];
       f.t += dt;
       if (f.t > f.dur) { this.fires.splice(i, 1); continue; }
-      if (Math.random() < dt * 26) this.fx.fireTick(f.x0, f.x1, f.lane, this.map);
+      if (this.rnd() < dt * 26) this.fx.fireTick(f.x0, f.x1, f.lane, this.map);
       for (const u of this.units) {
         if (u.lane === f.lane && u.deadT == null && u.x > f.x0 && u.x < f.x1) {
           this._damage(u, f.dps * dt, { side: 'us' });
@@ -3226,10 +3249,10 @@ class Game {
           st.fireHurt = 0;
           this._hurtStructure(st, 6, false);
         }
-        if (Math.random() < dt * 5) {
+        if (this.rnd() < dt * 5) {
           const y = groundY(this.map, st.lane, st.x);
           this.fx.fireTick(st.x - st.w / 2, st.x + st.w / 2, st.lane, this.map);
-          if (Math.random() < 0.5) this.fx.smokePuff(st.x + rand(-st.w / 3, st.w / 3), y - rand(14, 26));
+          if (this.rnd() < 0.5) this.fx.smokePuff(st.x + this.rand(-st.w / 3, st.w / 3), y - this.rand(14, 26));
         }
       }
       // standing fires ignite what they touch
@@ -3290,29 +3313,29 @@ class Game {
     for (const s of this.smokeSrc) {
       s.t -= dt;
       if (s.t <= 0) {
-        s.t = rand(0.5, 1.1);
+        s.t = this.rand(0.5, 1.1);
         this.fx.add({
-          x: s.x + rand(-6, 6), y: 342, vx: rand(-4, 4), vy: rand(-14, -8), g: -2,
-          t: 0, life: rand(3.5, 6), size: rand(9, 16), color: 'dark', type: 'smoke', drag: 0.3,
+          x: s.x + this.rand(-6, 6), y: 342, vx: this.rand(-4, 4), vy: this.rand(-14, -8), g: -2,
+          t: 0, life: this.rand(3.5, 6), size: this.rand(9, 16), color: 'dark', type: 'smoke', drag: 0.3,
         });
       }
     }
     // an occasional patrol flight crossing the AO
     this.patrolT -= dt;
     if (this.patrolT <= 0) {
-      this.patrolT = rand(55, 95);
-      const dir = Math.random() < 0.5 ? 1 : -1;
+      this.patrolT = this.rand(55, 95);
+      const dir = this.rnd() < 0.5 ? 1 : -1;
       this.strikes.push({
         type: 'patrol', age: 0, dur: (WORLD_W + 400) / 170,
-        x: dir > 0 ? -180 : WORLD_W + 180, dirX: dir, y: rand(80, 140), heard: false,
+        x: dir > 0 ? -180 : WORLD_W + 180, dirX: dir, y: this.rand(80, 140), heard: false,
       });
     }
   }
 
   tryBirds(x) {
     if (this.birdT > 0 || this.map.treeDensity < 0.3) return;
-    this.birdT = rand(9, 18);
-    this.fx.birds(x + rand(-60, 60), LANE_BASE[0] - rand(60, 110));
+    this.birdT = this.rand(9, 18);
+    this.fx.birds(x + this.rand(-60, 60), LANE_BASE[0] - this.rand(60, 110));
   }
 
   /* ---------- flags ---------- */
@@ -3354,8 +3377,8 @@ class Game {
   _aiUpdate(dt) {
     this.aiT -= dt;
     if (this.aiT > 0 || this.over) return;
-    this.aiT = this.diff.aiInterval * rand(0.7, 1.3);
-    if (Math.random() < this.diff.mistake) return;
+    this.aiT = this.diff.aiInterval * this.rand(0.7, 1.3);
+    if (this.rnd() < this.diff.mistake) return;
 
     const side = this.aiSide, foe = other(side);
     const cp = this.cp[side];
@@ -3386,7 +3409,7 @@ class Game {
         for (const o of this.squads) {
           if (o.side === side || o.lane !== s.lane || !o.inCover) continue;
           if (!this.squadAlive(o).length) continue;
-          if (Math.abs(this.squadAnchor(o) - s.x) < GRENADE.range && Math.random() < 0.55) {
+          if (Math.abs(this.squadAnchor(o) - s.x) < GRENADE.range && this.rnd() < 0.55) {
             this._squadGrenade(s);
             break;
           }
@@ -3446,7 +3469,7 @@ class Game {
       const full = (sd.comp && sd.comp.length) || 1;
       const left = this.squadAlive(s).length;
       if (left && left / full <= 0.34 && !s.ceding &&
-          (s.underFireT || 0) > 0 && Math.random() < 0.4) {
+          (s.underFireT || 0) > 0 && this.rnd() < 0.4) {
         this.orderSquad(s, 'fallback');
         s.playerHeld = false;
       }
@@ -3463,7 +3486,7 @@ class Game {
         const oLane = s.lane === 0 ? 1 : 0;
         const here = this._lanePower(side, s.lane), hereFoe = this._lanePower(foe, s.lane);
         const there = this._lanePower(side, oLane), thereFoe = this._lanePower(foe, oLane);
-        if (here > hereFoe * 1.6 && thereFoe > there * 1.25 && Math.random() < 0.22) {
+        if (here > hereFoe * 1.6 && thereFoe > there * 1.25 && this.rnd() < 0.22) {
           this.orderSquad(s, 'crosslane');
           s.playerHeld = false;
         }
@@ -3519,19 +3542,19 @@ class Game {
   _aiVC(cp, hot, weak) {
     const side = 'vc';
     // trap seeding ahead of the US advance
-    if (cp >= 30 && (this.cool[side].punji || 0) <= 0 && Math.random() < 0.65) {
+    if (cp >= 30 && (this.cool[side].punji || 0) <= 0 && this.rnd() < 0.65) {
       // randi is INCLUSIVE at both ends, so the old randi(0, 2) kept returning
       // lane 2 after the drop to LANE_N = 2
-      const lane = randi(0, LANE_N - 1);
+      const lane = this.randi(0, LANE_N - 1);
       const front = this._usFront(lane);
-      const x = clamp(front + rand(140, 420), WORLD_W * 0.1, WORLD_W * 0.9);
+      const x = clamp(front + this.rand(140, 420), WORLD_W * 0.1, WORLD_W * 0.9);
       this.tryCallin(side, 'punji', lane, x);
       return;
     }
-    if (cp >= 45 && (this.cool[side].mine || 0) <= 0 && Math.random() < 0.4) {
+    if (cp >= 45 && (this.cool[side].mine || 0) <= 0 && this.rnd() < 0.4) {
       const lane = hot.lane;
       const front = this._usFront(lane);
-      this.tryCallin(side, 'mine', lane, clamp(front + rand(160, 380), WORLD_W * 0.1, WORLD_W * 0.9));
+      this.tryCallin(side, 'mine', lane, clamp(front + this.rand(160, 380), WORLD_W * 0.1, WORLD_W * 0.9));
       return;
     }
     if (cp >= CALLINS.spiderhole.cost + 20 && (this.cool[side].spiderhole || 0) <= 0 && this.holes.length < 4) {
@@ -3548,7 +3571,7 @@ class Game {
     if (cp >= CALLINS.tunnel.cost + 30 && (this.cool[side].tunnel || 0) <= 0 && this.time > 100) {
       const lane = weak.lane;
       if (!this.tunnels.some(t => t.lane === lane)) {
-        this.tryCallin(side, 'tunnel', lane, WORLD_W * rand(0.5, 0.62));
+        this.tryCallin(side, 'tunnel', lane, WORLD_W * this.rand(0.5, 0.62));
       }
     }
   }
@@ -3572,19 +3595,19 @@ class Game {
     const afford = k => cp >= SQUADS[k].cost;
 
     if (side === 'us') {
-      if (this.hiddenLoss[lane] >= 1 && cool('engineers') && afford('engineers') && Math.random() < 0.5) return 'engineers';
+      if (this.hiddenLoss[lane] >= 1 && cool('engineers') && afford('engineers') && this.rnd() < 0.5) return 'engineers';
       if (foeSniper && cool('snipers') && afford('snipers')) return 'snipers';
       if (foes.length >= 3 && cool('weapons') && afford('weapons')) return 'weapons';
-      if (this.map.id !== 'iadrang' && cool('lrrp') && afford('lrrp') && Math.random() < 0.3) return 'lrrp';
+      if (this.map.id !== 'iadrang' && cool('lrrp') && afford('lrrp') && this.rnd() < 0.3) return 'lrrp';
       if (cool('rifles') && afford('rifles')) return 'rifles';
       if (cool('arvnsq') && afford('arvnsq')) return 'arvnsq';
     } else {
       const foeArmour = foes.some(u => UNITS[u.key] && UNITS[u.key].armour);
       if (foeArmour && cool('rpgteam') && afford('rpgteam')) return 'rpgteam';
       if (foeSniper && cool('marksmanu') && afford('marksmanu')) return 'marksmanu';
-      if (foeMg && cool('sapperu') && afford('sapperu') && Math.random() < 0.6) return 'sapperu';
+      if (foeMg && cool('sapperu') && afford('sapperu') && this.rnd() < 0.6) return 'sapperu';
       if (foes.length >= 3 && cool('rpdteam') && afford('rpdteam')) return 'rpdteam';
-      if (cool('nvasq') && afford('nvasq') && Math.random() < 0.5) return 'nvasq';
+      if (cool('nvasq') && afford('nvasq') && this.rnd() < 0.5) return 'nvasq';
       if (cool('cell') && afford('cell')) return 'cell';
       if (cool('nvasq') && afford('nvasq')) return 'nvasq';
     }
