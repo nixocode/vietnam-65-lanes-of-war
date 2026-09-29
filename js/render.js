@@ -4905,11 +4905,11 @@ const Renderer = {
    * to let it bleed.
    *
    * Cheap, and deliberately so. The frame goes into a 256px buffer, gets
-   * multiplied by itself twice — v^3, which crushes the mid-tones and leaves
-   * the highlights standing, and is the thresholding step done with a blend
-   * rather than per-pixel work — then comes back blurred and additive. Three
-   * small blits and one full-screen add; no getImageData anywhere, so nothing
-   * de-accelerates the canvas.
+   * multiplied by itself four times — v^5, which crushes the mid-tones and
+   * leaves the highlights standing, and is the thresholding step done with
+   * blends rather than per-pixel work — then comes back blurred and additive.
+   * Four small blits and one full-screen add; no getImageData anywhere, so
+   * nothing de-accelerates the canvas.
    *
    * It is the first thing dropped when the frame budget is tight: the adaptive
    * scaler already knows when the device is struggling, and a device that has
